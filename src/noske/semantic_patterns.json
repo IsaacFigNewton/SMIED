@@ -1,0 +1,170 @@
+{
+    "basic_semantic": {
+        "causality": {
+            "description": "Find causal relationships: Subject -> Action -> Object",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB", "AUX"]},
+                {"labels": ["object"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        },
+        "temporal_sequence": {
+            "description": "Find temporal sequences of events",
+            "pattern": [
+                {"root_type": ["VERB"]},
+                {"labels": ["boxer.owl: temp_before"]},
+                {"root_type": ["VERB"]}
+            ]
+        },
+        "quality_attribution": {
+            "description": "Find quality/property attributions to entities",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["DUL.owl: hasQuality"]},
+                {"root_type": ["ADJ"]}
+            ]
+        },
+        "spatial_location": {
+            "description": "Find spatial location relationships",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["hasSpatiotemporalLocation"]},
+                {"root_type": ["NOUN", "PROPN", "ADV"]}
+            ]
+        },
+        "entity_classification": {
+            "description": "Find entity type classifications",
+            "pattern": [
+                {"root_type": ["PROPN"]},
+                {"labels": ["rdf-schema: subClassOf"]},
+                {}
+            ]
+        },
+        "quantified_entity": {
+            "description": "Find quantified entities",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["quantifiers.owl: hasQuantity"]},
+                {"root_type": ["NUM", "DET"]}
+            ]
+        },
+        "agent_action_patient": {
+            "description": "Find agent-action-patient relationships",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB"]},
+                {"labels": ["object"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        }
+    },
+    "complex_semantic": {
+        "ditransitive_action": {
+            "description": "Find ditransitive actions (subject gives object to recipient)",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"node_id_pattern": "DITRANSITIVE_"},
+                {"labels": ["action"]},
+                {"root_type": ["VERB"]}
+            ]
+        },
+        "complement_clause": {
+            "description": "Find complement clauses (complex predicates)",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"node_id_pattern": "CCOMP_"},
+                {"labels": ["subject"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        },
+        "transfer_event": {
+            "description": "Find transfer events (giving, selling, etc.)",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"node_id_pattern": "DITRANSITIVE_"},
+                {"labels": ["motivator"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        },
+        "causal_chain": {
+            "description": "Find causal chains: A causes B, B causes C",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB"]},
+                {"labels": ["boxer.owl: temp_before"]},
+                {"root_type": ["VERB"]},
+                {"labels": ["subject"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        }
+    },
+    "domain_specific": {
+        "medical_diagnosis": {
+            "description": "Pattern for medical diagnosis relationships",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB"], "lemma": ["diagnose", "treat", "examine"]},
+                {"labels": ["object"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        },
+        "business_transaction": {
+            "description": "Pattern for business transactions",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"node_id_pattern": "DITRANSITIVE_"},
+                {"labels": ["motivator"]},
+                {"root_type": ["NOUN", "PROPN"], "semantic_type": ["MONEY", "CURRENCY"]}
+            ]
+        },
+        "scientific_observation": {
+            "description": "Pattern for scientific observations",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB"], "lemma": ["observe", "measure", "analyze", "study"]},
+                {"labels": ["object"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        }
+    },
+    "linguistic_structures": {
+        "passive_voice": {
+            "description": "Find passive voice constructions",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["auxpass"]},
+                {"root_type": ["VERB"]}
+            ]
+        },
+        "compound_predicate": {
+            "description": "Find compound predicates",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["subject"]},
+                {"root_type": ["VERB"]},
+                {"labels": ["conj"]},
+                {"root_type": ["VERB"]}
+            ]
+        },
+        "relative_clause": {
+            "description": "Find relative clause constructions",
+            "pattern": [
+                {"root_type": ["NOUN", "PROPN"]},
+                {"labels": ["relcl"]},
+                {"root_type": ["VERB"]},
+                {"labels": ["object"]},
+                {"root_type": ["NOUN", "PROPN"]}
+            ]
+        }
+    }
+}
