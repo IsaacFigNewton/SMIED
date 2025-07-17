@@ -19,7 +19,7 @@ class PatternLoader:
             self.patterns = self._get_default_patterns()
 
         # Reformat patterns to ensure they have the correct structure
-        self.reformat_patterns()
+        self.json_to_pattern()
     
     def load_patterns_from_file(self,
                                 file_path: str):
@@ -35,9 +35,14 @@ class PatternLoader:
                               file_path: str):
         """Save current patterns to a JSON file"""
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(self.patterns, f, indent=2, ensure_ascii=False)
+            json.dump(
+                self.pattern_to_json(),
+                f,
+                indent=4,
+                ensure_ascii=False
+            )
     
-    def reformat_patterns(self):
+    def json_to_pattern(self):
         """
         Reformat patterns to ensure they have the correct structure
         This is useful if patterns were loaded from a file and need to be converted
@@ -62,6 +67,28 @@ class PatternLoader:
                 if isinstance(pattern, list):
                     self.patterns[category][name] = convert_pattern_from_json(pattern)
     
+
+    def pattern_to_json(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Convert patterns to a JSON-serializable format
+        This is useful for saving patterns to a file
+        """
+        json_patterns = {}
+        
+        for category, patterns in self.patterns.items():
+            json_patterns[category] = {}
+            for name, pattern in patterns.items():
+                # Convert sets back to lists for JSON serialization
+                json_patterns[category][name] = {
+                    "description": pattern.get("description", ""),
+                    "pattern": [
+                        {k: list(v) if isinstance(v, set) else v for k, v in item.items()}
+                        for item in pattern["pattern"]
+                    ]
+                }
+        
+        return json_patterns
+
 
     def add_pattern(self,
                     name: str,
@@ -92,3 +119,8 @@ class PatternLoader:
                 print(f"Default patterns file for {pattern} not found. No default patterns loaded for this category.")
 
         return default_patterns
+    
+
+    def __str__(self) -> str:
+        """String representation of the PatternLoader"""
+        return json.dumps(self.pattern_to_json(), indent=4)
