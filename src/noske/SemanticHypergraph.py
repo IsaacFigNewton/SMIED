@@ -123,9 +123,9 @@ class SemanticHypergraph:
     def plot(self):
         # Extract node labels and edge labels
         node_labels = {
-            node: g.nodes[node]['text']
-            for node in g.nodes()
-            if 'text' in g.nodes[node]
+            node: self.G.nodes[node]['text']
+            for node in self.G.nodes()
+            if 'text' in self.G.nodes[node]
         }
         edge_labels = {
             (u, v): d['type']
@@ -133,7 +133,7 @@ class SemanticHypergraph:
         }
 
         # Position nodes using spring layout
-        pos = nx.spring_layout(G, k=50)
+        pos = nx.spring_layout(self.G, k=50)
 
         # Draw the graph
         plt.figure(figsize=(12, 8))
