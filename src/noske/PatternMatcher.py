@@ -1,4 +1,4 @@
-from typing import List, Dict, overload
+from typing import List, Dict, Any
 
 from noske.PatternLoader import PatternLoader
 from noske.SemanticHypergraph import SemanticHypergraph
@@ -14,6 +14,20 @@ class PatternMatcher:
         self.semantic_graph = semantic_graph
         self.pattern_loader = pattern_loader or PatternLoader()
     
+    
+    def add_pattern(self,
+                    name: str,
+                    pattern: List[Dict[str, Any]], 
+                    description: str = "",
+                    category: str = "custom"):
+        """Add a new pattern to the loader"""
+        self.pattern_loader.add_pattern(
+            name=name,
+            pattern=pattern,
+            description=description,
+            category=category
+        )
+
 
     # Enhanced helper functions with additional matching capabilities
     def node_matches(self, node_attrs: dict, pattern_attrs: dict) -> bool:
