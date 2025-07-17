@@ -12,10 +12,9 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-  importlib,
-  networkx,
-  hypergraphx,
-  spacy
+  "importlib",
+  "networkx",
+  "spacy"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,3 +27,6 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.setuptools.include-package-data]
+include = true

@@ -1,7 +1,9 @@
-import importlib.resources
+from importlib.resources import files, as_file
 import json
 from typing import Dict, List, Any, Union
 import networkx as nx
+
+import noske.patterns
 
 class PatternLoader:
     """
@@ -83,8 +85,9 @@ class PatternLoader:
 
         for pattern in patterns:
             try:
-                with importlib.resources.open_text("noske", f"./patterns/{pattern}_patterns.json") as file:
-                    default_patterns[pattern] = json.load(file)
+                resource_path = files(noske.patterns).joinpath(f"{pattern}.json")
+                with resource_path.open("r", encoding="utf-8") as f:
+                    default_patterns[pattern] = json.load(f)
             except FileNotFoundError:
                 print(f"Default patterns file for {pattern} not found. No default patterns loaded for this category.")
 

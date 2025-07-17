@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, overload
 
 from noske.PatternLoader import PatternLoader
 from noske.SemanticHypergraph import SemanticHypergraph
@@ -14,7 +14,7 @@ class PatternMatcher:
         self.semantic_graph = semantic_graph
         self.pattern_loader = pattern_loader or PatternLoader()
     
-    
+
     # Enhanced helper functions with additional matching capabilities
     def node_matches(self, node_attrs: dict, pattern_attrs: dict) -> bool:
         """Node matching with additional pattern types"""
@@ -136,31 +136,35 @@ class PatternMatcher:
         return results
     
 
-    # Overloaded call methods for matching patterns at different granularities
-    def __call__(self) -> Dict[str, Dict[str, List[List[str]]]]:
-        """Match against all patterns across all categories"""
-        results = {}
-        for category in self.pattern_loader.patterns.keys():
-            results[category] = self(category)
-        return results
-
-    def __call__(self, category: str) -> Dict[str, List[List[str]]]:
-        """Match against all patterns in a specified category"""
-        results = {}
-        patterns = self.pattern_loader.patterns[category]
-        for pattern_name, pattern in patterns.items():
-            results[pattern_name] = self(category, pattern)
-        return results
-    
-    def __call__(self, category: str, pattern_name: str) -> List[List[str]]:
-        """Match against a specified pattern in a specified category"""
-        # Check if the category exists
-        if category not in self.pattern_loader.patterns.keys():
-            raise KeyError(f"Category '{category}' does not exist.")
-        # Check if the pattern exists in the category
-        if pattern_name not in self.pattern_loader.patterns[category].keys():
-            raise KeyError(f"Pattern named '{pattern_name}' does not exist in category '{category}.")
+    # Overloaded call method for matching patterns at different granularities
+    def __call__(self,
+                 category: str = None,
+                 pattern_name: str = None) -> Dict[str, Dict[str, List[List[str]]]]\
+                                                | Dict[str, List[List[str]]]\
+                                                | List[List[str]]:
+        # Match all patterns across all categories
+        if not category and not pattern_name:
+            return {
+                c: self(c)
+                for c in self.pattern_loader.patterns.keys()
+            }
         
-        # Find a specific pattern by name
-        pattern = self.pattern_loader.get_pattern(category, pattern_name)
-        return self.match_chain(pattern)
+        # Match all patterns in the specified category
+        elif not pattern_name:
+            # Check if the category exists
+            if category not in self.pattern_loader.patterns.keys():
+                raise KeyError(f"Category '{category}' does not exist.")
+            return {
+                n: self(category, n)
+                for n in self.pattern_loader.patterns[category].keys()
+            }
+        
+        # Match against a specified pattern in a specified category
+        else:
+            # Check if the category exists
+            if category not in self.pattern_loader.patterns.keys():
+                raise KeyError(f"Category '{category}' does not exist.")
+            # Check if the pattern exists in the category
+            if pattern_name not in self.pattern_loader.patterns[category].keys():
+                raise KeyError(f"Pattern named '{pattern_name}' does not exist in category '{category}.")
+            return self.match_chain(self.pattern_loader.patterns[category][pattern_name]["pattern"])
