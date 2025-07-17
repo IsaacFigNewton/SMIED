@@ -1,0 +1,30 @@
+{
+    "passive_voice": {
+        "description": "Find passive voice constructions",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["auxpass"]},
+            {"root_type": ["VERB"]}
+        ]
+    },
+    "compound_predicate": {
+        "description": "Find compound predicates",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB"]},
+            {"labels": ["conj"]},
+            {"root_type": ["VERB"]}
+        ]
+    },
+    "relative_clause": {
+        "description": "Find relative clause constructions",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["relcl"]},
+            {"root_type": ["VERB"]},
+            {"labels": ["object"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    }
+}

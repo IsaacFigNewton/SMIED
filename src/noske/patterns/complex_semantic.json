@@ -1,0 +1,44 @@
+{
+    "ditransitive_action": {
+        "description": "Find ditransitive actions (subject gives object to recipient)",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"node_id_pattern": "DITRANSITIVE_"},
+            {"labels": ["action"]},
+            {"root_type": ["VERB"]}
+        ]
+    },
+    "complement_clause": {
+        "description": "Find complement clauses (complex predicates)",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"node_id_pattern": "CCOMP_"},
+            {"labels": ["subject"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    },
+    "transfer_event": {
+        "description": "Find transfer events (giving, selling, etc.)",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"node_id_pattern": "DITRANSITIVE_"},
+            {"labels": ["motivator"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    },
+    "causal_chain": {
+        "description": "Find causal chains: A causes B, B causes C",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB"]},
+            {"labels": ["boxer.owl: temp_before"]},
+            {"root_type": ["VERB"]},
+            {"labels": ["subject"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    }
+}

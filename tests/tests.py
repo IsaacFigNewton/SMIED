@@ -1,53 +1,54 @@
+import unittest
+
+from noske.SemanticHypergraph import SemanticHypergraph
 from noske.PatternLoader import PatternLoader
-from noske.PatternMatcher import *
-from noske.utils import match_chain
-import networkx as nx
+from noske.PatternMatcher import PatternMatcher
 
-# Example usage
-def create_example_patterns_file():
-    """Create an example patterns file for demonstration"""
-    loader = PatternLoader()
-    loader.save_patterns_to_file("semantic_patterns.json")
-    print("Example patterns file created: semantic_patterns.json")
+class TestPatternMatcher(unittest.TestCase):
+    def setUp(self):
+        # Create a simple semantic hypergraph for testing
+        self.graph = SemanticHypergraph()
+        self.graph.add_node(1, {"text": "test", "pos": "NOUN", "lemma": "test"})
+        self.graph.add_node(2, {"text": "example", "pos": "VERB", "lemma": "example"})
+        self.graph.add_edge(1, 2, {"type": "relation"})
 
-# Command-line interface for pattern management
-def main():
-    """Simple CLI for pattern management"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Semantic Pattern Matcher")
-    parser.add_argument("--create-example", action="store_true",
-                       help="Create example patterns file")
-    parser.add_argument("--patterns-file", type=str, default="semantic_patterns.json",
-                       help="Path to patterns file")
-    parser.add_argument("--list-categories", action="store_true",
-                       help="List available pattern categories")
-    parser.add_argument("--list-patterns", type=str,
-                       help="List patterns in a specific category")
-    
-    args = parser.parse_args()
-    
-    if args.create_example:
-        create_example_patterns_file()
-        return
-    
-    try:
-        loader = PatternLoader(args.patterns_file)
-    except FileNotFoundError:
-        print(f"Patterns file not found: {args.patterns_file}")
-        print("Use --create-example to create a sample file")
-        return
-    
-    if args.list_categories:
-        print("Available categories:")
-        for category in loader.list_categories():
-            print(f"  - {category}")
-    
-    if args.list_patterns:
-        patterns = loader.list_patterns_in_category(args.list_patterns)
-        print(f"Patterns in '{args.list_patterns}':")
-        for pattern in patterns:
-            print(f"  - {pattern}")
+        # Initialize PatternLoader with default patterns
+        self.pattern_loader = PatternLoader()
 
-if __name__ == "__main__":
-    main()
+        # Initialize PatternMatcher with the graph and loader
+        self.matcher = PatternMatcher(self.graph, self.pattern_loader)
+
+    def test_node_matches(self):
+        node_attrs = {"text": "test", "pos": "NOUN", "lemma": "test"}
+        pattern_attrs = {"text": "test", "pos": {"NOUN"}}
+        self.assertTrue(self.matcher.node_matches(node_attrs, pattern_attrs))
+
+    def test_edge_matches(self):
+        edge_attrs = {"type": "relation"}
+        pattern_attrs = {"type": {"relation"}}
+        self.assertTrue(self.matcher.edge_matches(edge_attrs, pattern_attrs))
+    
+    def test_match_patterns(self):
+        # Define a simple pattern to match
+        pattern = {
+            "name": "test_pattern",
+            "pattern": [
+                {"text": "test", "pos": {"NOUN"}},
+                {"text": "example", "pos": {"VERB"}}
+            ]
+        }
+        self.pattern_loader.add_pattern("test_category", pattern["name"], pattern["pattern"])
+
+        # Match the pattern against the semantic graph
+        results = self.matcher.match_patterns("test_category")
+        self.assertIn("test_pattern", results)
+        self.assertGreater(len(results["test_pattern"]), 0)
+    
+    def test_match_all_patterns(self):
+        # Match all patterns across all categories
+        results = self.matcher.match_all_patterns()
+        self.assertIsInstance(results, dict)
+        self.assertGreater(len(results), 0)
+    
+if __name__ == '__main__':
+    unittest.main()

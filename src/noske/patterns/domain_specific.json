@@ -1,0 +1,32 @@
+{
+    "medical_diagnosis": {
+        "description": "Pattern for medical diagnosis relationships",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB"], "lemma": ["diagnose", "treat", "examine"]},
+            {"labels": ["object"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    },
+    "business_transaction": {
+        "description": "Pattern for business transactions",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"node_id_pattern": "DITRANSITIVE_"},
+            {"labels": ["motivator"]},
+            {"root_type": ["NOUN", "PROPN"], "semantic_type": ["MONEY", "CURRENCY"]}
+        ]
+    },
+    "scientific_observation": {
+        "description": "Pattern for scientific observations",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB"], "lemma": ["observe", "measure", "analyze", "study"]},
+            {"labels": ["object"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    }
+}

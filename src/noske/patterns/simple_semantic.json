@@ -1,0 +1,62 @@
+{
+    "causality": {
+        "description": "Find causal relationships: Subject -> Action -> Object",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB", "AUX"]},
+            {"labels": ["object"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    },
+    "temporal_sequence": {
+        "description": "Find temporal sequences of events",
+        "pattern": [
+            {"root_type": ["VERB"]},
+            {"labels": ["boxer.owl: temp_before"]},
+            {"root_type": ["VERB"]}
+        ]
+    },
+    "quality_attribution": {
+        "description": "Find quality/property attributions to entities",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["DUL.owl: hasQuality"]},
+            {"root_type": ["ADJ"]}
+        ]
+    },
+    "spatial_location": {
+        "description": "Find spatial location relationships",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["hasSpatiotemporalLocation"]},
+            {"root_type": ["NOUN", "PROPN", "ADV"]}
+        ]
+    },
+    "entity_classification": {
+        "description": "Find entity type classifications",
+        "pattern": [
+            {"root_type": ["PROPN"]},
+            {"labels": ["rdf-schema: subClassOf"]},
+            {}
+        ]
+    },
+    "quantified_entity": {
+        "description": "Find quantified entities",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["quantifiers.owl: hasQuantity"]},
+            {"root_type": ["NUM", "DET"]}
+        ]
+    },
+    "agent_action_patient": {
+        "description": "Find agent-action-patient relationships",
+        "pattern": [
+            {"root_type": ["NOUN", "PROPN"]},
+            {"labels": ["subject"]},
+            {"root_type": ["VERB"]},
+            {"labels": ["object"]},
+            {"root_type": ["NOUN", "PROPN"]}
+        ]
+    }
+}
