@@ -3,6 +3,7 @@ import json
 import networkx as nx
 from spacy.tokens import Doc, Token
 import matplotlib.pyplot as plt
+import hypergraphx as hgx
 
 class SemanticHypergraph:
     """

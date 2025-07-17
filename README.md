@@ -1,5 +1,5 @@
 # NoSKE-Pipeline
-#### A pipeline for (soon) hypergraph-based, non-stochastic knowledge extraction from text.
+#### A pipeline for hypergraph-based, non-stochastic knowledge extraction from text via a combination of SpaCy and HypergraphX pipelines.
 ---
 
 ## Installation
