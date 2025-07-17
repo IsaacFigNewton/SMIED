@@ -22,11 +22,15 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["noske*"]
 
 [tool.setuptools.package-dir]
 "" = "src"
 
-[tool.setuptools.include-package-data]
-include = true
+[tool.setuptools.package-data]
+"noske.patterns" = ["*.json"]

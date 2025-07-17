@@ -9,13 +9,7 @@ class SemanticHypergraph:
     Semantic Hypergraph representation of a knowledge graph
     TODO: Integrate HypergraphX
     """
-    
-    def __init__(self, graph: nx.DiGraph):
-        """
-        Initialize with a NetworkX directed graph
-        """
-        self.G = graph
-    
+        
     def __init__(self, doc: Doc):
         """
         Initialize from a spaCy Doc object
