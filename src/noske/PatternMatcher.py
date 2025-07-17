@@ -142,7 +142,10 @@ class PatternMatcher:
             for pattern_name, matches in patterns.items():
                 full_name = f"{category}.{pattern_name}"
                 if len(matches) > 0:
-                    print(f"Found {len(matches)} matches for {full_name}: {self.pattern_loader.patterns[category][pattern_name]}")
+                    pattern_info = self.pattern_loader.patterns[category][pattern_name]
+                    print(f"Found {len(matches)} matches for {full_name}:")
+                    print(f"\tDescription: {pattern_info.get('description', 'No description')}")
+                    print(f"\tPattern: {pattern_info['pattern']}")
                     for match in matches:
                         print(f"\t{match}")
                     print()
