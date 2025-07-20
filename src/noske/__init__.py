@@ -18,10 +18,17 @@ from .SemanticHypergraph import SemanticHypergraph
 from .PatternLoader import PatternLoader
 from .PatternMatcher import PatternMatcher
 
+from .hypergraphx.Object import Object
+from .hypergraphx.visualizations import draw
+
 # Define what gets imported with "from package import *"
 __all__ = [
     # Main classes
     "SemanticHypergraph",
     "PatternLoader",
     "PatternMatcher",
+
+    # Modified from old hypergraphx package file
+    "Object",
+    "draw",
 ]
