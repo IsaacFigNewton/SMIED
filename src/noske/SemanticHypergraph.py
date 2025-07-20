@@ -110,13 +110,19 @@ class SemanticHypergraph:
             edge_list.append((
                 t.i,
                 child.i,
-                {"type": child.dep_, "rel_pos": "after"}
+                {
+                    "type": child.dep_,
+                    "rel_pos": "after"
+                }
             ))
         for child in t.rights:
             edge_list.append((
                 t.i,
                 child.i,
-                {"type": child.dep_, "rel_pos": "before"}
+                {
+                    "type": child.dep_,
+                    "rel_pos": "before"
+                }
             ))
         return edge_list
 
