@@ -14,12 +14,13 @@ Tools include:
 """
 
 # Import stuff from the package
-from .SemanticHypergraph import SemanticHypergraph
-from .PatternLoader import PatternLoader
-from .PatternMatcher import PatternMatcher
+from noske.SemanticHypergraph import SemanticHypergraph
+from noske.PatternLoader import PatternLoader
+from noske.PatternMatcher import PatternMatcher
+from noske.utils import to_nx
 
-from .hypergraphx.Object import Object
-from .hypergraphx.visualizations import draw
+from noske.hypergraphx.Object import Object
+from noske.hypergraphx.visualizations import draw
 
 # Define what gets imported with "from package import *"
 __all__ = [
@@ -27,6 +28,9 @@ __all__ = [
     "SemanticHypergraph",
     "PatternLoader",
     "PatternMatcher",
+
+    # Utility functions
+    "to_nx",
 
     # Modified from old hypergraphx package file
     "Object",

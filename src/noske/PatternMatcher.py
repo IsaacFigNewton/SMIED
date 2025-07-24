@@ -10,7 +10,7 @@ class PatternMatcher:
     
     def __init__(self,
                     semantic_graph: SemanticHypergraph,
-                    pattern_loader: PatternLoader = None):
+                    pattern_loader: PatternLoader|None = None):
         self.semantic_graph = semantic_graph
         self.pattern_loader = pattern_loader or PatternLoader()
     
@@ -101,8 +101,8 @@ class PatternMatcher:
             
             if pattern_idx == 0:
                 # First node - try all nodes in the graph
-                for node in g.nodes():
-                    node_data = g.nodes[node].copy()
+                for node in g.get_nodes():
+                    node_data = g.get_nodes[node].copy()
                     # Add node_id for pattern matching
                     node_data["node_id"] = str(node)
                     if self.node_matches(node_data, node_patterns[0]):
@@ -116,12 +116,12 @@ class PatternMatcher:
                 node_pattern = node_patterns[pattern_idx]
                 
                 # Check all outgoing edges from the last node
-                for neighbor in g.neighbors(last_node):
+                for neighbor in g.get_neighbors(last_node):
                     # Check if the edge matches the pattern
-                    edge_data = g.edges[last_node, neighbor]
+                    edge_data = g.get_edges[last_node, neighbor]
                     if self.edge_matches(edge_data, edge_pattern):
                         # Check if the neighbor node matches the pattern
-                        neighbor_data = g.nodes[neighbor].copy()
+                        neighbor_data = g.get_nodes[neighbor].copy()
                         neighbor_data["node_id"] = str(neighbor)
                         if self.node_matches(neighbor_data, node_pattern):
                             current_path.append(neighbor)
@@ -155,19 +155,19 @@ class PatternMatcher:
 
     # Overloaded call method for matching patterns at different granularities
     def __call__(self,
-                 category: str = None,
-                 pattern_name: str = None) -> Dict[str, Dict[str, List[List[str]]]]\
+                 category:str|None = None,
+                 name:str|None = None) -> Dict[str, Dict[str, List[List[str]]]]\
                                                 | Dict[str, List[List[str]]]\
                                                 | List[List[str]]:
         # Match all patterns across all categories
-        if not category and not pattern_name:
+        if not category and not name:
             return {
                 c: self(c)
                 for c in self.pattern_loader.patterns.keys()
             }
         
         # Match all patterns in the specified category
-        elif not pattern_name:
+        elif not name:
             # Check if the category exists
             if category not in self.pattern_loader.patterns.keys():
                 raise KeyError(f"Category '{category}' does not exist.")
@@ -182,6 +182,6 @@ class PatternMatcher:
             if category not in self.pattern_loader.patterns.keys():
                 raise KeyError(f"Category '{category}' does not exist.")
             # Check if the pattern exists in the category
-            if pattern_name not in self.pattern_loader.patterns[category].keys():
-                raise KeyError(f"Pattern named '{pattern_name}' does not exist in category '{category}.")
-            return self.match_chain(self.pattern_loader.patterns[category][pattern_name]["pattern"])
+            if name not in self.pattern_loader.patterns[category].keys():
+                raise KeyError(f"Pattern named '{name}' does not exist in category '{category}.")
+            return self.match_chain(self.pattern_loader.patterns[category][name]["pattern"])

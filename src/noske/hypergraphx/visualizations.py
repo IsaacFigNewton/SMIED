@@ -2,16 +2,50 @@ from typing import Dict, List, Optional, Union
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
+
 from hypergraphx.linalg import *
 from hypergraphx.representations.projections import clique_projection
 from hypergraphx.generation.random import *
 
+from noske.utils import to_nx
 from noske.hypergraphx.Object import Object
-from noske.SemanticHypergraph import SemanticHypergraph
+
+def get_node_labels(g: Hypergraph, key:str="text") -> Dict[int, str]:
+    """
+    Get node labels for visualization.
+    """
+    return {
+        node: metadata.get(key, '')
+        for node, metadata in g.nodes(metadata=True).items()
+        if key in metadata.keys()
+    }
+
+
+def get_pairwise_edge_labels(g: Hypergraph, key:str="type") -> Dict[tuple, str]:
+    """
+    Get edge labels for edges of order 1 (standard edge pairs) to use for visualization.
+    """
+    return {
+        edge: metadata.get(key, '')
+        for edge, metadata in g.get_edges(order=1, metadata=True).items()
+        if key in metadata.keys()
+    }
+
+
+def get_hyperedge_labels(g: Hypergraph, key:str="type") -> Dict[tuple, str]:
+    """
+    Get hyperedge labels for visualization.
+    """
+    return {
+        edge: metadata.get(key, '')
+        for edge, metadata in g.edges(metadata=True).items()
+        if key in metadata.keys() and len(edge) > 2
+    }
+
 
 def draw(
     # main parameters
-    hypergraph: SemanticHypergraph,
+    hypergraph: Hypergraph,
     figsize: tuple = (12, 7),
     ax: Optional[plt.Axes] = None,
 
@@ -20,7 +54,7 @@ def draw(
     iterations: int = 100,
     seed: int = 10,
     scale: int = 1,
-    k: float = 0.5,
+    opt_dist: float = 0.5,
 
     # node styling
     with_node_labels: bool = False,
@@ -55,27 +89,25 @@ def draw(
     # Extract node positions based on the hypergraph clique projection.
     if pos is None:
         pos = nx.spring_layout(
-            clique_projection(hypergraph.G, keep_isolated=True),
+            G=clique_projection(hypergraph, keep_isolated=True), # type: ignore
             iterations=iterations,
             seed=seed,
             scale=scale,
-            k=k,
+            k=opt_dist,
         )
 
 
     # Initialize a networkx graph with the nodes and only the pairwise interactions of the hypergraph.
-    pairwise_G = hypergraph.to_nx()
+    pairwise_G = to_nx(hypergraph)
 
     # Plot the pairwise graph.
     if type(node_shape) == str:
         node_shape = {n: node_shape for n in pairwise_G.nodes()}
     for nid, n in enumerate(list(pairwise_G.nodes())):
         nx.draw_networkx_nodes(
-            pairwise_G,
-            pos,
-            [n],
-            with_labels=with_node_labels,
-            labels=hypergraph.get_node_labels() if with_node_labels else None,
+            G=pairwise_G,
+            pos=pos,
+            nodelist=[n],
             node_size=node_size,
             node_shape=node_shape[n],
             node_color=node_color,
@@ -84,20 +116,29 @@ def draw(
             edgecolors=node_facecolor,
             ax=ax,
         )
+    if with_node_labels:
+        nx.draw_networkx_labels(
+            G=pairwise_G,
+            pos=pos,
+            labels=get_node_labels(hypergraph),
+            font_size=int(label_size),
+            font_color=label_col,
+            ax=ax,
+        )
 
     # Plot the edges of the pairwise graph.
     if with_pairwise_edge_labels:
         nx.draw_networkx_edge_labels(
-            pairwise_G,
-            pos,
-            edge_labels=hypergraph.get_pairwise_edge_labels(),
-            font_size=label_size,
+            G=pairwise_G,
+            pos=pos,
+            edge_labels=get_pairwise_edge_labels(hypergraph),
+            font_size=int(label_size),
             font_color=label_col,
             ax=ax,
         )
     nx.draw_networkx_edges(
-        pairwise_G,
-        pos,
+        G=pairwise_G,
+        pos=pos,
         width=pairwise_edge_width,
         edge_color=pairwise_edge_color,
         alpha=0.8,
@@ -105,9 +146,10 @@ def draw(
     )
 
     # Plot the hyperedges (size>2/order>1).
-    for hye in list(hypergraph.G.get_edges()):
+    hyperedge_labels = get_hyperedge_labels(hypergraph) if with_hyperedge_labels else dict()
+    for hye in list(hypergraph.get_edges()):
         if len(hye) > 2:
-            x1, y1, color, facecolor = hypergraph.get_hyperedge_styling_data(
+            x1, y1, color, facecolor = get_hyperedge_styling_data(
                 hye,
                 pos,
                 hyperedge_color_by_order,
@@ -122,7 +164,7 @@ def draw(
             )
             if with_hyperedge_labels:
                 ax.annotate(
-                    hypergraph.get_hyperedge_labels(),
+                    hyperedge_labels.get(hye, ''),
                     (pos[n][0] - 0.1, pos[n][1] - 0.06),
                     fontsize=label_size,
                     color=label_col,
@@ -143,14 +185,17 @@ def get_hyperedge_styling_data(
     """
     Get the fill data for a hyperedge.
     """
-    points = []
-    for node in hye:
-        points.append((pos[node][0], pos[node][1]))
-        # Center of mass of points.
-        x_c = np.mean([x for x, y in points])
-        y_c = np.mean([y for x, y in points])
+        
+    # Center of mass of points.
+    points = [(pos[node][0], pos[node][1]) for node in hye]
+    x_c = np.mean([x for x, y in points])
+    y_c = np.mean([y for x, y in points])
+
     # Order points in a clockwise fashion.
-    points = sorted(points, key=lambda x: np.arctan2(x[1] - y_c, x[0] - x_c))
+    points = sorted(
+        points,
+        key=lambda x: np.arctan2(x[1] - y_c, x[0] - x_c)
+    )
 
     if len(points) == 3:
         points = [

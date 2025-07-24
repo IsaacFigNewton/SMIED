@@ -11,8 +11,8 @@ class PatternLoader:
     """
     
     def __init__(self,
-                 patterns_file: str = None):
-        self.patterns = {}
+                 patterns_file:str|None = None):
+        self.patterns:Dict[str, Dict[str, Dict[str, Any]]] = dict()
         if patterns_file:
             self.load_patterns_from_file(patterns_file)
         else:
@@ -65,7 +65,10 @@ class PatternLoader:
         for category, patterns in self.patterns.items():
             for name, pattern in patterns.items():
                 if isinstance(pattern, list):
-                    self.patterns[category][name] = convert_pattern_from_json(pattern)
+                    self.patterns[category][name] = {
+                        "description": pattern.get("description", ""),
+                        "pattern": convert_pattern_from_json(pattern)
+                    }
     
 
     def pattern_to_json(self) -> Dict[str, Dict[str, Any]]:

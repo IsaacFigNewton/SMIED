@@ -12,7 +12,7 @@ from hypergraphx.generation.random import *
 from hypergraphx.readwrite.save import save_hypergraph
 from hypergraphx.readwrite.load import load_hypergraph
 from hypergraphx.viz.draw_hypergraph import draw_hypergraph
-from hypergraphx.viz import Object
+from noske.hypergraphx import Object
 
 class SemanticHypergraph:
     """
@@ -20,13 +20,20 @@ class SemanticHypergraph:
     TODO: Integrate HypergraphX
     """
         
-    def __init__(self, doc: Doc):
-        """
-        Initialize from a spaCy Doc object
-        """
+    def __init__(self,
+                 doc:Doc|None=None,
+                 json_data:Dict[str, Any]|None=None):
+        # HypergraphX Hypergraph instance
+        #    directed by default
         self.G = Hypergraph()
-        self.directed = True  # Hypergraph is directed by default
-
+        if doc is not None:
+            # load the parsed SpaCy document into the hypergraph
+            self.add_doc(doc)
+        elif json_data is not None:
+            # load the hypergraph from JSON
+            self.from_json(json_data)
+    
+    def add_doc(self, doc:Doc):
         # add tokens and their relations
         for t in doc:
             # define and add the token's node to G
@@ -37,20 +44,20 @@ class SemanticHypergraph:
                 "lemma": t.lemma_
             }
             node_dict.update(self.get_token_tags(t))
-            self.G.add_node(t.i, metadata=node_dict)
+            self.add_node(t.i, metadata=node_dict)
 
             # add token NER relations
             if t.ent_type_:
                 # add the entity type as a node if it does not exist
-                self.G.add_node(
+                self.add_node(
                     t.ent_type_,
                     metadata={"text": t.ent_type_}
                 )
                 # will aggregate the outgoing edges of the entity type into a single hyperedge
-                self.G.add_edges(
+                self.add_edges(
                     [
-                        (t.i, t.ent_type_),
-                        (t.ent_type_, t.i),
+                        ((t.i), (t.ent_type_)),
+                        ((t.ent_type_), (t.i)),
                     ],
                     metadata=[
                         {"type": "hasEntityType"},
@@ -59,45 +66,32 @@ class SemanticHypergraph:
                 )
             # add dependency relations
             dep_edges, dep_edge_metadata = self.get_dep_edges(t)
-            self.G.add_edges(
+            self.add_edges(
                 dep_edges,
                 metadata=dep_edge_metadata
             )
         
         # convert the outgoing edges of the t.ent_type_ nodes into hyperedges
-        for ent_type in doc.ents:
-            if ent_type.ent_type_:
-                # get all nodes that are connected to the entity type
-                connected_nodes = list(self.G.get_neighbors(ent_type.ent_type_))
-                if len(connected_nodes) > 1:
-                    # create a hyperedge for the entity type
-                    self.G.add_edge(
-                        (node for node in connected_nodes),
-                        metadata={
-                            "type": "hasEntityType",
-                            "subtype": ent_type.ent_type_,
-                        }
-                    )
-                    # remove the individual entity type node and its edges
-                    self.G.remove_node(ent_type.ent_type_)
-    
-    def to_nx(self) -> nx.Graph|nx.DiGraph:
-        """
-        Convert a Hypergraph to a NetworkX Graph.
-        """
-        G = nx.DiGraph() if self.directed else nx.Graph()
-        for node in self.G.nodes():
-            G.add_node(node, **self.G.get_node_metadata(node))
-        
-        for edge in self.G.get_edges(order=1, metadata=True):
-            G.add_edge(edge, **self.G.get_edge_metadata(edge))
-        
-        return G
+        for ent in doc.ents:
+            # get all nodes that are connected to the entity type
+            connected_nodes = list(self.G.get_neighbors(ent.label_))
+            if len(connected_nodes) > 1:
+                # create a hyperedge for the entity type
+                self.add_edge(
+                    (node for node in connected_nodes),
+                    metadata={
+                        "type": "hasEntityType",
+                        "subtype": ent.label_,
+                    }
+                )
+                # remove the individual entity type node and its edges
+                self.G.remove_node(ent.label_)
+
 
     def to_json(self) -> Dict[str, Any]:
         """Convert the hypergraph to JSON format"""
-        nodes = json.dumps(list(self.G.nodes(metadata=True)), indent=4)
-        edges = json.dumps(list(self.G.edges(metadata=True)), indent=4)
+        nodes = json.dumps(list(self.get_nodes(metadata=True)), indent=4)
+        edges = json.dumps(list(self.get_edges(metadata=True)), indent=4)
         return {"nodes": nodes, "edges": edges}
     
 
@@ -111,9 +105,9 @@ class SemanticHypergraph:
         edges = list(edge_data.keys())
         edges_metadata = [edge_data[edge] for edge in edges]
         
-        new_graph = SemanticHypergraph(Hypergraph())
-        new_graph.G.add_nodes(nodes, metadata=nodes_metadata)
-        new_graph.G.add_edges(edges, metadata=edges_metadata)
+        new_graph = SemanticHypergraph()
+        new_graph.add_nodes(nodes, metadata=nodes_metadata)
+        new_graph.add_edges(edges, metadata=edges_metadata)
         return new_graph
     
 
@@ -183,36 +177,37 @@ class SemanticHypergraph:
                 "rel_pos": "before"
             })
         return edge_list, metadata_list
+
+
+    # Add nodes and edges to the hypergraph 
+    def add_node(self,
+                  node,
+                  metadata: Optional[Dict[str, Any]] = None):
+        self.G.add_node(node, metadata=metadata)
+    def add_nodes(self,
+                  nodes,
+                  metadata: Optional[List[Dict[str, Any]]] = None):
+        self.G.add_nodes(nodes, metadata=metadata)
+    def add_edge(self,
+                  edge,
+                  metadata: Optional[Dict[str, Any]] = None):
+        self.G.add_node(edge, metadata=metadata)
+    def add_edges(self,
+                  edges,
+                  metadata: Optional[List[Dict[str, Any]]] = None):
+        self.G.add_edges(edges, metadata=metadata)
     
 
-    def get_node_labels(self, key:str="text") -> Dict[int, str]:
-        """
-        Get node labels for visualization.
-        """
-        return {
-            node: metadata.get(key, '')
-            for node, metadata in self.G.nodes(metadata=True).items()
-            if key in metadata.keys()
-        }
-    
+    # Get nodes and edges from the hypergraph
+    def get_nodes(self,
+                  metadata:bool = True) -> list[Any]\
+                                            | dict[Any, dict[Any, Any]]:
+        return self.G.get_nodes(metadata=metadata)
+    def get_edges(self,
+                  metadata:bool = True) -> Hypergraph\
+                                            | list[Any]\
+                                            | dict[Any, dict[Any, Any]]:
+        return self.G.get_edges(metadata=metadata)
 
-    def get_pairwise_edge_labels(self, key:str="type") -> Dict[tuple, str]:
-        """
-        Get edge labels for edges of order 1 (standard edge pairs) to use for visualization.
-        """
-        return {
-            edge: metadata.get(key, '')
-            for edge, metadata in self.G.get_edges(order=1, metadata=True).items()
-            if key in metadata.keys()
-        }
-
-
-    def get_hyperedge_labels(self, key:str="type") -> Dict[tuple, str]:
-        """
-        Get hyperedge labels for visualization.
-        """
-        return {
-            edge: metadata.get(key, '')
-            for edge, metadata in self.G.edges(metadata=True).items()
-            if key in metadata.keys() and len(edge) > 2
-        }
+    def get_node_with_idx(self, node_idx) -> dict:
+        return self.get_nodes()[node_idx]

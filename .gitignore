@@ -1,4 +1,6 @@
 build/*
 src/noske.egg-info/*
 src/noske/__pycache__/*
+src/noske/hypergraphx/__pycache__/*
 src/noske/patterns/__pycache__/*
+tests/__pycache__/*

@@ -4,8 +4,8 @@
 """
 
 # Import stuff from the package
-from .Object import Object
-from .visualizations import draw
+from noske.hypergraphx.Object import Object
+from noske.hypergraphx.visualizations import draw
 
 __all__ = [
     "Object",
