@@ -1,6 +1,4 @@
 import unittest
-import spacy
-import json
 
 from TestPatternMatcher import TestPatternMatcher
 

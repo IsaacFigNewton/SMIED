@@ -9,9 +9,9 @@ class PatternMatcher:
     """
     
     def __init__(self,
-                    semantic_graph: SemanticHypergraph,
+                    G: SemanticHypergraph,
                     pattern_loader: PatternLoader|None = None):
-        self.semantic_graph = semantic_graph
+        self.G = G
         self.pattern_loader = pattern_loader or PatternLoader()
     
     
@@ -91,8 +91,6 @@ class PatternMatcher:
 
         # Find all matching paths using DFS
         results = []
-        
-        g = self.semantic_graph.G
         def dfs(current_path, pattern_idx):
             if pattern_idx == n:
                 # We've matched all nodes in the pattern
@@ -100,13 +98,12 @@ class PatternMatcher:
                 return
             
             if pattern_idx == 0:
+
                 # First node - try all nodes in the graph
-                for node in g.get_nodes():
-                    node_data = g.get_nodes[node].copy()
+                for node_idx, node_data in self.G.get_nodes(metadata=True).items():
                     # Add node_id for pattern matching
-                    node_data["node_id"] = str(node)
                     if self.node_matches(node_data, node_patterns[0]):
-                        current_path.append(node)
+                        current_path.append(node_idx)
                         dfs(current_path, 1)
                         current_path.pop()
             else:
@@ -116,17 +113,19 @@ class PatternMatcher:
                 node_pattern = node_patterns[pattern_idx]
                 
                 # Check all outgoing edges from the last node
-                for neighbor in g.get_neighbors(last_node):
+                for neighbor_idx in self.G.G.get_neighbors(last_node):
+
                     # Check if the edge matches the pattern
-                    edge_data = g.get_edges[last_node, neighbor]
+                    edge_data = self.G.G.get_edge_metadata((last_node, neighbor_idx))
                     if self.edge_matches(edge_data, edge_pattern):
+                        
                         # Check if the neighbor node matches the pattern
-                        neighbor_data = g.get_nodes[neighbor].copy()
-                        neighbor_data["node_id"] = str(neighbor)
+                        neighbor_data = self.G.G.get_node_metadata(neighbor_idx)
                         if self.node_matches(neighbor_data, node_pattern):
-                            current_path.append(neighbor)
+                            current_path.append(neighbor_idx)
                             dfs(current_path, pattern_idx + 1)
                             current_path.pop()
+                            
         # Start DFS from an empty path
         dfs([], 0)
         return results

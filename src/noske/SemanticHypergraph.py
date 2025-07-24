@@ -183,10 +183,15 @@ class SemanticHypergraph:
     def add_node(self,
                   node,
                   metadata: Optional[Dict[str, Any]] = None):
+        if metadata:
+            metadata["node_id"] = str(node)
         self.G.add_node(node, metadata=metadata)
     def add_nodes(self,
-                  nodes,
+                  nodes: Union[List[Any], List[int]],
                   metadata: Optional[List[Dict[str, Any]]] = None):
+        if metadata:
+            for i in range(len(metadata)):
+                metadata[i]["node_id"] = str(nodes[i])
         self.G.add_nodes(nodes, metadata=metadata)
     def add_edge(self,
                   edge,
