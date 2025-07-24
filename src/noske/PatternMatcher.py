@@ -125,7 +125,7 @@ class PatternMatcher:
                             current_path.append(neighbor_idx)
                             dfs(current_path, pattern_idx + 1)
                             current_path.pop()
-                            
+
         # Start DFS from an empty path
         dfs([], 0)
         return results
@@ -133,11 +133,11 @@ class PatternMatcher:
     
     def get_pattern_summary(self) -> Dict[str, Dict[str, int]]:
         """Get a summary of match counts for all patterns"""
-        results = self()
+        all_matches = self()
         
         # Print insights
         insights = {}
-        for category, patterns in results.items():
+        for category, patterns in all_matches.items():
             for pattern_name, matches in patterns.items():
                 full_name = f"{category}.{pattern_name}"
                 if len(matches) > 0:
@@ -149,7 +149,7 @@ class PatternMatcher:
                         print(f"\t{match}")
                     print()
 
-        return results
+        return all_matches
     
 
     # Overloaded call method for matching patterns at different granularities
