@@ -38,11 +38,8 @@ class TestSemanticMetagraph(unittest.TestCase):
         test_graph.add_node(2, metadata={"text": "test2"}) 
         test_graph.add_edge((1, 2), metadata={"type": "test_edge"})
         
-        # Serialize to JSON
-        json_data = test_graph.to_json()
-        
         # Create new graph from JSON
-        new_graph = SemanticMetagraph(json_data=json_data)
+        new_graph = SemanticMetagraph(json_data=test_graph.to_json())
         
         # Verify structure is preserved
         self.assertEqual(len(new_graph.get_nodes()), len(test_graph.get_nodes()))
@@ -53,9 +50,8 @@ class TestSemanticMetagraph(unittest.TestCase):
         graph = SemanticMetagraph()
         graph.add_doc(self.doc)
         
-        nodes = graph.get_nodes()
-        
         # Should have a node for each token
+        nodes = graph.get_nodes()
         self.assertEqual(len(nodes), len(self.doc))
         
         # Check that token data is preserved
@@ -74,21 +70,17 @@ class TestSemanticMetagraph(unittest.TestCase):
         graph = SemanticMetagraph()
         graph.add_doc(doc_with_entities)
         
-        nodes = graph.get_nodes()
-        edges = graph.get_edges()
-        
         # Should have created nodes and edges
-        self.assertGreater(len(nodes), 0)
-        self.assertGreater(len(edges), 0)
+        self.assertGreater(len(graph.get_nodes()), 0)
+        self.assertGreater(len(graph.get_edges()), 0)
 
     def test_add_doc_creates_dependency_relations(self):
         """Test that adding a document creates dependency relations"""
         graph = SemanticMetagraph()
         graph.add_doc(self.doc)
         
-        edges = graph.get_edges()
-        
         # Should have dependency edges
+        edges = graph.get_edges()
         self.assertGreater(len(edges), 0)
         
         # Check for dependency relation metadata
@@ -120,7 +112,6 @@ class TestSemanticMetagraph(unittest.TestCase):
     def test_get_token_tags_classes(self):
         """Test token tag extraction for token classes"""
         doc_classes = self.nlp("word 123 user@email.com http://example.com $50 .")
-        
         tags_list = [SemanticMetagraph.get_token_tags(token) for token in doc_classes]
         
         # Check that different classes are detected
@@ -168,7 +159,6 @@ class TestSemanticMetagraph(unittest.TestCase):
         
         if root_token and (list(root_token.lefts) or list(root_token.rights)):
             edges, metadata = SemanticMetagraph.get_dep_edges(root_token)
-            
             self.assertIsInstance(edges, list)
             self.assertIsInstance(metadata, list)
             self.assertEqual(len(edges), len(metadata))
@@ -192,10 +182,8 @@ class TestSemanticMetagraph(unittest.TestCase):
                 # Check position labels
                 left_count = len(list(token.lefts))
                 right_count = len(list(token.rights))
-                
                 after_count = sum(1 for meta in metadata if meta["rel_pos"] == "after")
                 before_count = sum(1 for meta in metadata if meta["rel_pos"] == "before")
-                
                 self.assertEqual(after_count, left_count)
                 self.assertEqual(before_count, right_count)
                 break
@@ -211,7 +199,6 @@ class TestSemanticMetagraph(unittest.TestCase):
         
         if leaf_token:
             edges, metadata = SemanticMetagraph.get_dep_edges(leaf_token)
-            
             self.assertIsInstance(edges, list)
             self.assertIsInstance(metadata, list)
             self.assertEqual(len(edges), 0)
@@ -230,7 +217,7 @@ class TestSemanticMetagraph(unittest.TestCase):
         
         # Use static method to create new graph
         new_graph = SemanticMetagraph.from_json(json_data)
-        
+
         # Verify it's the correct type
         self.assertIsInstance(new_graph, SemanticMetagraph)
         
@@ -249,14 +236,12 @@ class TestSemanticMetagraph(unittest.TestCase):
         # Test query operations
         nodes = self.graph.get_nodes()
         edges = self.graph.get_edges()
-        
         self.assertEqual(len(nodes), 3)
         self.assertGreaterEqual(len(edges), 3)
         
         # Test search operations
         node_result = self.graph.get_node_with_id(1)
         self.assertIsNotNone(node_result)
-        
         edge_result = self.graph.get_edge_with_id((1, 2))
         self.assertIsNotNone(edge_result)
 
@@ -273,13 +258,11 @@ class TestSemanticMetagraph(unittest.TestCase):
         
         # Should have some structure created
         self.assertGreater(len(edges), 0)
-        
-        # Look for entity-related edges
-        entity_edges_found = False
+
+        # Look for at least one 'hasEntityType' edge, which indicates an entity is present
+        entity_edge_found = False
         for edge_data in edges.values():
             if edge_data.get("class") == "hasEntityType":
-                entity_edges_found = True
+                entity_edge_found = True
                 break
-        
-        # Depending on the NER model, we might or might not find entities
-        # This test checks the mechanism works without being too strict about results
+        assert entity_edge_found, "Expected at least one 'hasEntityType' edge indicating an entity"
