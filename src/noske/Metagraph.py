@@ -34,11 +34,11 @@ class Metagraph:
     
     def to_json(self) -> Dict[str, Any]:
         """Convert the hypergraph to JSON format"""
-        nodes = json.dumps(list(self.get_nodes()), indent=4)
-        edges = json.dumps(list(self.get_edges()), indent=4)
-        return {"nodes": nodes, "edges": edges}
+        return {
+            "nodes": json.dumps(self.get_nodes(), indent=4),
+            "edges": json.dumps(self.get_edges(), indent=4)
+        }
     
-
     @staticmethod
     def from_json(json_data: Dict[str, Any]) -> 'Metagraph':
         """
@@ -100,16 +100,20 @@ class Metagraph:
         if metadata is None:
             metadata = [{}] * len(nodes)
         
+        # Update metadata with required fields
         for i in range(len(nodes)):
             metadata[i].update(_get_required_node_fields(
                 id=nodes[i],
                 node_type=node_type
             ))
-        self.G.add_nodes(nodes, metadata=metadata)
+        
+        # Convert list-based metadata to dict-based metadata for HypergraphX
+        metadata_dict = {nodes[i]: metadata[i] for i in range(len(nodes))}
+        self.G.add_nodes(nodes, metadata=metadata_dict)
 
     def _add_metavert(self,
-                     edge: tuple,
-                     metadata: Dict[str, Any]):
+                      edge: tuple,
+                      metadata: Dict[str, Any]):
         """
         Add a metavertex (node representing a hyperedge) to the graph.
         
@@ -127,8 +131,12 @@ class Metagraph:
         # add the metavert to the graph
         self.G.add_node(str(edge), metadata=metavert_metadata)
         
+        # Convert all elements to strings to avoid sorting issues
+        flattened_edge = (e for e in _flatten_edge(edge))
+        metavert_str = str(edge)
+        
         # link the metavertex to the hyperedge
-        parent_child_e = (str(edge), tuple(_flatten_edge(edge)))
+        parent_child_e = (metavert_str, flattened_edge)
         self.add_edge(
             edge=parent_child_e,
             metadata=_get_required_edge_fields(
@@ -138,7 +146,7 @@ class Metagraph:
         )
         
         # link the hyperedge to the metavertex
-        child_parent_e = (tuple(_flatten_edge(edge)), str(edge))
+        child_parent_e = (flattened_edge, metavert_str)
         self.add_edge(
             edge=child_parent_e,
             metadata=_get_required_edge_fields(
