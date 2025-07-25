@@ -27,6 +27,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         self.assertEqual(color, "#FFBC79")  # Predefined color used
         self.assertEqual(facecolor, "#79BCFF")
 
+
     def test_four_node_hyperedge(self):
         hye = [0, 1, 2, 3]
         pos = {
@@ -47,6 +48,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         self.assertEqual(color, "#4C9F4C")
         self.assertEqual(facecolor, "#4C9F4C")
 
+
     def test_undefined_order_color_generation(self):
         hye = [0, 1, 2, 3, 4]  # 4th order (5 nodes)
         pos = {i: (i, i) for i in range(5)}
@@ -62,6 +64,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         self.assertEqual(len(color), 7)  # Format #RRGGBB
         self.assertTrue(facecolor.startswith('#'))
         self.assertEqual(len(facecolor), 7)
+
 
     def test_clockwise_ordering(self):
         # Test points are ordered clockwise
@@ -90,9 +93,11 @@ class TestHypergraphVisualizations(unittest.TestCase):
         angles_diff = np.diff(angles)
         self.assertTrue(all(diff <= 0 for diff in angles_diff[-2:]))  # Check last points
 
+
     def test_empty_inputs(self):
         with self.assertRaises(Exception):
             get_hyperedge_styling_data([], {}, {}, {})
+
 
     def test_semantic_hypergraph_visualization(self):
         # Create a simple semantic hypergraph
@@ -120,6 +125,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         self.assertGreater(len(y1), 0)
         self.assertEqual(color, "#FFBC79")
         self.assertEqual(facecolor, "#79BCFF")
+
 
     def test_semantic_hypergraph_complex(self):
         from noske.SemanticMetagraph import SemanticMetagraph
