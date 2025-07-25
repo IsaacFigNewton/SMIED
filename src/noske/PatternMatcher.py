@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 from noske.PatternLoader import PatternLoader
-from noske.SemanticHypergraph import SemanticHypergraph
+from noske.SemanticMetagraph import SemanticMetagraph
 
 class PatternMatcher:
     """
@@ -9,7 +9,7 @@ class PatternMatcher:
     """
     
     def __init__(self,
-                    G: SemanticHypergraph,
+                    G: SemanticMetagraph,
                     pattern_loader: PatternLoader|None = None):
         self.G = G
         self.pattern_loader = pattern_loader or PatternLoader()

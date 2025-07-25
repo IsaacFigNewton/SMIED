@@ -14,7 +14,7 @@ Tools include:
 """
 
 # Import stuff from the package
-from noske.SemanticHypergraph import SemanticHypergraph
+from noske.SemanticMetagraph import SemanticMetagraph
 from noske.PatternLoader import PatternLoader
 from noske.PatternMatcher import PatternMatcher
 from noske.utils import to_nx
@@ -25,7 +25,7 @@ from noske.hypergraphx.visualizations import draw
 # Define what gets imported with "from package import *"
 __all__ = [
     # Main classes
-    "SemanticHypergraph",
+    "SemanticMetagraph",
     "PatternLoader",
     "PatternMatcher",
 

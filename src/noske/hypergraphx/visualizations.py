@@ -181,7 +181,8 @@ def get_hyperedge_styling_data(
         hye,
         pos: Dict[int, tuple],
         hyperedge_color_by_order: Dict[int, str],
-        hyperedge_facecolor_by_order: Dict[int, str]) -> List[tuple]:
+        hyperedge_facecolor_by_order: Dict[int, str]
+    ) -> tuple[List[float], List[float], str, str]:
     """
     Get the fill data for a hyperedge.
     """

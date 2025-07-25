@@ -2,7 +2,7 @@ import unittest
 import spacy
 import json
 
-from noske.SemanticHypergraph import SemanticHypergraph
+from noske.SemanticMetagraph import SemanticMetagraph
 from noske.PatternLoader import PatternLoader
 from noske.PatternMatcher import PatternMatcher
 
@@ -12,7 +12,7 @@ class TestPatternMatcher(unittest.TestCase):
         nlp = spacy.load("en_core_web_sm")
 
         # Create a simple semantic hypergraph for testing
-        self.graph = SemanticHypergraph(doc=nlp("This runs a test."))
+        self.graph = SemanticMetagraph(doc=nlp("This runs a test."))
 
         # Initialize PatternLoader with default patterns
         self.pattern_loader = PatternLoader()
