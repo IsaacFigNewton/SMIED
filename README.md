@@ -3,8 +3,8 @@
 ---
 
 ## Installation
-1. Run `git clone https://github.com/IsaacFigNewton/NoSKE-Pipeline.git` to clone the repo from GitHub.
-2. Do `cd NoSKE-Pipeline` to navigate into the repo directory.
+1. Run `git clone https://github.com/IsaacFigNewton/NoSKE.git` to clone the repo from GitHub.
+2. Do `cd NoSKE` to navigate into the repo directory.
 3. Run `pip install .` to install noske.
 4. Install a SpaCy pipeline using one of the following commands:
     - `python -m spacy download en_core_web_sm`
