@@ -1,3 +1,4 @@
+import ast
 from typing import Dict, List, Any, Optional
 import json
 
@@ -5,6 +6,7 @@ from hypergraphx.linalg import *
 from hypergraphx.generation.random import *
 
 from noske.MetagraphUtils import (
+    wrap,
     _is_edge,
     _flatten_edge,
     _get_required_node_fields,
@@ -34,10 +36,23 @@ class Metagraph:
     
     def to_json(self) -> Dict[str, Any]:
         """Convert the hypergraph to JSON format"""
-        return {
-            "nodes": json.dumps(self.get_nodes(), indent=4),
-            "edges": json.dumps(self.get_edges(), indent=4)
+        node_data = {
+            k: v
+            for k, v in self.get_nodes().items()
         }
+        edge_data = {
+            str(k): v
+            for k, v in self.get_edges().items()
+        }
+        combined_dict = {
+            "nodes": node_data,
+            "edges": edge_data
+        }
+        return json.dumps(
+            combined_dict,
+            indent=4,
+            default=str
+        )
     
     @staticmethod
     def from_json(json_data: Dict[str, Any]) -> 'Metagraph':
@@ -50,12 +65,21 @@ class Metagraph:
         Returns:
             New Metagraph instance
         """
+        # load the nodes' json data as a dict
         node_data = json.loads(json_data["nodes"])
-        nodes = list(node_data.keys())
-        nodes_metadata = [node_data[node] for node in nodes]
+        nodes = list()
+        nodes_metadata = list()
+        for k, v in node_data.items():
+            nodes.append(k)
+            nodes_metadata.append(v)
+
         edge_data = json.loads(json_data["edges"])
-        edges = list(edge_data.keys())
-        edges_metadata = [edge_data[edge] for edge in edges]
+        edges = list()
+        edges_metadata = list()
+        for k, v in edge_data.items():
+            # load the edge keys as tuples instead of strings
+            edges.append(ast.literal_eval(k))
+            edges_metadata.append(v)
         
         new_graph = Metagraph()
         new_graph.add_nodes(nodes, metadata=nodes_metadata)
@@ -136,7 +160,7 @@ class Metagraph:
         flattened_edge = tuple(e for e in _flatten_edge(edge))
         
         # link the metavertex to the hyperedge
-        parent_child_e = ((metavert_idx), flattened_edge)
+        parent_child_e = ((metavert_idx, ), flattened_edge)
         self.add_edge(
             edge=parent_child_e,
             metadata=_get_required_edge_fields(
@@ -146,7 +170,7 @@ class Metagraph:
         )
         
         # link the hyperedge to the metavertex
-        child_parent_e = (flattened_edge, (metavert_idx))
+        child_parent_e = (flattened_edge, (metavert_idx, ))
         self.add_edge(
             edge=child_parent_e,
             metadata=_get_required_edge_fields(
@@ -172,20 +196,22 @@ class Metagraph:
         
         # create a list indicating whether each element of the edge is an edge itself
         subedge_mask = [_is_edge(e) for e in edge]
+        # wrap naked node indices (integers) in tuples to avoid comparison issues
+        edge = tuple(wrap(e) for e in edge)
 
         # if it's a pairwise edge between nodes
         if len(edge) == 2 and not any(subedge_mask):
             metadata.update(_get_required_edge_fields(edge, "regular"))
-            self.G.add_edge([edge], metadata=metadata)
+            self.G.add_edge(edge, metadata=metadata)
         # if it's an undirected hyperedge
         elif not any(subedge_mask):
             metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge([edge], metadata=metadata)
+            self.G.add_edge(edge, metadata=metadata)
             self._add_metavert(edge, metadata=metadata)
         # if it's a directed hyperedge
         elif len(edge) == 2:
             metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge([edge], metadata=metadata)
+            self.G.add_edge(edge, metadata=metadata)
         # if len(edge) != 2 and the edge contains a nested edge
         #   ie if it's a metaedge/metavertex
         else:
@@ -246,9 +272,5 @@ class Metagraph:
         return {
             key: data
             for key, data in self.get_nodes().items()
-            if data["type"] == "meta"
+            if data.get("type") == "meta"
         }
-    
-    def get_metavert_metadata(self, hyperedge: tuple) -> dict[Any, Any] | None:
-        """Get metadata for a metavertex representing the given hyperedge"""
-        return self.get_nodes().get(str(hyperedge))

@@ -1,5 +1,6 @@
 import unittest
 import spacy
+import json
 
 from noske.Metagraph import Metagraph
 
@@ -127,17 +128,12 @@ class TestMetagraph(unittest.TestCase):
         """Test adding a hyperedge (more than 2 nodes)"""
         # First add nodes
         self.graph.add_nodes([1, 2, 3])
-        
-        # Add hyperedge
-        self.graph.add_edge((1, 2, 3), metadata={"type": "test_hyperedge"})
-        
-        edges = self.graph.get_edges()
-        nodes = self.graph.get_nodes()
+        self.graph.add_edge((1, 2, 3))
         
         # Should have created the hyperedge and a metavertex
+        edges = self.graph.get_edges()
         self.assertGreater(len(edges), 0)
-        
-        # Should have added a metavertex node
+        print(json.dumps(self.graph.get_nodes(), indent=4))
         metaverts = self.graph.get_all_metaverts()
         self.assertGreater(len(metaverts), 0)
 
@@ -310,8 +306,8 @@ class TestMetagraph(unittest.TestCase):
         """Test adding a directed hyperedge (2 elements where one is nested)"""
         self.graph.add_nodes([1, 2, 3])
         
-        # Add directed hyperedge - this should work
-        self.graph.add_edge(((1, 2), 3), metadata={"type": "directed_hyper"})
+        # Add directed hyperedge
+        self.graph.add_edge(((1, 2), 3), metadata={"type": "hyper"})
         
         edges = self.graph.get_edges()
         metaverts = self.graph.get_all_metaverts()

@@ -16,6 +16,7 @@ Tools include:
 # Import base class stuff
 from noske.Metagraph import Metagraph
 from noske.MetagraphUtils import (
+    wrap,
     _is_edge,
     _flatten_edge,
     _get_required_node_fields,
@@ -36,6 +37,7 @@ from noske.hypergraphx.visualizations import draw
 __all__ = [
     # Metagraph class and helpers
     'Metagraph',
+    'wrap',
     '_is_edge',
     '_flatten_edge',
     '_get_required_node_fields',

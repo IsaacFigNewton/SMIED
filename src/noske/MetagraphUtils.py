@@ -3,6 +3,9 @@ from typing import Dict, List, Any
 from hypergraphx.linalg import *
 from hypergraphx.generation.random import *
 
+def wrap(v) -> tuple:
+    return v if isinstance(v, tuple) else (v,)
+
 def _is_edge(edge: Any) -> bool:
     return isinstance(edge, tuple) and len(edge) > 1
 

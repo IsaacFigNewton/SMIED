@@ -1,6 +1,7 @@
 import unittest
 
 from noske.MetagraphUtils import (
+    wrap,
     _is_edge,
     _flatten_edge,
     _get_required_node_fields,
