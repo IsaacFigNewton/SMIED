@@ -35,6 +35,7 @@ class SemanticMetagraph(Metagraph):
         Args:
             doc: SpaCy Doc object containing parsed text
         """
+        ner_hyperedges = dict()
         # add tokens and their relations
         for t in doc:
             # define and add the token's node to G
@@ -47,24 +48,16 @@ class SemanticMetagraph(Metagraph):
             node_dict.update(self.get_token_tags(t))
             self.add_node(t.i, metadata=node_dict)
 
-            # add token NER relations
+            # track token NER relations
             if t.ent_type_:
                 # add the entity type as a node if it does not exist
-                self.add_node(
-                    t.ent_type_,
-                    metadata={"text": t.ent_type_}
-                )
-                # will aggregate the outgoing edges of the entity type into a single hyperedge
-                self.add_edges(
-                    [
-                        ((t.i), (t.ent_type_)),
-                        ((t.ent_type_), (t.i)),
-                    ],
-                    metadata=[
-                        {"type": "hasEntityType"},
-                        {"type": "contains"}
-                    ]
-                )
+                #   use -1*(entity code) as the node id
+                #   to ensure no overwriting of current/future nodes with that token index
+                ent_hye_idx = -t.ent_type
+                # add the current token's index/node idx to the list of tokens in the associated NER spans
+                if not ner_hyperedges.get(ent_hye_idx):
+                    ner_hyperedges[ent_hye_idx] = list()
+                ner_hyperedges[ent_hye_idx].append(t.i)
             
             # add dependency relations
             dep_edges, dep_edge_metadata = self.get_dep_edges(t)
@@ -73,21 +66,18 @@ class SemanticMetagraph(Metagraph):
                 metadata=dep_edge_metadata
             )
         
-        # convert the outgoing edges of the t.ent_type_ nodes into hyperedges
-        for ent in doc.ents:
-            # get all nodes that are connected to the entity type
-            connected_nodes = list(self.G.get_neighbors(ent.label_))
-            if len(connected_nodes) > 1:
-                # create a hyperedge for the entity type
-                self.add_edge(
-                    tuple(connected_nodes),
-                    metadata={
-                        "class": "hasEntityType",
-                        "subclass": ent.label_,
-                    }
-                )
-                # remove the individual entity type node and its edges
-                self.G.remove_node(ent.label_)
+        # create hyperedges for linking all tokens in associated NER spans
+        for ent_idx, token_idxs in ner_hyperedges.items():
+            self.add_edge(
+                tuple(n for n in token_idxs),
+                metadata={
+                    "class": "hasEntityType",
+                    # get the entity label associated with the entity idx
+                    "subclass": doc.vocab.strings[-ent_idx],
+                }
+            )
+            # remove the individual entity type node and its edges
+            self.G.remove_node(ent_idx)
     
 
     @staticmethod
@@ -138,6 +128,11 @@ class SemanticMetagraph(Metagraph):
         morph_dict = t.morph.to_dict()
         morph_dict = {k: v.split(",") for k, v in morph_dict.items()}
         tags.update(morph_dict)
+
+        # add NER info
+        if t.ent_type_:
+            tags["ent_type"] = t.ent_type_
+
         return tags
 
 

@@ -100,7 +100,7 @@ class PatternMatcher:
             if pattern_idx == 0:
 
                 # First node - try all nodes in the graph
-                for node_idx, node_data in self.G.get_nodes(metadata=True).items():
+                for node_idx, node_data in self.G.get_nodes().items():
                     # Add node_id for pattern matching
                     if self.node_matches(node_data, node_patterns[0]):
                         current_path.append(node_idx)

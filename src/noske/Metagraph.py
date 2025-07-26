@@ -34,7 +34,7 @@ class Metagraph:
         if json_data is not None:
             self.from_json(json_data)
     
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> str:
         """Convert the hypergraph to JSON format"""
         node_data = {
             k: v
@@ -55,25 +55,28 @@ class Metagraph:
         )
     
     @staticmethod
-    def from_json(json_data: Dict[str, Any]) -> 'Metagraph':
+    def from_json(json_data: str) -> 'Metagraph':
         """
         Load a Metagraph from JSON format.
         
         Args:
-            json_data: Dictionary containing nodes and edges data
+            json_data: JSON dict containing nodes and edges data
             
         Returns:
             New Metagraph instance
         """
+        json_data = json.loads(json_data)
+
         # load the nodes' json data as a dict
-        node_data = json.loads(json_data["nodes"])
+        node_data = json_data["nodes"]
         nodes = list()
         nodes_metadata = list()
         for k, v in node_data.items():
             nodes.append(k)
             nodes_metadata.append(v)
 
-        edge_data = json.loads(json_data["edges"])
+        # load the edges' json data as a dict
+        edge_data = json_data["edges"]
         edges = list()
         edges_metadata = list()
         for k, v in edge_data.items():
@@ -81,6 +84,7 @@ class Metagraph:
             edges.append(ast.literal_eval(k))
             edges_metadata.append(v)
         
+        # build the metagraph from the node and edge data
         new_graph = Metagraph()
         new_graph.add_nodes(nodes, metadata=nodes_metadata)
         new_graph.add_edges(edges, metadata=edges_metadata)
@@ -89,7 +93,7 @@ class Metagraph:
 
     # Node management methods
     def add_node(self,
-                 node: Any,
+                 node: int | None = None,
                  metadata: Dict[str, Any] = None,
                  node_type: str = "regular"):
         """
@@ -100,6 +104,10 @@ class Metagraph:
             metadata: Optional metadata dictionary for the node
             node_type: Type of node ("regular" or "meta")
         """
+        if not node and not metadata:
+            raise ValueError("Must provide node id or metadata in order to create a node.")
+        if node is None:
+            node = len(self.get_nodes())
         if metadata is None:
             metadata = {}
         
@@ -110,7 +118,7 @@ class Metagraph:
         self.G.add_node(node, metadata=metadata)
 
     def add_nodes(self,
-                  nodes: List[Any],
+                  nodes: List[int] | None= None,
                   metadata: List[Dict[str, Any]] = None,
                   node_type: str = "regular"):
         """
@@ -121,6 +129,10 @@ class Metagraph:
             metadata: Optional list of metadata dictionaries for each node
             node_type: Type of nodes ("regular" or "meta")
         """
+        if not nodes and not metadata:
+            raise ValueError("Must provide node id or metadata in order to create a node.")
+        if nodes is None:
+            nodes = [i + len(self.get_nodes()) for i in range(len(metadata))]
         if metadata is None:
             metadata = [{}] * len(nodes)
         
@@ -158,9 +170,10 @@ class Metagraph:
         
         # Convert all elements to strings to avoid sorting issues
         flattened_edge = tuple(e for e in _flatten_edge(edge))
+        metavert_tuple = (metavert_idx, )
         
         # link the metavertex to the hyperedge
-        parent_child_e = ((metavert_idx, ), flattened_edge)
+        parent_child_e = (metavert_tuple, flattened_edge)
         self.add_edge(
             edge=parent_child_e,
             metadata=_get_required_edge_fields(
@@ -170,7 +183,7 @@ class Metagraph:
         )
         
         # link the hyperedge to the metavertex
-        child_parent_e = (flattened_edge, (metavert_idx, ))
+        child_parent_e = (flattened_edge, metavert_tuple)
         self.add_edge(
             edge=child_parent_e,
             metadata=_get_required_edge_fields(
@@ -206,8 +219,11 @@ class Metagraph:
         # if it's an undirected hyperedge
         elif not any(subedge_mask):
             metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge(edge, metadata=metadata)
-            self._add_metavert(edge, metadata=metadata)
+            try:
+                self.G.add_edge(edge, metadata=metadata)
+                self._add_metavert(edge, metadata=metadata)
+            except TypeError:
+                raise TypeError(f"TypeError, likely due to invalid comparison while sorting edge: {edge}")
         # if it's a directed hyperedge
         elif len(edge) == 2:
             metadata.update(_get_required_edge_fields(edge, "hyper"))

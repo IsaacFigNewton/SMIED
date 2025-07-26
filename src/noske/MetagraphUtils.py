@@ -9,10 +9,11 @@ def wrap(v) -> tuple:
 def _is_edge(edge: Any) -> bool:
     return isinstance(edge, tuple) and len(edge) > 1
 
-def _flatten_edge(edge: Any) -> List[Any]:
+def _flatten_edge(edge: tuple) -> List[Any]:
     flattened_edge = list()
     for e in edge:
         if not _is_edge(e):
+            # wrap the node in a tuple so that it gets combined, compared with other edges correctly
             flattened_edge.append(e)
         else:
             flattened_edge = flattened_edge + _flatten_edge(e)
