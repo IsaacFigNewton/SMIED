@@ -129,14 +129,14 @@ class Metagraph:
         ))
         
         # add the metavert to the graph
-        self.G.add_node(str(edge), metadata=metavert_metadata)
+        metavert_idx = len(self.G.get_nodes())
+        self.G.add_node(metavert_idx, metadata=metavert_metadata)
         
         # Convert all elements to strings to avoid sorting issues
-        flattened_edge = (e for e in _flatten_edge(edge))
-        metavert_str = str(edge)
+        flattened_edge = tuple(e for e in _flatten_edge(edge))
         
         # link the metavertex to the hyperedge
-        parent_child_e = (metavert_str, flattened_edge)
+        parent_child_e = ((metavert_idx), flattened_edge)
         self.add_edge(
             edge=parent_child_e,
             metadata=_get_required_edge_fields(
@@ -146,7 +146,7 @@ class Metagraph:
         )
         
         # link the hyperedge to the metavertex
-        child_parent_e = (flattened_edge, metavert_str)
+        child_parent_e = (flattened_edge, (metavert_idx))
         self.add_edge(
             edge=child_parent_e,
             metadata=_get_required_edge_fields(
@@ -159,7 +159,7 @@ class Metagraph:
     # Edge management methods
     def add_edge(self,
                  edge: tuple,
-                 metadata: Dict[str, Any] = None):
+                 metadata: Dict[str, Any] | None = None):
         """
         Add a single edge to the metagraph.
         
@@ -176,17 +176,16 @@ class Metagraph:
         # if it's a pairwise edge between nodes
         if len(edge) == 2 and not any(subedge_mask):
             metadata.update(_get_required_edge_fields(edge, "regular"))
-            self.G.add_edge(edge, metadata=metadata)
+            self.G.add_edge([edge], metadata=metadata)
         # if it's an undirected hyperedge
         elif not any(subedge_mask):
             metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge(edge, metadata=metadata)
+            self.G.add_edge([edge], metadata=metadata)
             self._add_metavert(edge, metadata=metadata)
         # if it's a directed hyperedge
         elif len(edge) == 2:
             metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge(edge, metadata=metadata)
-            self._add_metavert(edge, metadata=metadata)
+            self.G.add_edge([edge], metadata=metadata)
         # if len(edge) != 2 and the edge contains a nested edge
         #   ie if it's a metaedge/metavertex
         else:
@@ -194,7 +193,7 @@ class Metagraph:
     
     def add_edges(self,
                   edges: List[tuple],
-                  metadata: List[Dict[str, Any]] = None):
+                  metadata: List[Dict[str, Any]] | None= None):
         """
         Add multiple edges to the metagraph.
         
