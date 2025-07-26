@@ -1,4 +1,4 @@
-# NoSKE-Pipeline
+# NoSKE
 #### A pipeline for (soon) hypergraph-based, non-stochastic knowledge extraction from text.
 ---
 
