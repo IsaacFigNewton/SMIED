@@ -15,7 +15,7 @@ dependencies = [
   "importlib",
   "networkx",
   "spacy",
-  "hypergraphx >= 1.7.8",
+  "hypergraphx@git+https://github.com/IsaacFigNewton/hypergraphx.git",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

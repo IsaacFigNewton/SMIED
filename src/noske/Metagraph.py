@@ -2,6 +2,7 @@ import ast
 from typing import Dict, List, Any, Optional
 import json
 
+from hypergraphx.core.directed_hypergraph import DirectedHypergraph
 from hypergraphx.linalg import *
 from hypergraphx.generation.random import *
 
@@ -29,7 +30,7 @@ class Metagraph:
             json_data: Optional JSON data to load the metagraph from
         """
         # HypergraphX Hypergraph instance
-        self.G = Hypergraph()
+        self.G = DirectedHypergraph()
         
         if json_data is not None:
             self.from_json(json_data)
@@ -111,11 +112,12 @@ class Metagraph:
         if metadata is None:
             metadata = {}
         
+        # wrap the node idx 
         metadata.update(_get_required_node_fields(
-            id=node,
+            id=(node,),
             node_type=node_type
         ))
-        self.G.add_node(node, metadata=metadata)
+        self.G.add_node((node,), metadata=metadata)
 
     def add_nodes(self,
                   nodes: List[int] | None= None,

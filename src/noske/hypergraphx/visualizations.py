@@ -7,8 +7,18 @@ from hypergraphx.linalg import *
 from hypergraphx.representations.projections import clique_projection
 from hypergraphx.generation.random import *
 
-from noske.utils import to_nx
-from noske.hypergraphx.Object import Object
+def to_nx(g:Hypergraph) -> nx.Graph|nx.DiGraph:
+    """
+    Convert a directed Hypergraph to a NetworkX Graph.
+    """
+    G = nx.DiGraph()
+    for node in g.get_nodes():
+        G.add_node(node, **g.get_node_metadata(node))
+    
+    for edge in g.get_edges(order=1, metadata=True):
+        G.add_edge(edge, **g.get_edge_metadata(edge))
+    
+    return G
 
 def get_node_labels(g: Hypergraph, key:str="text") -> Dict[int, str]:
     """
