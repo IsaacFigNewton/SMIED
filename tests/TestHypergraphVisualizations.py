@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from typing import Dict, List, Union
-from noske.hypergraphx.visualizations import get_hyperedge_styling_data
+from noske.SemanticMetagraph import SemanticMetagraph
 
 class TestHypergraphVisualizations(unittest.TestCase):
     def test_three_node_hyperedge(self):
@@ -16,7 +16,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         face_colors = {2: "#79BCFF"}
         
         # Execute
-        x1, y1, color, facecolor = get_hyperedge_styling_data(
+        x1, y1, color, facecolor = SemanticMetagraph.get_hyperedge_styling_data(
             hye, pos, colors, face_colors
         )
         
@@ -39,7 +39,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         colors = {3: "#4C9F4C"}
         face_colors = {3: "#4C9F4C"}
         
-        x1, y1, color, facecolor = get_hyperedge_styling_data(
+        x1, y1, color, facecolor = SemanticMetagraph.get_hyperedge_styling_data(
             hye, pos, colors, face_colors
         )
         
@@ -55,7 +55,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         colors = {2: "#FFBC79"}  # No color defined for order 4
         face_colors = {2: "#79BCFF"}
         
-        x1, y1, color, facecolor = get_hyperedge_styling_data(
+        x1, y1, color, facecolor = SemanticMetagraph.get_hyperedge_styling_data(
             hye, pos, colors, face_colors
         )
         
@@ -77,7 +77,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         colors = {2: "#FFBC79"}
         face_colors = {2: "#79BCFF"}
         
-        x1, y1, *_ = get_hyperedge_styling_data(
+        x1, y1, *_ = SemanticMetagraph.get_hyperedge_styling_data(
             hye, pos, colors, face_colors
         )
         
@@ -96,13 +96,11 @@ class TestHypergraphVisualizations(unittest.TestCase):
 
     def test_empty_inputs(self):
         with self.assertRaises(Exception):
-            get_hyperedge_styling_data([], {}, {}, {})
+            SemanticMetagraph.get_hyperedge_styling_data([], {}, {}, {})
 
 
     def test_semantic_hypergraph_visualization(self):
         # Create a simple semantic hypergraph
-        from noske.SemanticMetagraph import SemanticMetagraph
-        
         h = SemanticMetagraph()
         # Add some test nodes and edges
         h.add_nodes([0, 1, 2], metadata=[
@@ -117,7 +115,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         colors = {2: "#FFBC79"} 
         face_colors = {2: "#79BCFF"}
         
-        x1, y1, color, facecolor = get_hyperedge_styling_data(
+        x1, y1, color, facecolor = SemanticMetagraph.get_hyperedge_styling_data(
             [0, 1, 2], pos, colors, face_colors
         )
         
@@ -127,9 +125,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         self.assertEqual(facecolor, "#79BCFF")
 
 
-    def test_semantic_hypergraph_complex(self):
-        from noske.SemanticMetagraph import SemanticMetagraph
-        
+    def test_semantic_hypergraph_complex(self):        
         h = SemanticMetagraph()
         # Create a more complex structure with nested hyperedges
         h.add_nodes([0,1,2,3,4], metadata=[
@@ -146,7 +142,7 @@ class TestHypergraphVisualizations(unittest.TestCase):
         colors = {3: "#FFBC79", 4: "#4C9F4C"}
         face_colors = {3: "#79BCFF", 4: "#9F4C4C"}
 
-        x1, y1, color, facecolor = get_hyperedge_styling_data(
+        x1, y1, color, facecolor = SemanticMetagraph.get_hyperedge_styling_data(
             [0,1,2,3,4], pos, colors, face_colors
         )
 

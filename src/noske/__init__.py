@@ -29,10 +29,6 @@ from noske.PatternLoader import PatternLoader
 from noske.PatternMatcher import PatternMatcher
 from noske.utils import to_nx
 
-# Import modified Hypergraphx classes, functions
-from noske.hypergraphx.Object import Object
-from noske.hypergraphx.visualizations import draw
-
 # Define what gets imported with "from package import *"
 __all__ = [
     # Metagraph class and helpers
@@ -50,8 +46,4 @@ __all__ = [
 
     # Utility functions
     "to_nx",
-
-    # Modified from old hypergraphx package file
-    "Object",
-    "draw",
 ]

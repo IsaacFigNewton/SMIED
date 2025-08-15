@@ -14,7 +14,7 @@ from noske.MetagraphUtils import (
     _get_required_edge_fields,
 )
 
-class Metagraph:
+class Metagraph(DirectedHypergraph):
     """
     Base class for metagraph structures using HypergraphX.
     
@@ -29,9 +29,6 @@ class Metagraph:
         Args:
             json_data: Optional JSON data to load the metagraph from
         """
-        # HypergraphX Hypergraph instance
-        self.G = DirectedHypergraph()
-        
         if json_data is not None:
             self.from_json(json_data)
     
@@ -92,63 +89,6 @@ class Metagraph:
         return new_graph
     
 
-    # Node management methods
-    def add_node(self,
-                 node: int | None = None,
-                 metadata: Dict[str, Any] = None,
-                 node_type: str = "regular"):
-        """
-        Add a single node to the metagraph.
-        
-        Args:
-            node: The node identifier
-            metadata: Optional metadata dictionary for the node
-            node_type: Type of node ("regular" or "meta")
-        """
-        if not node and not metadata:
-            raise ValueError("Must provide node id or metadata in order to create a node.")
-        if node is None:
-            node = len(self.get_nodes())
-        if metadata is None:
-            metadata = {}
-        
-        # wrap the node idx 
-        metadata.update(_get_required_node_fields(
-            id=(node,),
-            node_type=node_type
-        ))
-        self.G.add_node((node,), metadata=metadata)
-
-    def add_nodes(self,
-                  nodes: List[int] | None= None,
-                  metadata: List[Dict[str, Any]] = None,
-                  node_type: str = "regular"):
-        """
-        Add multiple nodes to the metagraph.
-        
-        Args:
-            nodes: List of node identifiers
-            metadata: Optional list of metadata dictionaries for each node
-            node_type: Type of nodes ("regular" or "meta")
-        """
-        if not nodes and not metadata:
-            raise ValueError("Must provide node id or metadata in order to create a node.")
-        if nodes is None:
-            nodes = [i + len(self.get_nodes()) for i in range(len(metadata))]
-        if metadata is None:
-            metadata = [{}] * len(nodes)
-        
-        # Update metadata with required fields
-        for i in range(len(nodes)):
-            metadata[i].update(_get_required_node_fields(
-                id=nodes[i],
-                node_type=node_type
-            ))
-        
-        # Convert list-based metadata to dict-based metadata for HypergraphX
-        metadata_dict = {nodes[i]: metadata[i] for i in range(len(nodes))}
-        self.G.add_nodes(nodes, metadata=metadata_dict)
-
     def _add_metavert(self,
                       edge: tuple,
                       metadata: Dict[str, Any]):
@@ -167,8 +107,8 @@ class Metagraph:
         ))
         
         # add the metavert to the graph
-        metavert_idx = len(self.G.get_nodes())
-        self.G.add_node(metavert_idx, metadata=metavert_metadata)
+        metavert_idx = len(self.get_nodes())
+        self.add_node(metavert_idx, metadata=metavert_metadata)
         
         # Convert all elements to strings to avoid sorting issues
         flattened_edge = tuple(e for e in _flatten_edge(edge))
@@ -193,7 +133,37 @@ class Metagraph:
                 edge_type="hye_to_metavert"
             )
         )
+
+        return metavert_idx
     
+
+    def _add_metaedge(self,
+            edge: tuple,
+            metadata=dict(),
+        ):
+        # create a list indicating whether each element of the edge is an edge itself
+        subedge_mask = [_is_edge(e) for e in edge]
+
+        new_edge = list()
+        for nested_edge_idx, is_e in enumerate(subedge_mask):
+            if not is_e:
+                # if it's not an edge, add it to the list of members of the new hyperedge
+                new_edge.append(edge[nested_edge_idx])
+            else:
+                # if it is an edge, recurse on the nested edge
+                self.add_edge(edge[nested_edge_idx])
+                # get the most recently created edge (should be the outer-most shell of the metaedge onion)
+                most_recent_edge_idx = self._next_edge_id - 1
+                most_recent_edge = self.get_edge_with_edge_list_idx(most_recent_edge_idx)
+                # add a metavertex for it
+                metavert_idx = self._add_metavert(most_recent_edge, metadata=metadata)
+                # add the metavert's idx to the new edge
+                new_edge.append(metavert_idx)
+
+        # add the new hyperedge containing only regular vertices to the metagraph
+        metadata.update(_get_required_edge_fields(edge, "hyper"))
+        super().add_edge(tuple(new_edge), metadata=metadata)
+
 
     # Edge management methods
     def add_edge(self,
@@ -211,30 +181,42 @@ class Metagraph:
         
         # create a list indicating whether each element of the edge is an edge itself
         subedge_mask = [_is_edge(e) for e in edge]
-        # wrap naked node indices (integers) in tuples to avoid comparison issues
-        edge = tuple(wrap(e) for e in edge)
 
-        # if it's a pairwise edge between nodes
-        if len(edge) == 2 and not any(subedge_mask):
-            metadata.update(_get_required_edge_fields(edge, "regular"))
-            self.G.add_edge(edge, metadata=metadata)
-        # if it's an undirected hyperedge
-        elif not any(subedge_mask):
-            metadata.update(_get_required_edge_fields(edge, "hyper"))
-            try:
-                self.G.add_edge(edge, metadata=metadata)
-                self._add_metavert(edge, metadata=metadata)
-            except TypeError:
-                raise TypeError(f"TypeError, likely due to invalid comparison while sorting edge: {edge}")
-        # if it's a directed hyperedge
-        elif len(edge) == 2:
-            metadata.update(_get_required_edge_fields(edge, "hyper"))
-            self.G.add_edge(edge, metadata=metadata)
-        # if len(edge) != 2 and the edge contains a nested edge
-        #   ie if it's a metaedge/metavertex
+        # if it's a directed edge
+        if len(edge) == 2:
+
+            # if it's a pairwise edge between nodes (ex: (1, 2))
+            if not any(subedge_mask):
+                metadata.update(_get_required_edge_fields(edge, "regular"))
+                super().add_edge(edge, metadata=metadata)
+            
+            # if it's a hyperedge or metaedge
+            else:
+                
+                # if it's a hyperedge (ex: ((1, 2, 3), (4, 5, 6)))
+                if not any([_is_edge(e) for e in edge[0]])\
+                    and not any([_is_edge(e) for e in edge[1]]):
+                    metadata.update(_get_required_edge_fields(edge, "hyper"))
+                    super().add_edge(edge, metadata=metadata)
+                
+                # if it's a directed metaedge (ex: ((1, 2, (3, 4)), (5, 6, 7)))
+                else:
+                    self._add_metaedge(edge, metadata)
+        
+        # if it's an undirected hyperedge or metaedge
         else:
-            raise ValueError("Can't add a metavertex/metaedge (hyperedge with nested children) to edge list.")
-    
+
+            # if it's an undirected hyperedge (ex: (1, 2, 3))
+            if not any(subedge_mask):
+                metadata.update(_get_required_edge_fields(edge, "hyper"))
+                # add a directed edge from the contents of the edge to itself
+                super().add_edge((edge, edge), metadata=metadata)
+            
+            # if it's an undirected metaedge (ex: ((1, 2, (3, 4)), (5, 6, 7), 8, 9))
+            else:
+                self._add_metaedge(edge, metadata)
+
+
     def add_edges(self,
                   edges: List[tuple],
                   metadata: List[Dict[str, Any]] | None= None):
@@ -261,7 +243,7 @@ class Metagraph:
     # Node query methods
     def get_nodes(self) -> dict[Any, dict[Any, Any]]:
         """Get all nodes with their metadata"""
-        return self.G.get_nodes(metadata=True)  # type: ignore
+        return super().get_nodes(metadata=True)  # type: ignore
     
     def get_node_with_id(self, id: Any) -> tuple[int, dict] | None:
         """Find the node with the given id"""
@@ -274,13 +256,20 @@ class Metagraph:
     # Edge query methods
     def get_edges(self) -> dict[Any, dict[Any, Any]]:
         """Get all edges with their metadata"""
-        return self.G.get_edges(metadata=True)  # type: ignore
+        return super().get_edges(metadata=True)  # type: ignore
     
     def get_edge_with_id(self, id: Any) -> tuple[int, dict] | None:
         """Find the edge with the given id"""
         for key, data in self.get_edges().items():
             if data["id"] == id:
                 return (key, data)
+        return None
+    
+    def get_edge_with_edge_list_idx(self, idx: int) -> tuple[int, dict] | None:
+        """Find the edge with the given index"""
+        for key, data in self._edge_list.items():
+            if data == idx:
+                return key
         return None
     
 

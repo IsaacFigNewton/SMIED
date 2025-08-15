@@ -19,8 +19,10 @@ def _flatten_edge(edge: tuple) -> List[Any]:
             flattened_edge = flattened_edge + _flatten_edge(e)
     return flattened_edge
 
-def _get_required_node_fields(id: int | str | tuple,
-                                node_type: str) -> Dict[Any, Any]:
+def _get_required_node_fields(
+        id: int | str | tuple,
+        node_type: str
+    ) -> Dict[Any, Any]:
     # regular vertex ids:   v1
     # metavertex ids:       (v1, v2)
     #                       (v1, v2, v3, ...)
