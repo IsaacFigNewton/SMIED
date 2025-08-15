@@ -1,10 +1,10 @@
-from TestPatternMatcher import TestPatternMatcher
-from TestHypergraphVisualizations import TestHypergraphVisualizations
+from tests.PatternMatcher_tests import TestPatternMatcher
+from tests.HypergraphVisualization_tests import TestHypergraphVisualizations
 
-from TestMetagraphUtils import TestMetagraphUtils
-from TestMetagraph import TestMetagraph
+from tests.MetagraphUtils_tests import TestMetagraphUtils
+from tests.Metagraph_tests import TestMetagraph
 
-from TestSemanticMetagraph import TestSemanticMetagraph
+from tests.SemanticMetagraph_tests import TestSemanticMetagraph
 
 __all__ = [
     'TestPatternMatcher',

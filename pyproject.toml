@@ -16,6 +16,7 @@ dependencies = [
   "networkx",
   "spacy",
   "hypergraphx@git+https://github.com/IsaacFigNewton/hypergraphx.git",
+  "pytest"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

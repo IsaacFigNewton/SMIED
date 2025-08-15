@@ -1,10 +1,10 @@
 import unittest
 
-from TestMetagraphUtils import TestMetagraphUtils
-from TestMetagraph import TestMetagraph
-from TestPatternMatcher import TestPatternMatcher
-from TestHypergraphVisualizations import TestHypergraphVisualizations
-from TestSemanticMetagraph import TestSemanticMetagraph
+from MetagraphUtils_tests import TestMetagraphUtils
+from Metagraph_tests import TestMetagraph
+from PatternMatcher_tests import TestPatternMatcher
+from HypergraphVisualization_tests import TestHypergraphVisualizations
+from SemanticMetagraph_tests import TestSemanticMetagraph
 
 if __name__ == '__main__':
     unittest.main()
