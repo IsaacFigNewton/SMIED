@@ -2,31 +2,51 @@
     "medical_diagnosis": {
         "description": "Pattern for medical diagnosis relationships",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB"], "lemma": ["diagnose", "treat", "examine"]},
-            {"labels": ["object"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["diagnose", "treat", "examine"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     },
     "business_transaction": {
         "description": "Pattern for business transactions",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"node_id_pattern": "DITRANSITIVE_"},
-            {"labels": ["motivator"]},
-            {"root_type": ["NOUN", "PROPN"], "semantic_type": ["MONEY", "CURRENCY"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["buy", "sell", "purchase", "pay", "invest"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"], "semantic_type": ["MONEY", "CURRENCY"]}
         ]
     },
     "scientific_observation": {
         "description": "Pattern for scientific observations",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB"], "lemma": ["observe", "measure", "analyze", "study"]},
-            {"labels": ["object"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["observe", "measure", "analyze", "study"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
+        ]
+    },
+    "legal_action": {
+        "description": "Pattern for legal actions and proceedings",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["sue", "prosecute", "defend", "appeal"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
+        ]
+    },
+    "educational_process": {
+        "description": "Pattern for educational processes",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["teach", "learn", "study", "educate", "train"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     }
 }

@@ -2,29 +2,45 @@
     "passive_voice": {
         "description": "Find passive voice constructions",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["auxpass"]},
-            {"root_type": ["VERB"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubjpass", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]}
         ]
     },
     "compound_predicate": {
         "description": "Find compound predicates",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB"]},
-            {"labels": ["conj"]},
-            {"root_type": ["VERB"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "conj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]}
         ]
     },
     "relative_clause": {
         "description": "Find relative clause constructions",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["relcl"]},
-            {"root_type": ["VERB"]},
-            {"labels": ["object"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "relcl", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
+        ]
+    },
+    "adverbial_modifier": {
+        "description": "Find adverbial modifiers of verbs",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "advmod", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["ADV"]}
+        ]
+    },
+    "prepositional_phrase": {
+        "description": "Find prepositional phrase attachments",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN", "VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "nmod", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     }
 }

@@ -2,61 +2,60 @@
     "causality": {
         "description": "Find causal relationships: Subject -> Action -> Object",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB", "AUX"]},
-            {"labels": ["object"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB", "AUX"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     },
     "temporal_sequence": {
         "description": "Find temporal sequences of events",
         "pattern": [
-            {"root_type": ["VERB"]},
-            {"labels": ["boxer.owl: temp_before"]},
-            {"root_type": ["VERB"]}
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "advcl", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]}
         ]
     },
     "quality_attribution": {
         "description": "Find quality/property attributions to entities",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["DUL.owl: hasQuality"]},
-            {"root_type": ["ADJ"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "amod", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["ADJ"]}
         ]
     },
     "spatial_location": {
         "description": "Find spatial location relationships",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["hasSpatiotemporalLocation"]},
-            {"root_type": ["NOUN", "PROPN", "ADV"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nmod", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN", "ADV"]}
         ]
     },
     "entity_classification": {
         "description": "Find entity type classifications",
         "pattern": [
-            {"root_type": ["PROPN"]},
-            {"labels": ["rdf-schema: subClassOf"]},
-            {}
+            {"mv_type": "atomic", "pos": ["PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "has_entity_type", "requires_reference": true}
         ]
     },
     "quantified_entity": {
         "description": "Find quantified entities",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["quantifiers.owl: hasQuantity"]},
-            {"root_type": ["NUM", "DET"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nummod", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NUM", "DET"]}
         ]
     },
     "agent_action_patient": {
         "description": "Find agent-action-patient relationships",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB"]},
-            {"labels": ["object"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     }
 }

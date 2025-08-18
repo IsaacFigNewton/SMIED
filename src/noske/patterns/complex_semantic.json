@@ -2,43 +2,58 @@
     "ditransitive_action": {
         "description": "Find ditransitive actions (subject gives object to recipient)",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"node_id_pattern": "DITRANSITIVE_"},
-            {"labels": ["action"]},
-            {"root_type": ["VERB"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "iobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     },
     "complement_clause": {
         "description": "Find complement clauses (complex predicates)",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"node_id_pattern": "CCOMP_"},
-            {"labels": ["subject"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "ccomp", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]}
         ]
     },
     "transfer_event": {
         "description": "Find transfer events (giving, selling, etc.)",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"node_id_pattern": "DITRANSITIVE_"},
-            {"labels": ["motivator"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["give", "sell", "transfer", "hand", "pass"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
     },
     "causal_chain": {
         "description": "Find causal chains: A causes B, B causes C",
         "pattern": [
-            {"root_type": ["NOUN", "PROPN"]},
-            {"labels": ["subject"]},
-            {"root_type": ["VERB"]},
-            {"labels": ["boxer.owl: temp_before"]},
-            {"root_type": ["VERB"]},
-            {"labels": ["subject"]},
-            {"root_type": ["NOUN", "PROPN"]}
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"], "lemma": ["cause", "lead", "result", "trigger"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]}
+        ]
+    },
+    "complex_predicate_structure": {
+        "description": "Find complex predicate structures using undirected relations",
+        "pattern": [
+            {"mv_type": "undirected_relation", "relation_type": "predicate"}
+        ]
+    },
+    "hierarchical_relation": {
+        "description": "Find hierarchical relations (metavertex referencing other relations)",
+        "pattern": [
+            {"mv_type": "directed_relation"},
+            {"mv_type": "directed_relation", "requires_reference": true}
         ]
     }
 }

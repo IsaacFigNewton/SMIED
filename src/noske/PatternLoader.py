@@ -107,7 +107,8 @@ class PatternLoader:
     
     def _get_default_patterns(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
         """Default patterns as JSON-serializable dictionary"""
-        patterns = ["lexical", "simple_semantic", "complex_semantic", "domain_specific"]
+        patterns = ["lexical", "simple_semantic", "complex_semantic", "domain_specific", 
+                   "metavertex_basic", "metavertex_semantic", "metavertex_complex"]
         default_patterns = dict()
 
         for pattern in patterns:

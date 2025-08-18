@@ -1,0 +1,44 @@
+{
+    "atomic_noun": {
+        "description": "Find atomic metavertices containing nouns",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
+        ]
+    },
+    "atomic_verb": {
+        "description": "Find atomic metavertices containing verbs",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["VERB", "AUX"]}
+        ]
+    },
+    "directed_relation": {
+        "description": "Find any directed relation metavertex",
+        "pattern": [
+            {"mv_type": "directed_relation"}
+        ]
+    },
+    "undirected_relation": {
+        "description": "Find any undirected relation metavertex",
+        "pattern": [
+            {"mv_type": "undirected_relation"}
+        ]
+    },
+    "dependency_relation": {
+        "description": "Find dependency relation metavertices",
+        "pattern": [
+            {"mv_type": "directed_relation", "relation_type": ["nsubj", "dobj", "nmod", "amod", "det"]}
+        ]
+    },
+    "subject_relation": {
+        "description": "Find subject relation metavertices",
+        "pattern": [
+            {"mv_type": "directed_relation", "relation_type": "nsubj"}
+        ]
+    },
+    "object_relation": {
+        "description": "Find object relation metavertices",
+        "pattern": [
+            {"mv_type": "directed_relation", "relation_type": ["dobj", "iobj"]}
+        ]
+    }
+}
