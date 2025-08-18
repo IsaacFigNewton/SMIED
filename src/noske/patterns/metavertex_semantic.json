@@ -1,0 +1,48 @@
+{
+    "agent_action": {
+        "description": "Find agent performing an action (noun + subject relation)",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true}
+        ]
+    },
+    "action_object": {
+        "description": "Find action with direct object (verb + object relation)",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true}
+        ]
+    },
+    "noun_modifier": {
+        "description": "Find noun with adjective modifier",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "amod", "requires_reference": true}
+        ]
+    },
+    "determiner_noun": {
+        "description": "Find determiner-noun relationships",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["DET"]},
+            {"mv_type": "directed_relation", "relation_type": "det", "requires_reference": true}
+        ]
+    },
+    "compound_entity": {
+        "description": "Find compound entities (undirected relations of nouns)",
+        "pattern": [
+            {"mv_type": "undirected_relation", "relation_type": ["compound", "entity_group"]}
+        ]
+    },
+    "entity_type_relation": {
+        "description": "Find entity type relations",
+        "pattern": [
+            {"mv_type": "directed_relation", "relation_type": "has_entity_type"}
+        ]
+    },
+    "predicate_structure": {
+        "description": "Find predicate structures (undirected relations of verbs and arguments)",
+        "pattern": [
+            {"mv_type": "undirected_relation", "relation_type": "predicate"}
+        ]
+    }
+}

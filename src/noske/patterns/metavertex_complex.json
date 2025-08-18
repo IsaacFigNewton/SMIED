@@ -1,0 +1,55 @@
+{
+    "full_predicate": {
+        "description": "Find complete predicate: subject -> verb -> object",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "directed_relation", "relation_type": "dobj", "requires_reference": true}
+        ]
+    },
+    "modified_noun_phrase": {
+        "description": "Find modified noun phrase: determiner -> noun <- adjective",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["DET"]},
+            {"mv_type": "directed_relation", "relation_type": "det", "requires_reference": true},
+            {"mv_type": "directed_relation", "relation_type": "amod", "requires_reference": true}
+        ]
+    },
+    "prepositional_relation": {
+        "description": "Find prepositional relationships",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "relation_type": "nmod", "requires_reference": true}
+        ]
+    },
+    "causal_sequence": {
+        "description": "Find potential causal sequences (verb chains)",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true},
+            {"mv_type": "atomic", "pos": ["VERB"]},
+            {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": true}
+        ]
+    },
+    "complex_entity": {
+        "description": "Find complex entities with multiple relations",
+        "pattern": [
+            {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
+            {"mv_type": "directed_relation", "requires_reference": true},
+            {"mv_type": "directed_relation", "requires_reference": true}
+        ]
+    },
+    "hierarchical_structure": {
+        "description": "Find hierarchical structures (metavertex referencing other relations)",
+        "pattern": [
+            {"mv_type": "directed_relation"},
+            {"mv_type": "directed_relation", "requires_reference": true}
+        ]
+    },
+    "semantic_cluster": {
+        "description": "Find semantic clusters (undirected relations with multiple components)",
+        "pattern": [
+            {"mv_type": "undirected_relation"}
+        ]
+    }
+}
