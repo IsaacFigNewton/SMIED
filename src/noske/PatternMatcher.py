@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 from noske.PatternLoader import PatternLoader
-from noske.SemanticHypergraph import SemanticHypergraph
+from noske.SemanticMetagraph import SemanticHypergraph
 
 class PatternMatcher:
     """

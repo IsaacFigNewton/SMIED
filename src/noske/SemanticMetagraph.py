@@ -1,20 +1,20 @@
 from typing import Dict, List, Any
 import json
-import networkx as nx
 from spacy.tokens import Doc, Token
 import matplotlib.pyplot as plt
 
-class SemanticHypergraph:
+from .DirectedMetagraph import DirectedMetagraph
+
+class SemanticMetagraph(DirectedMetagraph):
     """
-    Semantic Hypergraph representation of a knowledge graph
-    TODO: Integrate HypergraphX
+    Semantic Metagraph representation of a knowledge graph
     """
         
     def __init__(self, doc: Doc):
         """
         Initialize from a spaCy Doc object
         """
-        self.G = nx.DiGraph()
+        super().__init__()
 
         # add tokens and their relations
         for t in doc:
@@ -37,7 +37,7 @@ class SemanticHypergraph:
                     (t.i, t.ent_type_, {"type":"type"}),
                 ])
             # add dependency relations
-            self.G.add_edges_from(self.get_dep_edges(t))
+            self.add_edges_from(self.get_dep_edges(t))
     
 
     def to_json(self) -> Dict[str, Any]:
@@ -53,7 +53,7 @@ class SemanticHypergraph:
         nodes = json.loads(json_data["nodes"])
         edges = json.loads(json_data["edges"])
         
-        new_graph = SemanticHypergraph(nx.DiGraph())
+        new_graph = SemanticMetagraph(nx.DiGraph())
         new_graph.G.add_nodes_from(nodes)
         new_graph.G.add_edges_from(edges)
         return new_graph
