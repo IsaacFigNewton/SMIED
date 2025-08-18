@@ -5,11 +5,12 @@ import matplotlib.pyplot as plt
 from typing import Tuple, List, Dict, Any, Set
 
 class DirectedMetagraph:
-    def __init__(self, vert_list: List[Tuple] | None):
+    def __init__(self, vert_list: List[Tuple] | None = None):
         if vert_list is None:
             self.metaverts = list()
-        self.validate_graph(vert_list)
-        self.metaverts = [self.canonicalize_vert(mv) for mv in vert_list]
+        else:
+            self.validate_graph(vert_list)
+            self.metaverts = [self.canonicalize_vert(mv) for mv in vert_list]
     
 
     @classmethod
@@ -20,7 +21,7 @@ class DirectedMetagraph:
         mv_type_0 = type(mv[0])
         # Ensure metavert metadata is in the correct format
         if len(mv) == 2:
-            assert type(mv[1]) == Dict[str, Any]
+            assert mv[1] is None or isinstance(mv[1], dict)
 
         # Check that tuple is in a valid format
         # If it's an atomic type 
@@ -28,7 +29,7 @@ class DirectedMetagraph:
             pass
 
         # If it's a directed complex type/relation
-        elif mv_type_0 == Tuple[int, int]:
+        elif isinstance(mv[0], tuple) and len(mv[0]) == 2:
             # Make sure it's only referencing previously declared metaverts
             assert mv[0][0] < mv_idx
             assert mv[0][1] < mv_idx
@@ -37,7 +38,7 @@ class DirectedMetagraph:
             assert "relation" in mv[1].keys()
 
         # If it's an undirected complex type/relation
-        elif mv_type_0 == List[int]:
+        elif isinstance(mv[0], list):
             # Make sure it's only referencing previously declared metaverts
             assert all(id < mv_idx for id in mv[0])
             # Anything more complex than an atomic type must describe the inter-nodal relation
@@ -64,10 +65,10 @@ class DirectedMetagraph:
         if mv_type_0 == str:
             return mv
         # If it's a directed complex type/relation
-        elif mv_type_0 == Tuple[int, int]:
+        elif isinstance(mv[0], tuple) and len(mv[0]) == 2:
             return mv
         # If it's an undirected complex type/relation
-        elif mv_type_0 == List[int]:
+        elif isinstance(mv[0], list):
             # Canonical form has component verts in ascending order
             return (sorted(mv[0]), mv[1])
 
@@ -128,7 +129,7 @@ class DirectedMetagraph:
         Returns:
             networkx.Graph: The constructed graph.
         """
-        G = nx.Graph()
+        G = nx.DiGraph()
 
         # Add nodes from the metagraph dictionary
         for node_id, node_data in enumerate(self.metaverts):
@@ -154,8 +155,8 @@ class DirectedMetagraph:
             metaverts: List[Tuple]
         ) -> List[Tuple]:
         # Base case
-        if len(mv_ids) == 0:
-            return []
+        if len(mv_ids) == 0 or len(metaverts) == 0:
+            return metaverts
 
         # Remove all references to any mv ids in mv_idx
         current_mv = metaverts[0]
@@ -176,12 +177,12 @@ class DirectedMetagraph:
             )
         
         # if it's a directed metaedge with >=1 bad ids, 
-        if isinstance(current_mv[0], Tuple[int, int]):
+        if isinstance(current_mv[0], tuple) and len(current_mv[0]) == 2:
             # add it to the list of verts to remove
             mv_ids.add(current_mv_idx)
         
         # if it's an undirected metaedge with >=1 bad id, 
-        if isinstance(current_mv[0], List[int]):
+        if isinstance(current_mv[0], list):
             # get new contents without the problem ids
             clean_contents = list()
             for i in current_mv[0]:

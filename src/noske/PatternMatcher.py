@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 from noske.PatternLoader import PatternLoader
-from noske.SemanticMetagraph import SemanticHypergraph
+from noske.SemanticMetagraph import SemanticMetagraph
 
 class PatternMatcher:
     """
@@ -9,7 +9,7 @@ class PatternMatcher:
     """
     
     def __init__(self,
-                    semantic_graph: SemanticHypergraph,
+                    semantic_graph: SemanticMetagraph,
                     pattern_loader: PatternLoader = None):
         self.semantic_graph = semantic_graph
         self.pattern_loader = pattern_loader or PatternLoader()
@@ -92,7 +92,7 @@ class PatternMatcher:
         # Find all matching paths using DFS
         results = []
         
-        g = self.semantic_graph.G
+        g = self.semantic_graph.to_nx()
         def dfs(current_path, pattern_idx):
             if pattern_idx == n:
                 # We've matched all nodes in the pattern

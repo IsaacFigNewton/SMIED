@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_semantic_metagraph.py -v)",
+      "Bash(python -m pytest tests/test_semantic_metagraph.py::TestSemanticMetagraph::test_initialization_empty -xvs)",
+      "Bash(python -m pytest tests/test_semantic_metagraph.py::TestSemanticMetagraph::test_remove_vert -xvs)",
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
