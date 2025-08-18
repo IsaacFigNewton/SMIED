@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "noske"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Isaac Rudnick", email = "48895941+IsaacFigNewton@users.noreply.github.com"},
 ]
