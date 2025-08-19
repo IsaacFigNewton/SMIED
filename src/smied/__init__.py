@@ -3,9 +3,9 @@ __authors__ = 'Isaac Rudnick'
 
 """
 A Python package for semantic knowledge extraction and pattern matching.
-This package provides tools for working with semantic knowledge graphs and (soon) hypergraphs.
+This package provides tools for constructing semantic metagraphs from text and enriching them with semantic decomposition.
 Tools include:
-- (soon) semantic hypergraph representation
+- semantic metagraph representation
 - pattern loading
 - pattern matching
 - visualization

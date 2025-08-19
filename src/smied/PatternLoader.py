@@ -3,7 +3,7 @@ import json
 from typing import Dict, List, Any, Union
 import networkx as nx
 
-import noske.patterns
+import smied.patterns
 
 class PatternLoader:
     """
@@ -113,7 +113,7 @@ class PatternLoader:
 
         for pattern in patterns:
             try:
-                resource_path = files(noske.patterns).joinpath(f"{pattern}.json")
+                resource_path = files(smied.patterns).joinpath(f"{pattern}.json")
                 with resource_path.open("r", encoding="utf-8") as f:
                     default_patterns[pattern] = json.load(f)
             except FileNotFoundError:

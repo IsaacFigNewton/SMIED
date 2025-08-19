@@ -1,19 +1,35 @@
-# NoSKE
-#### A pipeline for (soon) hypergraph-based, non-stochastic knowledge extraction from text.
+# SMIED
+#### SMIED is a pipeline for Semantic Metagraph-based Information Extraction and Decomposition.
 ---
 
-## Installation
-1. Run `git clone https://github.com/IsaacFigNewton/NoSKE.git` to clone the repo from GitHub.
-2. Do `cd NoSKE` to navigate into the repo directory.
-3. Run `pip install .` to install noske.
-4. Install a SpaCy pipeline using one of the following commands:
+## Quick Start
+1. Install a SpaCy pipeline using one of the following commands:
     - `python -m spacy download en_core_web_sm`
     - `python -m spacy download en_core_web_md`
     - `python -m spacy download en_core_web_lg`
+2. Run `pip install git+https://github.com/IsaacFigNewton/SMIED.git` to install SMIED from the repo's main branch.
+3. Try running the full pipeline on a piece of text with the following snippet:
+```python
+    import spacy
+    from smied import SemanticMetagraph
+    
+    nlp = spacy.load('en_core_web_sm')
+    text = "The quick brown fox jumps over the lazy dog."
+    doc = nlp(text)
+    
+    G = SemanticMetagraph(doc)
+    
+    G.plot()
+```
 ---
 
 ## Testing
-Note: If modifying parts of the package, you may want to install noske with `pip install -e .` in lieu of step 3 above.
-1. Navigate to the `tests` directory.
-2. Open and run `tests.py` in the SDE of your choice.
+Note: If modifying parts of the package, you may want to install noske with `pip install -e git+https://github.com/IsaacFigNewton/SMIED.git` in lieu of step 2 above.
+
+### Unittest Framework
+Open and run `tests.py` in the SDE of your choice.
+
+### Pytest Framework
+1. SMIED should have installed the pytest package as one of its dependencies, but if it didn't, you can do so manually with `pip install pytest`
+2. Run `python -m pytest` to run all the unit tests.
 ---

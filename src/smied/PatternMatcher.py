@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Set, Tuple, Union
 
-from noske.PatternLoader import PatternLoader
-from noske.SemanticMetagraph import SemanticMetagraph
+from smied.PatternLoader import PatternLoader
+from smied.SemanticMetagraph import SemanticMetagraph
 
 class PatternMatcher:
     """

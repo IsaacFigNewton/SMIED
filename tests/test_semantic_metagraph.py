@@ -9,7 +9,7 @@ import os
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from noske.SemanticMetagraph import SemanticMetagraph
+from smied.SemanticMetagraph import SemanticMetagraph
 
 
 class TestSemanticMetagraph(unittest.TestCase):
