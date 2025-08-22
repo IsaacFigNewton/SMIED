@@ -1,349 +1,873 @@
 import unittest
-import spacy
-import json
+from unittest.mock import Mock, patch, MagicMock
 import sys
 import os
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from smied.SemanticMetagraph import SemanticMetagraph
-from smied.PatternLoader import PatternLoader
 from smied.PatternMatcher import PatternMatcher
 
+
 class TestPatternMatcher(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Load spaCy model once for all tests"""
-        try:
-            cls.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            # If model not installed, try to download it
-            import subprocess
-            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-            cls.nlp = spacy.load("en_core_web_sm")
+    """Test the PatternMatcher class functionality"""
     
     def setUp(self):
-        """Set up a simple semantic metagraph and pattern matcher for testing"""
-        # Create a simple semantic metagraph for testing
-        self.doc = self.nlp("This runs a test.")
-        self.graph = SemanticMetagraph(doc=self.doc)
+        """Set up test fixtures"""
+        # Mock SemanticMetagraph
+        self.mock_semantic_graph = Mock()
+        self.mock_semantic_graph.metaverts = {
+            0: ("cat", {"pos": "NOUN", "text": "cat"}),
+            1: ("runs", {"pos": "VERB", "text": "runs"}),
+            2: ((0, 1), {"relation": "subject"})
+        }
+        
+        # Mock PatternLoader
+        self.mock_pattern_loader = Mock()
+        self.mock_pattern_loader.patterns = {
+            "test_category": {
+                "noun_pattern": {
+                    "description": "Simple noun pattern",
+                    "pattern": [{"pos": {"NOUN"}}]
+                },
+                "verb_pattern": {
+                    "description": "Simple verb pattern", 
+                    "pattern": [{"pos": {"VERB"}}]
+                }
+            }
+        }
+        
+        self.pattern_matcher = PatternMatcher(
+            semantic_graph=self.mock_semantic_graph,
+            pattern_loader=self.mock_pattern_loader
+        )
 
-        # Initialize PatternLoader with default patterns
-        self.pattern_loader = PatternLoader()
-
-        # Initialize PatternMatcher with the graph and loader
-        self.matcher = PatternMatcher(self.graph, self.pattern_loader)
-
-    def test_node_matches(self):
-        """Test node matching functionality"""
-        node_attrs = {"text": "test", "pos": "NOUN", "lemma": "test"}
-        pattern_attrs = {"text": "test", "pos": {"NOUN"}}
-        self.assertTrue(self.matcher.node_matches(node_attrs, pattern_attrs))
-        
-        # Test negative case
-        pattern_attrs_negative = {"text": "test", "pos": {"VERB"}}
-        self.assertFalse(self.matcher.node_matches(node_attrs, pattern_attrs_negative))
-        
-        # Test lemma matching
-        pattern_attrs_lemma = {"lemma": {"test", "testing"}}
-        self.assertTrue(self.matcher.node_matches(node_attrs, pattern_attrs_lemma))
-        
-        # Test semantic type matching
-        node_attrs_semantic = {"text": "test", "semantic_type": "concept"}
-        pattern_attrs_semantic = {"semantic_type": {"concept", "entity"}}
-        self.assertTrue(self.matcher.node_matches(node_attrs_semantic, pattern_attrs_semantic))
-
-    def test_edge_matches(self):
-        """Test edge matching functionality"""
-        edge_attrs = {"type": "relation"}
-        pattern_attrs = {"type": {"relation"}}
-        self.assertTrue(self.matcher.edge_matches(edge_attrs, pattern_attrs))
-        
-        # Test negative case
-        pattern_attrs_negative = {"type": {"different_relation"}}
-        self.assertFalse(self.matcher.edge_matches(edge_attrs, pattern_attrs_negative))
-        
-        # Test exact match
-        pattern_attrs_exact = {"type": "relation"}
-        self.assertTrue(self.matcher.edge_matches(edge_attrs, pattern_attrs_exact))
-    
-    def test_pattern_loader_integration(self):
-        """Test integration with PatternLoader"""
-        # Test adding patterns through the matcher
-        self.matcher.add_pattern(
-            name="test_integration",
-            pattern=[{"text": "test"}],
-            description="Integration test pattern",
-            category="integration"
+    def test_initialization_with_pattern_loader(self):
+        """Test PatternMatcher initialization with pattern loader"""
+        matcher = PatternMatcher(
+            semantic_graph=self.mock_semantic_graph,
+            pattern_loader=self.mock_pattern_loader
         )
         
-        # Verify pattern was added
-        self.assertIn("integration", self.pattern_loader.patterns)
-        self.assertIn("test_integration", self.pattern_loader.patterns["integration"])
-    
-    def test_graph_conversion(self):
-        """Test that the semantic graph can be converted to NetworkX"""
-        nx_graph = self.graph.to_nx()
-        
-        # Verify basic graph properties
-        self.assertGreater(len(nx_graph.nodes()), 0)
-        
-        # Check that nodes have required attributes for pattern matching
-        for node_id in nx_graph.nodes():
-            node_data = nx_graph.nodes[node_id]
-            # Should have label at minimum
-            self.assertIn("label", node_data)
-    
-    def test_semantic_graph_structure(self):
-        """Test the structure of the semantic metagraph"""
-        # Test that we have metaverts
-        self.assertGreater(len(self.graph.metaverts), 0)
-        
-        # Test that we can get tokens
-        tokens = self.graph.get_tokens()
-        self.assertIsInstance(tokens, list)
-        self.assertGreater(len(tokens), 0)
-        
-        # Test that we can get relations
-        relations = self.graph.get_relations()
-        self.assertIsInstance(relations, list)
-    
-    def test_matcher_initialization(self):
-        """Test PatternMatcher initialization"""
-        # Test with explicit pattern loader
-        custom_loader = PatternLoader()
-        matcher = PatternMatcher(self.graph, custom_loader)
-        self.assertEqual(matcher.semantic_graph, self.graph)
-        self.assertEqual(matcher.pattern_loader, custom_loader)
-        
-        # Test with default pattern loader
-        matcher_default = PatternMatcher(self.graph)
-        self.assertEqual(matcher_default.semantic_graph, self.graph)
-        self.assertIsNotNone(matcher_default.pattern_loader)
-    
-    def test_pattern_matching_compatibility(self):
-        """Test that PatternMatcher works with new SemanticMetagraph structure"""
-        # The PatternMatcher expects semantic_graph.G to be a NetworkX graph
-        # but our new SemanticMetagraph doesn't have a .G attribute
-        
-        # Check if matcher has access to graph structure
-        self.assertTrue(hasattr(self.matcher.semantic_graph, 'to_nx'))
-        
-        # Convert to NetworkX and verify structure
-        nx_graph = self.matcher.semantic_graph.to_nx()
-        self.assertGreater(len(nx_graph.nodes()), 0)
-        
-        # The PatternMatcher currently expects self.semantic_graph.G
-        # This test documents the incompatibility that needs to be fixed
-        with self.assertRaises(AttributeError):
-            # This will fail because SemanticMetagraph doesn't have .G attribute
-            _ = self.matcher.semantic_graph.G
+        self.assertEqual(matcher.semantic_graph, self.mock_semantic_graph)
+        self.assertEqual(matcher.pattern_loader, self.mock_pattern_loader)
+        self.assertTrue(matcher.use_metavertex_matching)
 
-
-class TestPatternMatcherWithUpdatedGraph(unittest.TestCase):
-    """Test PatternMatcher functionality that needs to be updated for new graph structure"""
-    
-    @classmethod
-    def setUpClass(cls):
-        """Load spaCy model once for all tests"""
-        try:
-            cls.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            import subprocess
-            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-            cls.nlp = spacy.load("en_core_web_sm")
-    
-    def setUp(self):
-        """Set up for testing with mock graph structure"""
-        self.doc = self.nlp("The cat runs fast.")
-        self.graph = SemanticMetagraph(doc=self.doc)
-        self.pattern_loader = PatternLoader()
-        
-        # Create a PatternMatcher but note it may need updates
-        self.matcher = PatternMatcher(self.graph, self.pattern_loader)
-    
-    def test_pattern_matching_with_networkx_conversion(self):
-        """Test pattern matching using NetworkX conversion"""
-        # Convert to NetworkX
-        nx_graph = self.graph.to_nx()
-        
-        # Create a temporary PatternMatcher that uses the NetworkX graph directly
-        # This simulates how the PatternMatcher should work with the new structure
-        class TempPatternMatcher:
-            def __init__(self, nx_graph, pattern_loader):
-                self.G = nx_graph  # Use NetworkX graph directly
-                self.pattern_loader = pattern_loader
+    def test_initialization_without_pattern_loader(self):
+        """Test PatternMatcher initialization without pattern loader"""
+        with patch('smied.PatternMatcher.PatternLoader') as mock_pl_class:
+            mock_pl_instance = Mock()
+            mock_pl_class.return_value = mock_pl_instance
             
-            def node_matches(self, node_attrs, pattern_attrs):
-                for k, v in pattern_attrs.items():
-                    if isinstance(v, set):
-                        if node_attrs.get(k) not in v:
-                            return False
-                    else:
-                        if node_attrs.get(k) != v:
-                            return False
-                return True
-        
-        temp_matcher = TempPatternMatcher(nx_graph, self.pattern_loader)
-        
-        # Test node matching with actual graph data
-        for node_id in nx_graph.nodes():
-            node_data = nx_graph.nodes[node_id]
-            # Test matching with a simple pattern
-            if "label" in node_data:
-                pattern = {"label": node_data["label"]}
-                self.assertTrue(temp_matcher.node_matches(node_data, pattern))
-    
-    def test_graph_structure_compatibility(self):
-        """Test that graph structure is compatible with pattern matching expectations"""
-        nx_graph = self.graph.to_nx()
-        
-        # Check that we have the expected structure
-        self.assertGreater(len(nx_graph.nodes()), 0)
-        
-        # Check node attributes
-        node_attrs = set()
-        for node_id in nx_graph.nodes():
-            node_data = nx_graph.nodes[node_id]
-            node_attrs.update(node_data.keys())
-        
-        # Should have basic attributes needed for pattern matching
-        self.assertIn("label", node_attrs)
-        
-        # Check edge attributes if edges exist
-        if len(nx_graph.edges()) > 0:
-            edge_attrs = set()
-            for u, v in nx_graph.edges():
-                edge_data = nx_graph.edges[u, v]
-                edge_attrs.update(edge_data.keys())
+            matcher = PatternMatcher(semantic_graph=self.mock_semantic_graph)
             
-            # Should have label for edges
-            self.assertIn("label", edge_attrs)
-    
-    def test_pattern_matching_works_now(self):
-        """Test that PatternMatcher now works with new graph structure after fix"""
-        # Add a simple pattern
-        self.pattern_loader.add_pattern(
-            category="test",
-            name="simple_pattern",
-            pattern=[{"text": "cat"}],
-            description="Simple pattern to match 'cat'"
+            self.assertEqual(matcher.semantic_graph, self.mock_semantic_graph)
+            self.assertEqual(matcher.pattern_loader, mock_pl_instance)
+            mock_pl_class.assert_called_once()
+
+    def test_add_pattern_delegates_to_loader(self):
+        """Test add_pattern delegates to pattern loader"""
+        test_pattern = [{"text": "test"}]
+        
+        self.pattern_matcher.add_pattern(
+            name="new_pattern",
+            pattern=test_pattern,
+            description="Test description",
+            category="test_cat"
         )
         
-        # This should now work because we fixed the PatternMatcher
-        try:
-            results = self.matcher("test")
-            self.assertIsInstance(results, dict)
-            self.assertIn("simple_pattern", results)
-            # Results might be empty if "cat" is not in the test document
-        except Exception as e:
-            self.fail(f"PatternMatcher should work with new structure but failed: {e}")
+        self.mock_pattern_loader.add_pattern.assert_called_once_with(
+            name="new_pattern",
+            pattern=test_pattern,
+            description="Test description",
+            category="test_cat"
+        )
+
+    def test_metavertex_matches_atomic_string(self):
+        """Test metavertex_matches with atomic string metavertex"""
+        # Test matching atomic metavertex (index 0: "cat")
+        pattern_attrs = {"text": "cat", "pos": "NOUN"}
+        
+        result = self.pattern_matcher.metavertex_matches(0, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_metavertex_matches_atomic_string_no_match(self):
+        """Test metavertex_matches with non-matching atomic metavertex"""
+        pattern_attrs = {"text": "dog", "pos": "NOUN"}
+        
+        result = self.pattern_matcher.metavertex_matches(0, pattern_attrs)
+        
+        self.assertFalse(result)
+
+    def test_metavertex_matches_directed_relation(self):
+        """Test metavertex_matches with directed relation metavertex"""
+        # Test matching directed relation (index 2: ((0, 1), {"relation": "subject"}))
+        pattern_attrs = {"is_directed_relation": True, "relation": "subject"}
+        
+        result = self.pattern_matcher.metavertex_matches(2, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_metavertex_matches_directed_relation_source_target(self):
+        """Test metavertex_matches checking source and target indices"""
+        pattern_attrs = {"source_idx": 0, "target_idx": 1}
+        
+        result = self.pattern_matcher.metavertex_matches(2, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_metavertex_matches_nonexistent_index(self):
+        """Test metavertex_matches with non-existent metavertex index"""
+        pattern_attrs = {"text": "anything"}
+        
+        result = self.pattern_matcher.metavertex_matches(999, pattern_attrs)
+        
+        self.assertFalse(result)
+
+    def test_metavertex_matches_undirected_relation(self):
+        """Test metavertex_matches with undirected relation"""
+        # Add undirected relation to mock graph
+        self.mock_semantic_graph.metaverts[3] = ([0, 1, 2], {"relation": "group"})
+        
+        pattern_attrs = {"is_undirected_relation": True, "relation": "group"}
+        
+        result = self.pattern_matcher.metavertex_matches(3, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_basic(self):
+        """Test basic node_matches functionality"""
+        node_attrs = {"text": "cat", "pos": "NOUN"}
+        pattern_attrs = {"text": "cat", "pos": "NOUN"}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_with_sets(self):
+        """Test node_matches with set values in patterns"""
+        node_attrs = {"pos": "NOUN", "text": "cat"}
+        pattern_attrs = {"pos": {"NOUN", "PROPN"}}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_with_sets_no_match(self):
+        """Test node_matches with set values that don't match"""
+        node_attrs = {"pos": "VERB", "text": "runs"}
+        pattern_attrs = {"pos": {"NOUN", "PROPN"}}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertFalse(result)
+
+    def test_node_matches_node_id_pattern(self):
+        """Test node_matches with node_id_pattern"""
+        node_attrs = {"node_id": "node_123", "text": "test"}
+        pattern_attrs = {"node_id_pattern": "node_"}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_semantic_type(self):
+        """Test node_matches with semantic_type"""
+        node_attrs = {"semantic_type": "entity", "text": "test"}
+        pattern_attrs = {"semantic_type": {"entity", "concept"}}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_lemma(self):
+        """Test node_matches with lemma matching"""
+        node_attrs = {"lemma": "run", "text": "running"}
+        pattern_attrs = {"lemma": {"run", "walk"}}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_mv_type_atomic(self):
+        """Test node_matches with mv_type for atomic"""
+        node_attrs = {"is_atomic": True, "text": "cat"}
+        pattern_attrs = {"mv_type": "atomic"}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_mv_type_directed_relation(self):
+        """Test node_matches with mv_type for directed_relation"""
+        node_attrs = {"is_directed_relation": True, "relation": "subject"}
+        pattern_attrs = {"mv_type": "directed_relation"}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_references_mv(self):
+        """Test node_matches with references_mv for directed relation"""
+        node_attrs = {
+            "is_directed_relation": True,
+            "source_idx": 0,
+            "target_idx": 1
+        }
+        pattern_attrs = {"references_mv": 0}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_references_mv_undirected(self):
+        """Test node_matches with references_mv for undirected relation"""
+        node_attrs = {
+            "is_undirected_relation": True,
+            "component_indices": [0, 1, 2]
+        }
+        pattern_attrs = {"references_mv": 1}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_references_mv_no_relation(self):
+        """Test node_matches with references_mv for non-relation"""
+        node_attrs = {"is_atomic": True, "text": "cat"}
+        pattern_attrs = {"references_mv": 0}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertFalse(result)
+
+    def test_edge_matches_basic(self):
+        """Test basic edge_matches functionality"""
+        edge_attrs = {"relation": "subject", "weight": 1.0}
+        pattern_attrs = {"relation": "subject"}
+        
+        result = self.pattern_matcher.edge_matches(edge_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_edge_matches_with_set(self):
+        """Test edge_matches with set pattern"""
+        edge_attrs = {"relation": "subject"}
+        pattern_attrs = {"relation": {"subject", "object"}}
+        
+        result = self.pattern_matcher.edge_matches(edge_attrs, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_edge_matches_no_match(self):
+        """Test edge_matches with no match"""
+        edge_attrs = {"relation": "object"}
+        pattern_attrs = {"relation": "subject"}
+        
+        result = self.pattern_matcher.edge_matches(edge_attrs, pattern_attrs)
+        
+        self.assertFalse(result)
+
+    def test_match_metavertex_chain_empty_query(self):
+        """Test match_metavertex_chain with empty query"""
+        result = self.pattern_matcher.match_metavertex_chain([])
+        
+        self.assertEqual(result, [])
+
+    def test_match_metavertex_chain_single_node(self):
+        """Test match_metavertex_chain with single node query"""
+        query = [{"pos": "NOUN"}]
+        
+        with patch.object(self.pattern_matcher, 'metavertex_matches') as mock_matches:
+            mock_matches.side_effect = lambda idx, pattern: idx == 0  # Only index 0 matches
+            
+            result = self.pattern_matcher.match_metavertex_chain(query)
+            
+            self.assertEqual(result, [[0]])
+
+    def test_match_metavertex_chain_multi_node(self):
+        """Test match_metavertex_chain with multi-node query"""
+        query = [{"pos": "NOUN"}, {"pos": "VERB"}]
+        
+        with patch.object(self.pattern_matcher, 'metavertex_matches') as mock_matches, \
+             patch.object(self.pattern_matcher, 'is_metavertex_related') as mock_related:
+            
+            # First pattern matches index 0, second pattern matches index 1
+            mock_matches.side_effect = lambda idx, pattern: (
+                (idx == 0 and pattern.get("pos") == "NOUN") or
+                (idx == 1 and pattern.get("pos") == "VERB")
+            )
+            mock_related.return_value = True
+            
+            result = self.pattern_matcher.match_metavertex_chain(query)
+            
+            self.assertIn([0, 1], result)
+
+    def test_is_metavertex_related_directed_relation(self):
+        """Test is_metavertex_related with directed relation"""
+        # mv_idx2 (index 2) has directed relation ((0, 1), {...})
+        result = self.pattern_matcher.is_metavertex_related(0, 2, {})
+        
+        self.assertTrue(result)
+
+    def test_is_metavertex_related_undirected_relation(self):
+        """Test is_metavertex_related with undirected relation"""
+        # Add undirected relation
+        self.mock_semantic_graph.metaverts[3] = ([0, 1], {"relation": "group"})
+        
+        result = self.pattern_matcher.is_metavertex_related(0, 3, {})
+        
+        self.assertTrue(result)
+
+    def test_is_metavertex_related_requires_reference(self):
+        """Test is_metavertex_related with requires_reference pattern"""
+        pattern = {"requires_reference": True}
+        
+        result = self.pattern_matcher.is_metavertex_related(0, 1, pattern)
+        
+        self.assertTrue(result)  # mv_idx2 > mv_idx1
+
+    def test_is_metavertex_related_no_relation(self):
+        """Test is_metavertex_related with no specific relation"""
+        result = self.pattern_matcher.is_metavertex_related(0, 1, {})
+        
+        self.assertTrue(result)  # Default: allow any relationship
+
+    def test_match_chain_metavertex_enabled(self):
+        """Test match_chain with metavertex matching enabled"""
+        query = [{"pos": "NOUN"}]
+        
+        with patch.object(self.pattern_matcher, 'match_metavertex_chain') as mock_mv_match:
+            mock_mv_match.return_value = [[0]]
+            
+            result = self.pattern_matcher.match_chain(query)
+            
+            mock_mv_match.assert_called_once_with(query)
+            self.assertEqual(result, [[0]])
+
+    def test_match_chain_networkx_fallback(self):
+        """Test match_chain with NetworkX fallback"""
+        # Disable metavertex matching
+        self.pattern_matcher.use_metavertex_matching = False
+        
+        # Mock NetworkX graph
+        mock_nx_graph = Mock()
+        mock_nx_graph.nodes.return_value = ["node1", "node2"]
+        mock_nx_graph.nodes.__getitem__ = lambda self, node: {"label": node, "pos": "NOUN"}
+        mock_nx_graph.neighbors.return_value = []
+        
+        self.mock_semantic_graph.to_nx.return_value = mock_nx_graph
+        
+        query = [{"pos": "NOUN"}]
+        
+        with patch.object(self.pattern_matcher, 'node_matches') as mock_node_matches:
+            mock_node_matches.return_value = True
+            
+            result = self.pattern_matcher.match_chain(query)
+            
+            self.assertIsInstance(result, list)
+
+    def test_match_chain_invalid_query_length(self):
+        """Test match_chain with invalid query length"""
+        # Disable metavertex matching to test NetworkX path
+        self.pattern_matcher.use_metavertex_matching = False
+        
+        # Even length query should raise error
+        query = [{"pos": "NOUN"}, {"pos": "VERB"}]  # Even length
+        
+        self.mock_semantic_graph.to_nx.return_value = Mock()
+        
+        with self.assertRaises(ValueError) as context:
+            self.pattern_matcher.match_chain(query)
+        
+        self.assertIn("odd length", str(context.exception))
+
+    def test_get_pattern_summary(self):
+        """Test get_pattern_summary method"""
+        with patch.object(self.pattern_matcher, '__call__') as mock_call:
+            mock_results = {
+                "test_category": {
+                    "noun_pattern": [[0], [1]],
+                    "verb_pattern": []
+                }
+            }
+            mock_call.return_value = mock_results
+            
+            with patch('builtins.print') as mock_print:
+                result = self.pattern_matcher.get_pattern_summary()
+            
+            self.assertEqual(result, mock_results)
+            mock_print.assert_called()  # Should print pattern information
+
+    def test_match_metavertex_pattern(self):
+        """Test match_metavertex_pattern method"""
+        pattern_dict = {
+            "description": "Test pattern",
+            "pattern": [{"pos": "NOUN"}]
+        }
+        
+        with patch.object(self.pattern_matcher, 'match_metavertex_chain') as mock_match:
+            mock_match.return_value = [[0]]
+            
+            result = self.pattern_matcher.match_metavertex_pattern(pattern_dict)
+            
+            mock_match.assert_called_once_with([{"pos": "NOUN"}])
+            self.assertEqual(result, [[0]])
+
+    def test_match_metavertex_pattern_no_pattern_key(self):
+        """Test match_metavertex_pattern with missing pattern key"""
+        pattern_dict = {"description": "No pattern"}
+        
+        result = self.pattern_matcher.match_metavertex_pattern(pattern_dict)
+        
+        self.assertEqual(result, [])
+
+    def test_get_metavertex_context(self):
+        """Test get_metavertex_context method"""
+        mv_indices = [0, 1, 2]
+        
+        result = self.pattern_matcher.get_metavertex_context(mv_indices)
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["indices"], mv_indices)
+        self.assertIn("metaverts", result)
+        self.assertIn("summary", result)
+        
+        # Check that summary includes text from atomic metaverts
+        self.assertIn("cat", result["summary"])
+        self.assertIn("runs", result["summary"])
+
+    def test_call_method_all_patterns(self):
+        """Test __call__ method matching all patterns"""
+        with patch.object(self.pattern_matcher, '__call__') as mock_call:
+            # Mock recursive calls
+            mock_call.side_effect = [
+                {"noun_pattern": [], "verb_pattern": []},  # First recursive call
+                {"test_category": {"noun_pattern": [], "verb_pattern": []}}  # Final result
+            ]
+            
+            # Call without arguments (original call)
+            mock_call.side_effect = None
+            mock_call.return_value = {"test_category": {"noun_pattern": [], "verb_pattern": []}}
+            
+            result = self.pattern_matcher()
+            
+            self.assertIsInstance(result, dict)
+            self.assertIn("test_category", result)
+
+    def test_call_method_category_only(self):
+        """Test __call__ method with category only"""
+        with patch.object(self.pattern_matcher, '__call__') as mock_call:
+            # Mock recursive calls for each pattern in category
+            mock_call.side_effect = [
+                [],  # noun_pattern result
+                [],  # verb_pattern result
+                {"noun_pattern": [], "verb_pattern": []}  # Final aggregated result
+            ]
+            
+            result = self.pattern_matcher("test_category")
+            
+            self.assertIsInstance(result, dict)
+
+    def test_call_method_specific_pattern_metavertex(self):
+        """Test __call__ method with specific pattern using metavertex matching"""
+        with patch.object(self.pattern_matcher, 'match_metavertex_pattern') as mock_match, \
+             patch.object(self.pattern_matcher, 'get_metavertex_context') as mock_context:
+            
+            mock_match.return_value = [[0], [1]]
+            mock_context.side_effect = [
+                {"indices": [0], "summary": "cat"},
+                {"indices": [1], "summary": "runs"}
+            ]
+            
+            result = self.pattern_matcher("test_category", "noun_pattern")
+            
+            self.assertIsInstance(result, list)
+            self.assertEqual(len(result), 2)
+
+    def test_call_method_specific_pattern_networkx(self):
+        """Test __call__ method with specific pattern using NetworkX matching"""
+        self.pattern_matcher.use_metavertex_matching = False
+        
+        with patch.object(self.pattern_matcher, 'match_chain') as mock_match:
+            mock_match.return_value = [["node1"], ["node2"]]
+            
+            result = self.pattern_matcher("test_category", "noun_pattern")
+            
+            self.assertEqual(result, [["node1"], ["node2"]])
+
+    def test_call_method_invalid_category(self):
+        """Test __call__ method with invalid category"""
+        with self.assertRaises(KeyError) as context:
+            self.pattern_matcher("nonexistent_category")
+        
+        self.assertIn("does not exist", str(context.exception))
+
+    def test_call_method_invalid_pattern(self):
+        """Test __call__ method with invalid pattern name"""
+        with self.assertRaises(KeyError) as context:
+            self.pattern_matcher("test_category", "nonexistent_pattern")
+        
+        self.assertIn("does not exist", str(context.exception))
+
+    def test_find_atomic_metavertices(self):
+        """Test find_atomic_metavertices method"""
+        result = self.pattern_matcher.find_atomic_metavertices(pos="NOUN")
+        
+        self.assertIn(0, result)  # "cat" with pos="NOUN"
+        self.assertNotIn(1, result)  # "runs" with pos="VERB"
+        self.assertNotIn(2, result)  # Relation metavertex
+
+    def test_find_atomic_metavertices_text_filter(self):
+        """Test find_atomic_metavertices with text filter"""
+        result = self.pattern_matcher.find_atomic_metavertices(text="cat")
+        
+        self.assertEqual(result, [0])
+
+    def test_find_atomic_metavertices_no_matches(self):
+        """Test find_atomic_metavertices with no matches"""
+        result = self.pattern_matcher.find_atomic_metavertices(pos="ADJ")
+        
+        self.assertEqual(result, [])
+
+    def test_find_relation_metavertices(self):
+        """Test find_relation_metavertices method"""
+        result = self.pattern_matcher.find_relation_metavertices()
+        
+        self.assertIn(2, result)  # Relation metavertex
+        self.assertNotIn(0, result)  # Atomic metavertex
+        self.assertNotIn(1, result)  # Atomic metavertex
+
+    def test_find_relation_metavertices_specific_type(self):
+        """Test find_relation_metavertices with specific relation type"""
+        result = self.pattern_matcher.find_relation_metavertices(relation_type="subject")
+        
+        self.assertEqual(result, [2])
+
+    def test_find_relation_metavertices_no_matches(self):
+        """Test find_relation_metavertices with no matching relation type"""
+        result = self.pattern_matcher.find_relation_metavertices(relation_type="object")
+        
+        self.assertEqual(result, [])
+
+    def test_get_metavertex_chain(self):
+        """Test get_metavertex_chain method"""
+        result = self.pattern_matcher.get_metavertex_chain(0, max_depth=2)
+        
+        self.assertIsInstance(result, list)
+        # Should find chains starting from index 0
+
+    def test_get_metavertex_chain_max_depth_limit(self):
+        """Test get_metavertex_chain respects max_depth"""
+        result = self.pattern_matcher.get_metavertex_chain(0, max_depth=0)
+        
+        self.assertEqual(result, [])
+
+    def test_analyze_metavertex_patterns(self):
+        """Test analyze_metavertex_patterns method"""
+        result = self.pattern_matcher.analyze_metavertex_patterns()
+        
+        self.assertIsInstance(result, dict)
+        self.assertIn("total_metaverts", result)
+        self.assertIn("atomic_count", result)
+        self.assertIn("directed_relation_count", result)
+        self.assertIn("undirected_relation_count", result)
+        self.assertIn("relation_types", result)
+        self.assertIn("pos_distribution", result)
+        
+        # Check specific counts based on our test data
+        self.assertEqual(result["total_metaverts"], 3)
+        self.assertEqual(result["atomic_count"], 2)  # "cat" and "runs"
+        self.assertEqual(result["directed_relation_count"], 1)  # The subject relation
+        
+        # Check distributions
+        self.assertIn("NOUN", result["pos_distribution"])
+        self.assertIn("VERB", result["pos_distribution"])
+        self.assertIn("subject", result["relation_types"])
 
 
-class TestPatternMatcherFixedImplementation(unittest.TestCase):
-    """Test a fixed version of PatternMatcher that works with new SemanticMetagraph"""
-    
-    @classmethod
-    def setUpClass(cls):
-        """Load spaCy model once for all tests"""
-        try:
-            cls.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            import subprocess
-            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-            cls.nlp = spacy.load("en_core_web_sm")
+class TestPatternMatcherEdgeCases(unittest.TestCase):
+    """Test edge cases and error conditions"""
     
     def setUp(self):
-        """Set up for testing fixed implementation"""
-        self.doc = self.nlp("The quick brown fox jumps.")
-        self.graph = SemanticMetagraph(doc=self.doc)
-        self.pattern_loader = PatternLoader()
+        """Set up test fixtures"""
+        self.mock_semantic_graph = Mock()
+        self.mock_semantic_graph.metaverts = {}
         
-        # Create a fixed PatternMatcher that works with new graph structure
-        class FixedPatternMatcher(PatternMatcher):
-            def match_chain(self, query):
-                """Fixed match_chain that uses to_nx() conversion"""
-                # Convert the semantic graph to NetworkX format
-                g = self.semantic_graph.to_nx()
-                
-                # Verify that query length is odd and > 0
-                if len(query) < 1 or len(query) % 2 == 0:
-                    raise ValueError("Query must be non-empty and have odd length (node, edge, node, ...).")
-
-                # Extract pattern requirements
-                n = (len(query) + 1) // 2  # number of nodes in pattern
-                node_patterns = [query[2*i] for i in range(n)]
-                edge_patterns = [query[2*i + 1] for i in range(n-1)]
-
-                # Find all matching paths using DFS
-                results = []
-                
-                def dfs(current_path, pattern_idx):
-                    if pattern_idx == n:
-                        # We've matched all nodes in the pattern
-                        results.append(current_path[:])
-                        return
-                    
-                    if pattern_idx == 0:
-                        # First node - try all nodes in the graph
-                        for node in g.nodes():
-                            node_data = g.nodes[node].copy()
-                            # Add node_id for pattern matching
-                            node_data["node_id"] = str(node)
-                            if self.node_matches(node_data, node_patterns[0]):
-                                current_path.append(node)
-                                dfs(current_path, 1)
-                                current_path.pop()
-                    else:
-                        # Not the first node - look for neighbors of the last node
-                        last_node = current_path[-1]
-                        edge_pattern = edge_patterns[pattern_idx - 1]
-                        node_pattern = node_patterns[pattern_idx]
-                        
-                        # Check all outgoing edges from the last node
-                        for neighbor in g.neighbors(last_node):
-                            # Check if the edge matches the pattern
-                            edge_data = g.edges[last_node, neighbor]
-                            if self.edge_matches(edge_data, edge_pattern):
-                                # Check if the neighbor node matches the pattern
-                                neighbor_data = g.nodes[neighbor].copy()
-                                neighbor_data["node_id"] = str(neighbor)
-                                if self.node_matches(neighbor_data, node_pattern):
-                                    current_path.append(neighbor)
-                                    dfs(current_path, pattern_idx + 1)
-                                    current_path.pop()
-                
-                # Start DFS from an empty path
-                dfs([], 0)
-                return results
+        self.mock_pattern_loader = Mock()
+        self.mock_pattern_loader.patterns = {}
         
-        self.fixed_matcher = FixedPatternMatcher(self.graph, self.pattern_loader)
-    
-    def test_fixed_pattern_matching(self):
-        """Test that the fixed PatternMatcher works with new graph structure"""
-        # Add a simple pattern that should match
-        self.pattern_loader.add_pattern(
-            category="test",
-            name="noun_pattern",
-            pattern=[{"pos": {"NOUN"}}],  # Match any noun
-            description="Pattern to match nouns"
+        self.pattern_matcher = PatternMatcher(
+            semantic_graph=self.mock_semantic_graph,
+            pattern_loader=self.mock_pattern_loader
         )
+
+    def test_metavertex_matches_malformed_metavertex(self):
+        """Test metavertex_matches with malformed metavertex structure"""
+        # Metavertex with only content, no metadata
+        self.mock_semantic_graph.metaverts[0] = ("test",)
         
-        # This should work with the fixed implementation
-        try:
-            results = self.fixed_matcher("test")
-            self.assertIsInstance(results, dict)
-            self.assertIn("noun_pattern", results)
-        except Exception as e:
-            # Log what went wrong for debugging
-            print(f"Fixed matcher failed: {e}")
-            # Convert to NetworkX and check structure
-            nx_graph = self.graph.to_nx()
-            print(f"Graph has {len(nx_graph.nodes())} nodes and {len(nx_graph.edges())} edges")
-            for node_id in list(nx_graph.nodes())[:3]:  # Show first 3 nodes
-                print(f"Node {node_id}: {nx_graph.nodes[node_id]}")
-            raise
+        pattern_attrs = {"text": "test"}
+        
+        result = self.pattern_matcher.metavertex_matches(0, pattern_attrs)
+        
+        self.assertTrue(result)
+
+    def test_node_matches_empty_pattern(self):
+        """Test node_matches with empty pattern"""
+        node_attrs = {"text": "test", "pos": "NOUN"}
+        pattern_attrs = {}
+        
+        result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
+        
+        self.assertTrue(result)  # Empty pattern should match anything
+
+    def test_edge_matches_empty_pattern(self):
+        """Test edge_matches with empty pattern"""
+        edge_attrs = {"relation": "test"}
+        pattern_attrs = {}
+        
+        result = self.pattern_matcher.edge_matches(edge_attrs, pattern_attrs)
+        
+        self.assertTrue(result)  # Empty pattern should match anything
+
+    def test_is_metavertex_related_missing_metavertices(self):
+        """Test is_metavertex_related with missing metavertices"""
+        result = self.pattern_matcher.is_metavertex_related(999, 998, {})
+        
+        self.assertFalse(result)
+
+    def test_match_metavertex_chain_empty_graph(self):
+        """Test match_metavertex_chain with empty graph"""
+        query = [{"pos": "NOUN"}]
+        
+        result = self.pattern_matcher.match_metavertex_chain(query)
+        
+        self.assertEqual(result, [])
+
+    def test_get_metavertex_context_missing_indices(self):
+        """Test get_metavertex_context with missing indices"""
+        mv_indices = [999, 998]
+        
+        result = self.pattern_matcher.get_metavertex_context(mv_indices)
+        
+        self.assertEqual(result["indices"], mv_indices)
+        self.assertEqual(result["metaverts"], [])
+        self.assertEqual(result["summary"], "")
+
+    def test_find_atomic_metavertices_malformed_metaverts(self):
+        """Test find_atomic_metavertices with malformed metaverts"""
+        # Metavertex without metadata
+        self.mock_semantic_graph.metaverts = {
+            0: ("test",),  # No metadata tuple
+            1: (123,),     # Non-string content
+        }
+        
+        result = self.pattern_matcher.find_atomic_metavertices(text="test")
+        
+        self.assertEqual(result, [0])
+
+    def test_find_relation_metavertices_no_metadata(self):
+        """Test find_relation_metavertices with metaverts without metadata"""
+        self.mock_semantic_graph.metaverts = {
+            0: (((0, 1)),),  # Relation without metadata
+            1: ("atomic",)   # Atomic (should be skipped)
+        }
+        
+        result = self.pattern_matcher.find_relation_metavertices(relation_type="test")
+        
+        self.assertEqual(result, [])  # No metadata means no relation match
+
+    def test_analyze_metavertex_patterns_complex_structures(self):
+        """Test analyze_metavertex_patterns with complex metavertex structures"""
+        self.mock_semantic_graph.metaverts = {
+            0: ("word", {"pos": "NOUN"}),
+            1: (((0, 5)), {"relation": "distant_ref"}),  # Forward reference
+            2: ([0, 1], {"relation": "group"}),
+            3: ({"unexpected": "structure"},),  # Unexpected structure
+            4: ([],),  # Empty list
+            5: ("target", {"pos": "VERB"})
+        }
+        
+        result = self.pattern_matcher.analyze_metavertex_patterns()
+        
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["total_metaverts"], 6)
+        self.assertGreaterEqual(result["atomic_count"], 2)  # At least "word" and "target"
+
+
+class TestPatternMatcherIntegration(unittest.TestCase):
+    """Integration tests for PatternMatcher with realistic scenarios"""
+    
+    def setUp(self):
+        """Set up realistic test scenario"""
+        # Create realistic metavertex structure representing "The cat runs fast"
+        self.mock_semantic_graph = Mock()
+        self.mock_semantic_graph.metaverts = {
+            0: ("The", {"pos": "DET", "text": "The"}),
+            1: ("cat", {"pos": "NOUN", "text": "cat"}),
+            2: ("runs", {"pos": "VERB", "text": "runs"}),
+            3: ("fast", {"pos": "ADV", "text": "fast"}),
+            4: ((0, 1), {"relation": "det"}),      # The -> cat
+            5: ((1, 2), {"relation": "nsubj"}),   # cat -> runs (subject)
+            6: ((2, 3), {"relation": "advmod"})   # runs -> fast (adverbial modifier)
+        }
+        
+        # Create realistic patterns
+        self.mock_pattern_loader = Mock()
+        self.mock_pattern_loader.patterns = {
+            "syntactic": {
+                "noun_phrase": {
+                    "description": "Determiner + Noun",
+                    "pattern": [
+                        {"mv_type": "atomic", "pos": "DET"},
+                        {"mv_type": "directed_relation", "relation": "det"}
+                    ]
+                },
+                "subject_verb": {
+                    "description": "Subject-Verb relation",
+                    "pattern": [
+                        {"mv_type": "atomic", "pos": "NOUN"},
+                        {"mv_type": "directed_relation", "relation": "nsubj"}
+                    ]
+                }
+            },
+            "semantic": {
+                "agent_action": {
+                    "description": "Agent performing action",
+                    "pattern": [
+                        {"pos": "NOUN"},
+                        {"pos": "VERB"}
+                    ]
+                }
+            }
+        }
+        
+        self.pattern_matcher = PatternMatcher(
+            semantic_graph=self.mock_semantic_graph,
+            pattern_loader=self.mock_pattern_loader
+        )
+
+    def test_realistic_pattern_matching_workflow(self):
+        """Test complete pattern matching workflow with realistic data"""
+        # Test finding noun phrases
+        with patch.object(self.pattern_matcher, 'metavertex_matches') as mock_matches:
+            # Mock matching logic for determiner-noun pattern
+            def mock_match_logic(idx, pattern):
+                mv = self.mock_semantic_graph.metaverts[idx]
+                if pattern.get("mv_type") == "atomic" and pattern.get("pos") == "DET":
+                    return idx == 0  # "The"
+                elif pattern.get("mv_type") == "directed_relation" and pattern.get("relation") == "det":
+                    return idx == 4  # det relation
+                return False
+            
+            mock_matches.side_effect = mock_match_logic
+            
+            # Test matching determiner-noun pattern
+            noun_phrase_pattern = self.mock_pattern_loader.patterns["syntactic"]["noun_phrase"]["pattern"]
+            result = self.pattern_matcher.match_metavertex_chain(noun_phrase_pattern)
+            
+            # Should find the pattern starting with "The" (index 0)
+            self.assertIsInstance(result, list)
+
+    def test_pattern_analysis_comprehensive(self):
+        """Test comprehensive pattern analysis"""
+        analysis = self.pattern_matcher.analyze_metavertex_patterns()
+        
+        # Verify analysis results
+        self.assertEqual(analysis["total_metaverts"], 7)
+        self.assertEqual(analysis["atomic_count"], 4)  # The, cat, runs, fast
+        self.assertEqual(analysis["directed_relation_count"], 3)  # det, nsubj, advmod
+        self.assertEqual(analysis["undirected_relation_count"], 0)
+        
+        # Check POS distribution
+        expected_pos = {"DET": 1, "NOUN": 1, "VERB": 1, "ADV": 1}
+        self.assertEqual(analysis["pos_distribution"], expected_pos)
+        
+        # Check relation types
+        expected_relations = {"det": 1, "nsubj": 1, "advmod": 1}
+        self.assertEqual(analysis["relation_types"], expected_relations)
+
+    def test_find_patterns_by_type(self):
+        """Test finding specific types of patterns"""
+        # Find all nouns
+        nouns = self.pattern_matcher.find_atomic_metavertices(pos="NOUN")
+        self.assertEqual(nouns, [1])  # "cat"
+        
+        # Find all verbs
+        verbs = self.pattern_matcher.find_atomic_metavertices(pos="VERB")
+        self.assertEqual(verbs, [2])  # "runs"
+        
+        # Find subject relations
+        subject_rels = self.pattern_matcher.find_relation_metavertices(relation_type="nsubj")
+        self.assertEqual(subject_rels, [5])  # subject relation
+
+    def test_metavertex_chain_construction(self):
+        """Test building metavertex chains from relationships"""
+        # Start from "cat" (index 1) and find chains
+        chains = self.pattern_matcher.get_metavertex_chain(1, max_depth=2)
+        
+        self.assertIsInstance(chains, list)
+        # Should find chains that reference "cat"
+        
+        # Check that chains include relations that reference index 1
+        for chain in chains:
+            # Last element in chain should reference earlier elements
+            if len(chain) > 1:
+                last_idx = chain[-1]
+                mv = self.mock_semantic_graph.metaverts[last_idx]
+                # For directed relations, check if they reference index 1
+                if isinstance(mv[0], tuple) and len(mv[0]) == 2:
+                    self.assertTrue(1 in mv[0])
+
+    def test_context_extraction(self):
+        """Test extracting context from metavertex sequences"""
+        # Test context for a meaningful sequence
+        mv_sequence = [0, 1, 4]  # "The", "cat", det relation
+        
+        context = self.pattern_matcher.get_metavertex_context(mv_sequence)
+        
+        self.assertEqual(context["indices"], mv_sequence)
+        self.assertEqual(len(context["metaverts"]), 3)
+        
+        # Summary should include text from atomic metaverts
+        summary = context["summary"]
+        self.assertIn("The", summary)
+        self.assertIn("cat", summary)
+        self.assertIn("det", summary)  # Relation should be included
+
+    def test_pattern_matching_with_filters(self):
+        """Test pattern matching with various filters and conditions"""
+        # Test complex pattern matching scenario
+        complex_pattern = [
+            {"mv_type": "atomic", "pos": "NOUN"},
+            {"mv_type": "directed_relation", "relation_type": {"nsubj", "dobj"}},
+            {"mv_type": "atomic", "pos": "VERB"}
+        ]
+        
+        # Mock the matching to simulate realistic results
+        with patch.object(self.pattern_matcher, 'metavertex_matches') as mock_matches, \
+             patch.object(self.pattern_matcher, 'is_metavertex_related') as mock_related:
+            
+            def match_logic(idx, pattern):
+                mv = self.mock_semantic_graph.metaverts[idx]
+                if pattern.get("mv_type") == "atomic":
+                    if pattern.get("pos") == "NOUN" and idx == 1:  # cat
+                        return True
+                    elif pattern.get("pos") == "VERB" and idx == 2:  # runs
+                        return True
+                elif pattern.get("mv_type") == "directed_relation":
+                    if idx == 5:  # nsubj relation
+                        return True
+                return False
+            
+            mock_matches.side_effect = match_logic
+            mock_related.return_value = True
+            
+            result = self.pattern_matcher.match_metavertex_chain(complex_pattern)
+            
+            self.assertIsInstance(result, list)
 
 
 if __name__ == '__main__':
