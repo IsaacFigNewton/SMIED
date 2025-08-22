@@ -162,7 +162,8 @@ class TestGlossParser(unittest.TestCase):
         mock_token3.dep_ = "obj"
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_token1, mock_token2, mock_token3]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_token1, mock_token2, mock_token3]))
         
         subjects, passive_subjects = self.parser.extract_subjects_from_gloss(mock_doc)
         
@@ -183,7 +184,8 @@ class TestGlossParser(unittest.TestCase):
         mock_pobj.dep_ = "pobj"
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_iobj, mock_dobj, mock_pobj]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_iobj, mock_dobj, mock_pobj]))
         mock_doc.noun_chunks = []
         
         objects = self.parser.extract_objects_from_gloss(mock_doc)
@@ -203,7 +205,8 @@ class TestGlossParser(unittest.TestCase):
         mock_pobj.dep_ = "pobj"
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_dobj, mock_pobj]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_dobj, mock_pobj]))
         mock_doc.noun_chunks = []
         
         objects = self.parser.extract_objects_from_gloss(mock_doc)
@@ -224,10 +227,12 @@ class TestGlossParser(unittest.TestCase):
         
         mock_chunk = Mock()
         mock_chunk.root = mock_token
-        mock_chunk.__iter__ = Mock(return_value=iter([mock_token]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_chunk.__iter__ = Mock(side_effect=lambda: iter([mock_token]))
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_root_verb]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_root_verb]))
         mock_doc.noun_chunks = [mock_chunk]
         
         objects = self.parser.extract_objects_from_gloss(mock_doc)
@@ -249,7 +254,8 @@ class TestGlossParser(unittest.TestCase):
         mock_noun.pos_ = "NOUN"
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_verb, mock_participle, mock_noun]))
+        # Make __iter__ return a new iterator each time it's called
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_verb, mock_participle, mock_noun]))
         
         verbs = self.parser.extract_verbs_from_gloss(mock_doc, include_passive=True)
         
@@ -269,7 +275,8 @@ class TestGlossParser(unittest.TestCase):
         mock_participle.dep_ = "acl"
         
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_verb, mock_participle]))
+        # Make __iter__ return a new iterator each time it's called  
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_verb, mock_participle]))
         
         verbs = self.parser.extract_verbs_from_gloss(mock_doc, include_passive=False)
         

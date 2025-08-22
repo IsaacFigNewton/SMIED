@@ -161,14 +161,20 @@ class GlossParser:
 
     def extract_verbs_from_gloss(self, gloss_doc, include_passive=False):
         """Extract verb tokens from a parsed gloss."""
-        verbs = [tok for tok in gloss_doc if tok.pos_ == "VERB"]
-
         if include_passive:
-            # Past participles used as adjectives or in relative clauses
+            # Include all verbs
+            verbs = [tok for tok in gloss_doc if tok.pos_ == "VERB"]
+            # Past participles used as adjectives or in relative clauses (that aren't already included)
             passive_verbs = [tok for tok in gloss_doc if
                             tok.tag_ in ["VBN", "VBD"] and
-                            tok.dep_ in ["acl", "relcl", "amod"]]
+                            tok.dep_ in ["acl", "relcl", "amod"] and
+                            tok.pos_ != "VERB"]
             verbs.extend(passive_verbs)
+        else:
+            # Exclude past participles when not including passive
+            verbs = [tok for tok in gloss_doc if 
+                    tok.pos_ == "VERB" and 
+                    not (tok.tag_ in ["VBN", "VBD"] and tok.dep_ in ["acl", "relcl", "amod"])]
 
         return verbs
 

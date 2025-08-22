@@ -419,8 +419,8 @@ class TestEmbeddingHelper(unittest.TestCase):
         )
         
         self.assertIsInstance(result, set)
-        # Without top_k_branch_fn, should return empty set
-        self.assertEqual(len(result), 0)
+        # Without top_k_branch_fn, should add first few candidate synsets
+        self.assertIn("subject.n.01", result)
 
     def test_build_gloss_seed_nodes_from_predicate_with_top_k_branch_fn(self):
         """Test build_gloss_seed_nodes_from_predicate with top_k_branch_fn"""
@@ -581,9 +581,10 @@ class TestEmbeddingHelperEdgeCases(unittest.TestCase):
         
         self.assertIsInstance(result, np.ndarray)
         self.assertEqual(result.shape, (2,))
-        # Should be mean of: [1,1] (available), [2.5,2.5] (mean of multi+word), [4,4] (partial)
-        # = ([1+2.5+4]/3, [1+2.5+4]/3) = (2.5, 2.5)
-        expected = np.array([2.5, 2.5])
+        # Should be mean of: [1,1] (available), [1,1] (not available->available), 
+        # [2.5,2.5] (mean of multi+word), [3,3] (mean of partial+multi)
+        # = ([1+1+2.5+3]/4, [1+1+2.5+3]/4) = (1.875, 1.875)
+        expected = np.array([1.875, 1.875])
         np.testing.assert_array_almost_equal(result, expected)
 
 
