@@ -6,6 +6,57 @@ from unittest.mock import Mock
 from typing import List, Dict, Any, Optional, Set, Tuple
 
 
+class MetavertexPatternMatcherMockFactory:
+    """Factory class for creating MetavertexPatternMatcher mock instances."""
+    
+    def __init__(self):
+        self._mock_classes = {
+            'MockMetavertexPatternMatcher': MockMetavertexPatternMatcher,
+            'MockMetavertexPatternIntegration': MockMetavertexPatternIntegration,
+            'MockMetagraphForMatcher': MockMetagraphForMatcher,
+            'MockPatternLibraryForMatcher': MockPatternLibraryForMatcher,
+            'MockMatchingEngine': MockMatchingEngine,
+            'MockMetavertexPattern': MockMetavertexPattern,
+            'MockPatternIndex': MockPatternIndex,
+            'MockMatchingStatistics': MockMatchingStatistics,
+            'MockRealMetagraphForMatcher': MockRealMetagraphForMatcher,
+            'MockComplexPatternsForMatcher': MockComplexPatternsForMatcher,
+            'MockPerformanceOptimizer': MockPerformanceOptimizer,
+            'MockMetavertexForMatcher': MockMetavertexForMatcher,
+            'MockMetaedgeForMatcher': MockMetaedgeForMatcher,
+            'MockTreePattern': MockTreePattern,
+            'MockCyclePattern': MockCyclePattern,
+            'MockCliquePattern': MockCliquePattern,
+            'MockChainPattern': MockChainPattern,
+        }
+    
+    def __call__(self, mock_name: str, *args, **kwargs) -> Mock:
+        """
+        Create and return a mock instance by name.
+        
+        Args:
+            mock_name: Name of the mock class to instantiate
+            *args: Arguments to pass to the mock constructor
+            **kwargs: Keyword arguments to pass to the mock constructor
+            
+        Returns:
+            Mock instance of the specified type
+            
+        Raises:
+            ValueError: If mock_name is not found
+        """
+        if mock_name not in self._mock_classes:
+            available = ', '.join(self._mock_classes.keys())
+            raise ValueError(f"Mock '{mock_name}' not found. Available mocks: {available}")
+        
+        mock_class = self._mock_classes[mock_name]
+        return mock_class(*args, **kwargs)
+    
+    def get_available_mocks(self) -> List[str]:
+        """Return list of available mock class names."""
+        return list(self._mock_classes.keys())
+
+
 class MockMetavertexPatternMatcher(Mock):
     """Mock for MetavertexPatternMatcher class testing."""
     
