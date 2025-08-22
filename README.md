@@ -2,13 +2,51 @@
 #### SMIED is a pipeline for Semantic Metagraph-based Information Extraction and Decomposition.
 ---
 
+## Install Dependencies
+For OpenCog's Atomspace
+```
+    <!-- Install general dependencies -->
+    apt install libboost-all-dev cmake guile-3.0-dev pkg-config cxxtest
+    
+    <!-- Install, configure Octool -->
+    sudo curl -L http://raw.github.com/opencog/ocpkg/master/ocpkg -o /usr/local/bin/octool
+    sudo chmod +x /usr/local/bin/octool
+    sudo octool -rdcpav -l default
+    sudo octool -rdcv
+    sudo octool -rdv
+
+    <!-- Install cogutil -->
+    git clone https://github.com/opencog/cogutil
+    cd ./cogutil &&\
+        mkdir build &&\
+        cd build &&\
+        cmake .. &&\
+        make -j$(nproc) &&\
+        sudo make install
+    
+    <!-- Install AtomSpace -->
+    git clone https://github.com/opencog/atomspace
+    cd ./atomspace &&\
+        mkdir build &&\
+        cd build &&\
+        cmake .. &&\
+        make -j$(nproc) &&\
+        sudo make install
+
+    <!-- Install OpenCog -->
+    git clone https://github.com/opencog/opencog
+    cd ./opencog &&\
+        mkdir build &&\
+        cd build &&\
+        cmake .. &&\
+        make -j$(nproc) &&\
+        sudo make install
+```
+---
+
 ## Quick Start
-1. Install a SpaCy pipeline using one of the following commands:
-    - `python -m spacy download en_core_web_sm`
-    - `python -m spacy download en_core_web_md`
-    - `python -m spacy download en_core_web_lg`
-2. Run `pip install git+https://github.com/IsaacFigNewton/SMIED.git` to install SMIED from the repo's main branch.
-3. Try running the full pipeline on a piece of text with the following snippet:
+1. Run `pip install git+https://github.com/IsaacFigNewton/SMIED.git` to install SMIED from the repo's main branch.
+2. Try running the full pipeline on a piece of text with the following snippet:
 ```python
     import spacy
     from smied import SemanticMetagraph
