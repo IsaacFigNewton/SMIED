@@ -10,7 +10,7 @@ from .IBeamBuilder import IBeamBuilder
 from .IEmbeddingHelper import IEmbeddingHelper
 from .IGlossParser import IGlossParser
 from .ISemanticDecomposer import ISemanticDecomposer
-from .ICrossPOSBrancher import ICrossPOSBrancher
+from .ISMIEDPipeline import ISMIEDPipeline
 
 __all__ = [
     'IPairwiseBidirectionalAStar',
@@ -18,5 +18,5 @@ __all__ = [
     'IEmbeddingHelper',
     'IGlossParser',
     'ISemanticDecomposer',
-    'ICrossPOSBrancher'
+    'ISMIEDPipeline'
 ]

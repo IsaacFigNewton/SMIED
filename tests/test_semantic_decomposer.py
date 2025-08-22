@@ -286,8 +286,12 @@ class TestSemanticDecomposer(unittest.TestCase):
         mock_synset1.name.return_value = "cat.n.01"
         mock_synset1.hypernyms.return_value = []
         mock_synset1.hyponyms.return_value = []
-        mock_synset1.holonyms.return_value = []
-        mock_synset1.meronyms.return_value = []
+        mock_synset1.member_holonyms.return_value = []
+        mock_synset1.part_holonyms.return_value = []
+        mock_synset1.substance_holonyms.return_value = []
+        mock_synset1.member_meronyms.return_value = []
+        mock_synset1.part_meronyms.return_value = []
+        mock_synset1.substance_meronyms.return_value = []
         mock_synset1.similar_tos.return_value = []
         mock_synset1.also_sees.return_value = []
         mock_synset1.verb_groups.return_value = []
@@ -298,8 +302,12 @@ class TestSemanticDecomposer(unittest.TestCase):
         mock_synset2.name.return_value = "animal.n.01"
         mock_synset2.hypernyms.return_value = []
         mock_synset2.hyponyms.return_value = [mock_synset1]  # cat is hyponym of animal
-        mock_synset2.holonyms.return_value = []
-        mock_synset2.meronyms.return_value = []
+        mock_synset2.member_holonyms.return_value = []
+        mock_synset2.part_holonyms.return_value = []
+        mock_synset2.substance_holonyms.return_value = []
+        mock_synset2.member_meronyms.return_value = []
+        mock_synset2.part_meronyms.return_value = []
+        mock_synset2.substance_meronyms.return_value = []
         mock_synset2.similar_tos.return_value = []
         mock_synset2.also_sees.return_value = []
         mock_synset2.verb_groups.return_value = []
@@ -318,6 +326,48 @@ class TestSemanticDecomposer(unittest.TestCase):
         self.assertIn("animal.n.01", result.nodes())
         # Check that edge was added from animal to cat (hyponym relationship)
         self.assertIn(("animal.n.01", "cat.n.01"), result.edges())
+
+    def test_build_synset_graph_holonym_meronym_methods(self):
+        """Test that build_synset_graph uses correct holonym/meronym methods"""
+        # This test ensures the bug with holonyms() and meronyms() is fixed
+        mock_synset = Mock(spec=[
+            'name', 'hypernyms', 'hyponyms',
+            'member_holonyms', 'part_holonyms', 'substance_holonyms',
+            'member_meronyms', 'part_meronyms', 'substance_meronyms',
+            'similar_tos', 'also_sees', 'verb_groups', 'entailments', 'causes'
+        ])
+        mock_synset.name.return_value = "tree.n.01"
+        mock_synset.hypernyms.return_value = []
+        mock_synset.hyponyms.return_value = []
+        
+        # Set up the specific holonym/meronym methods that should be called
+        mock_synset.member_holonyms.return_value = []
+        mock_synset.part_holonyms.return_value = []
+        mock_synset.substance_holonyms.return_value = []
+        mock_synset.member_meronyms.return_value = []
+        mock_synset.part_meronyms.return_value = []
+        mock_synset.substance_meronyms.return_value = []
+        
+        # Set up other methods
+        mock_synset.similar_tos.return_value = []
+        mock_synset.also_sees.return_value = []
+        mock_synset.verb_groups.return_value = []
+        mock_synset.entailments.return_value = []
+        mock_synset.causes.return_value = []
+        
+        # These old methods should NOT exist (testing the bug fix)
+        # The spec parameter ensures these methods don't exist
+        self.assertFalse(hasattr(mock_synset, 'holonyms'))
+        self.assertFalse(hasattr(mock_synset, 'meronyms'))
+        
+        self.mock_wn.all_synsets.return_value = [mock_synset]
+        self.decomposer._synset_graph = None
+        
+        # Should successfully build graph without AttributeError
+        result = self.decomposer.build_synset_graph()
+        
+        self.assertIsInstance(result, nx.DiGraph)
+        self.assertIn("tree.n.01", result.nodes())
 
     def test_show_path_with_synsets(self):
         """Test show_path static method with synset objects"""
@@ -359,8 +409,14 @@ class TestSemanticDecomposer(unittest.TestCase):
         mock_predicate = Mock()
         mock_predicate.name.return_value = "run.v.01"
         
-        subject_path = [Mock(), mock_predicate]
-        object_path = [mock_predicate, Mock()]
+        mock_subj = Mock()
+        mock_subj.name.return_value = "cat.n.01"
+        
+        mock_obj = Mock()
+        mock_obj.name.return_value = "park.n.01"
+        
+        subject_path = [mock_subj, mock_predicate]
+        object_path = [mock_predicate, mock_obj]
         
         with patch('builtins.print') as mock_print, \
              patch.object(SemanticDecomposer, 'show_path') as mock_show_path:
