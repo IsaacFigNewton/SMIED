@@ -91,7 +91,7 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         # Test with atomic metavertex
         if len(self.simple_graph.metaverts) > 0:
             # Find first atomic metavertex
-            for mv_idx, mv in enumerate(self.simple_graph.metaverts):
+            for mv_idx, mv in self.simple_graph.metaverts.items():
                 if isinstance(mv[0], str):
                     # Test matching by type
                     self.assertTrue(self.simple_matcher.metavertex_matches(mv_idx, {"mv_type": "atomic"}))
@@ -153,7 +153,7 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         """Test getting context for metavertex sequences"""
         # Find any atomic metavertex
         atomic_indices = []
-        for mv_idx, mv in enumerate(self.simple_graph.metaverts):
+        for mv_idx, mv in self.simple_graph.metaverts.items():
             if isinstance(mv[0], str):
                 atomic_indices.append(mv_idx)
                 if len(atomic_indices) >= 2:
@@ -215,7 +215,7 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         """Test getting metavertex chains"""
         # Find first atomic metavertex
         start_idx = None
-        for mv_idx, mv in enumerate(self.simple_graph.metaverts):
+        for mv_idx, mv in self.simple_graph.metaverts.items():
             if isinstance(mv[0], str):
                 start_idx = mv_idx
                 break

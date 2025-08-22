@@ -36,7 +36,7 @@ class PatternMatcher:
         """
         Check if a metavertex matches the given pattern attributes
         """
-        if mv_idx >= len(self.semantic_graph.metaverts):
+        if mv_idx not in self.semantic_graph.metaverts:
             return False
             
         mv = self.semantic_graph.metaverts[mv_idx]
@@ -122,7 +122,8 @@ class PatternMatcher:
                         return False
                 else:
                     return False
-            elif isinstance(v, set):
+            elif isinstance(v, (set, list)):
+                # Handle both sets and lists for pattern matching
                 if node_attrs.get(k) not in v:
                     return False
             else:
@@ -154,7 +155,7 @@ class PatternMatcher:
         # For single node patterns, find all matching metavertices
         if len(query) == 1:
             results = []
-            for mv_idx in range(len(self.semantic_graph.metaverts)):
+            for mv_idx in self.semantic_graph.metaverts.keys():
                 if self.metavertex_matches(mv_idx, query[0]):
                     results.append([mv_idx])
             return results
@@ -169,7 +170,7 @@ class PatternMatcher:
             
             if len(current_chain) == 0:
                 # Start with any matching metavertex
-                for mv_idx in range(len(self.semantic_graph.metaverts)):
+                for mv_idx in self.semantic_graph.metaverts.keys():
                     if self.metavertex_matches(mv_idx, remaining_query[0]):
                         find_chains([mv_idx], remaining_query[1:])
             else:
@@ -178,7 +179,7 @@ class PatternMatcher:
                 next_pattern = remaining_query[0]
                 
                 # Find metavertices that reference the last one
-                for mv_idx in range(len(self.semantic_graph.metaverts)):
+                for mv_idx in self.semantic_graph.metaverts.keys():
                     if self.is_metavertex_related(last_mv_idx, mv_idx, next_pattern):
                         if self.metavertex_matches(mv_idx, next_pattern):
                             find_chains(current_chain + [mv_idx], remaining_query[1:])
@@ -190,7 +191,7 @@ class PatternMatcher:
         """
         Check if two metavertices are related according to the pattern
         """
-        if mv_idx1 >= len(self.semantic_graph.metaverts) or mv_idx2 >= len(self.semantic_graph.metaverts):
+        if mv_idx1 not in self.semantic_graph.metaverts or mv_idx2 not in self.semantic_graph.metaverts:
             return False
         
         mv2 = self.semantic_graph.metaverts[mv_idx2]
@@ -315,7 +316,7 @@ class PatternMatcher:
         }
         
         for mv_idx in mv_indices:
-            if mv_idx < len(self.semantic_graph.metaverts):
+            if mv_idx in self.semantic_graph.metaverts:
                 mv = self.semantic_graph.metaverts[mv_idx]
                 context["metaverts"].append(mv)
                 
@@ -377,7 +378,7 @@ class PatternMatcher:
         Find atomic metavertices (string content) matching filters
         """
         results = []
-        for mv_idx, mv in enumerate(self.semantic_graph.metaverts):
+        for mv_idx, mv in self.semantic_graph.metaverts.items():
             if isinstance(mv[0], str):
                 mv_attrs = {"text": mv[0], "mv_idx": mv_idx}
                 if len(mv) > 1 and mv[1]:
@@ -400,7 +401,7 @@ class PatternMatcher:
         Find relation metavertices matching criteria
         """
         results = []
-        for mv_idx, mv in enumerate(self.semantic_graph.metaverts):
+        for mv_idx, mv in self.semantic_graph.metaverts.items():
             mv_content, mv_metadata = mv if len(mv) == 2 else (mv[0], {})
             
             # Skip atomic metavertices
@@ -440,7 +441,9 @@ class PatternMatcher:
             last_idx = current_chain[-1]
             
             # Find metavertices that reference the last one
-            for mv_idx in range(last_idx + 1, len(self.semantic_graph.metaverts)):
+            for mv_idx in self.semantic_graph.metaverts.keys():
+                if mv_idx <= last_idx:  # Only look at later metavertices
+                    continue
                 mv = self.semantic_graph.metaverts[mv_idx]
                 mv_content = mv[0]
                 
@@ -472,7 +475,7 @@ class PatternMatcher:
             "dependency_depth": 0
         }
         
-        for mv_idx, mv in enumerate(self.semantic_graph.metaverts):
+        for mv_idx, mv in self.semantic_graph.metaverts.items():
             mv_content, mv_metadata = mv if len(mv) == 2 else (mv[0], {})
             
             if isinstance(mv_content, str):

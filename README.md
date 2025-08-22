@@ -24,7 +24,7 @@
 ---
 
 ## Testing
-Note: If modifying parts of the package, you may want to install noske with `pip install -e git+https://github.com/IsaacFigNewton/SMIED.git` in lieu of step 2 above.
+Note: If modifying parts of the package, you may want to install smied with `pip install -e git+https://github.com/IsaacFigNewton/SMIED.git` in lieu of step 2 above.
 
 ### Unittest Framework
 Open and run `tests.py` in the SDE of your choice.

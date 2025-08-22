@@ -54,7 +54,7 @@ class PatternLoader:
             for item in json_pattern:
                 converted_item = {}
                 for key, value in item.items():
-                    if isinstance(value, list) and key in ["root_type", "labels", "pos"]:
+                    if isinstance(value, list) and key in ["root_type", "labels", "pos", "relation_type"]:
                         converted_item[key] = set(value)
                     else:
                         converted_item[key] = value
