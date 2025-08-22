@@ -4,7 +4,8 @@ import nltk
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
 
-import nltk.corpus.wordnet as wn
+from nltk.corpus import wordnet as wn
+
 from typing import Optional, Callable, Dict, List, Tuple, Any
 from .PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
 from .BeamBuilder import BeamBuilder
@@ -36,7 +37,7 @@ class SemanticDecomposer:
         # Initialize component classes
         self.embedding_helper = EmbeddingHelper()
         self.beam_builder = BeamBuilder(self.embedding_helper)
-        self.gloss_parser = GlossParser()
+        self.gloss_parser = GlossParser(nlp_func=nlp_func)
         
         # Cached graph
         self._synset_graph = None
@@ -129,14 +130,12 @@ class SemanticDecomposer:
         subject_paths = []
         
         # Strategy 1: Look for active subjects in predicate's gloss
-        pred_gloss_doc = self.nlp_func(predicate_synset.definition())
-        active_subjects, _ = self.gloss_parser.extract_subjects_from_gloss(pred_gloss_doc)
-        
-        if active_subjects:
-            # Convert spacy tokens to synsets and get best matches
-            subject_candidates = [self.wn_module.synsets(s.text, pos=self.wn_module.NOUN) 
-                                for s in active_subjects[:max_sample_size]]
-            matched_synsets = self._get_best_synset_matches(subject_candidates, subject_synsets)
+        pred_gloss_parsed = self.gloss_parser.parse_gloss(predicate_synset.definition())
+        if pred_gloss_parsed and pred_gloss_parsed.get('subjects'):
+            # Get subject synsets from parsed gloss
+            matched_synsets = self._get_best_synset_matches(
+                [pred_gloss_parsed['subjects']], subject_synsets
+            )
             
             for subj_synset in subject_synsets:
                 for matched_synset in matched_synsets:
@@ -151,14 +150,12 @@ class SemanticDecomposer:
         
         # Strategy 2: Look for verbs in subject glosses
         for subj_synset in subject_synsets:
-            subj_gloss_doc = self.nlp_func(subj_synset.definition())
-            verbs = self.gloss_parser.extract_verbs_from_gloss(subj_gloss_doc, include_passive=False)
-            
-            if verbs:
-                # Convert spacy tokens to synsets  
-                verb_candidates = [self.wn_module.synsets(v.text, pos=self.wn_module.VERB) 
-                                 for v in verbs[:max_sample_size]]
-                matched_synsets = self._get_best_synset_matches(verb_candidates, [predicate_synset])
+            subj_gloss_parsed = self.gloss_parser.parse_gloss(subj_synset.definition())
+            if subj_gloss_parsed and subj_gloss_parsed.get('predicates'):
+                # Get predicate synsets from parsed subject gloss
+                matched_synsets = self._get_best_synset_matches(
+                    [subj_gloss_parsed['predicates']], [predicate_synset]
+                )
                 
                 for matched_synset in matched_synsets:
                     path = self._find_path_between_synsets(
@@ -173,7 +170,7 @@ class SemanticDecomposer:
         # Strategy 3: Explore hypernyms if no direct paths found
         if not subject_paths:
             subject_paths.extend(self._explore_hypernym_paths(
-                subject_synsets, predicate_synset, g, get_new_beams_fn,
+                subject_synsets, [predicate_synset], g, get_new_beams_fn,
                 beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
             ))
             
@@ -186,16 +183,12 @@ class SemanticDecomposer:
         object_paths = []
         
         # Strategy 1: Look for objects (including passive subjects) in predicate's gloss
-        pred_gloss_doc = self.nlp_func(predicate_synset.definition())
-        objects = self.gloss_parser.extract_objects_from_gloss(pred_gloss_doc)
-        _, passive_subjects = self.gloss_parser.extract_subjects_from_gloss(pred_gloss_doc)
-        objects.extend(passive_subjects)
-        
-        if objects:
-            # Convert spacy tokens to synsets and get best matches
-            object_candidates = [self.wn_module.synsets(o.text, pos=self.wn_module.NOUN) 
-                               for o in objects[:max_sample_size]]
-            matched_synsets = self._get_best_synset_matches(object_candidates, object_synsets)
+        pred_gloss_parsed = self.gloss_parser.parse_gloss(predicate_synset.definition())
+        if pred_gloss_parsed and pred_gloss_parsed.get('objects'):
+            # Get object synsets from parsed gloss
+            matched_synsets = self._get_best_synset_matches(
+                [pred_gloss_parsed['objects']], object_synsets
+            )
             
             for matched_synset in matched_synsets:
                 for obj_synset in object_synsets:
@@ -210,15 +203,12 @@ class SemanticDecomposer:
         
         # Strategy 2: Look for verbs in object glosses (including instrumental verbs)
         for obj_synset in object_synsets:
-            obj_gloss_doc = self.nlp_func(obj_synset.definition())
-            verbs = self.gloss_parser.extract_verbs_from_gloss(obj_gloss_doc, include_passive=True)
-            verbs.extend(self.gloss_parser.find_instrumental_verbs(obj_gloss_doc))
-            
-            if verbs:
-                # Convert spacy tokens to synsets
-                verb_candidates = [self.wn_module.synsets(v.text, pos=self.wn_module.VERB) 
-                                 for v in verbs[:max_sample_size]]
-                matched_synsets = self._get_best_synset_matches(verb_candidates, [predicate_synset])
+            obj_gloss_parsed = self.gloss_parser.parse_gloss(obj_synset.definition())
+            if obj_gloss_parsed and obj_gloss_parsed.get('predicates'):
+                # Get predicate synsets from parsed object gloss
+                matched_synsets = self._get_best_synset_matches(
+                    [obj_gloss_parsed['predicates']], [predicate_synset]
+                )
                 
                 for matched_synset in matched_synsets:
                     path = self._find_path_between_synsets(

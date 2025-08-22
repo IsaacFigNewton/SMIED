@@ -1,6 +1,9 @@
 from collections import deque
 from typing import List, Optional
-import nltk.corpus.wordnet as wn
+
+import nltk
+nltk.download('wordnet', quiet=True)
+from nltk.corpus import wordnet as wn
 
 
 class GlossParser:
@@ -11,18 +14,105 @@ class GlossParser:
     using dependency parsing information.
     """
     
-    def __init__(self):
-        pass
+    def __init__(self, nlp_func=None):
+        """
+        Initialize GlossParser with optional NLP function.
+        
+        Args:
+            nlp_func: spaCy NLP function for text processing. If None, parsing methods
+                     will require gloss_doc to be passed as pre-processed spaCy documents.
+        """
+        self.nlp_func = nlp_func
 
-    def parse_gloss(self, gloss_text):
+    def parse_gloss(self, gloss_text: str, nlp_func=None) -> Optional[dict]:
         """
         Parse a gloss text and return a dictionary with extracted semantic elements.
-        This is a simplified implementation for backward compatibility.
+        
+        Args:
+            gloss_text: The gloss definition text to parse
+            nlp_func: Optional spaCy NLP function. Uses instance nlp_func if not provided.
+            
+        Returns:
+            Dictionary with keys 'subjects', 'objects', 'predicates' containing lists of synsets,
+            or None if parsing fails.
         """
-        # For now, return None to indicate no structured parsing
-        # In a full implementation, this would parse the gloss and return
-        # a dictionary with keys like 'subject', 'object', 'predicate'
-        return None
+        # Use provided nlp_func or instance nlp_func
+        nlp = nlp_func or self.nlp_func
+        if nlp is None:
+            # Cannot parse without NLP function
+            return None
+            
+        try:
+            # Parse the gloss text
+            gloss_doc = nlp(gloss_text)
+            
+            # Extract semantic elements using existing methods
+            subjects, passive_subjects = self.extract_subjects_from_gloss(gloss_doc)
+            objects = self.extract_objects_from_gloss(gloss_doc)
+            predicates = self.extract_verbs_from_gloss(gloss_doc, include_passive=True)
+            
+            # Add instrumental verbs to predicates
+            instrumental_verbs = self.find_instrumental_verbs(gloss_doc)
+            predicates.extend(instrumental_verbs)
+            
+            # Convert tokens to synsets using WordNet
+            subject_synsets = self._tokens_to_synsets(subjects, pos='n')
+            object_synsets = self._tokens_to_synsets(objects + passive_subjects, pos='n')
+            predicate_synsets = self._tokens_to_synsets(predicates, pos='v')
+            
+            return {
+                'subjects': subject_synsets,
+                'objects': object_synsets, 
+                'predicates': predicate_synsets,
+                # Keep raw tokens for debugging/analysis
+                'raw_subjects': subjects,
+                'raw_objects': objects,
+                'raw_predicates': predicates,
+                'raw_passive_subjects': passive_subjects,
+                'raw_instrumental_verbs': instrumental_verbs
+            }
+            
+        except Exception as e:
+            # Return None on any parsing error
+            return None
+    
+    def _tokens_to_synsets(self, tokens, pos='n', max_synsets_per_token=3):
+        """
+        Convert spaCy tokens to WordNet synsets.
+        
+        Args:
+            tokens: List of spaCy tokens
+            pos: Part of speech ('n' for noun, 'v' for verb, 'a' for adjective, 'r' for adverb)
+            max_synsets_per_token: Maximum number of synsets to return per token
+            
+        Returns:
+            List of synsets
+        """
+        synsets = []
+        
+        for token in tokens:
+            # Skip punctuation and stop words
+            if token.is_punct or token.is_stop:
+                continue
+                
+            # Get lemmatized form
+            lemma = token.lemma_.lower()
+            
+            # Get synsets for the token
+            try:
+                token_synsets = wn.synsets(lemma, pos=pos)
+                # Limit to max_synsets_per_token to avoid explosion
+                synsets.extend(token_synsets[:max_synsets_per_token])
+            except:
+                # Try with the original text if lemma fails
+                try:
+                    token_synsets = wn.synsets(token.text.lower(), pos=pos)
+                    synsets.extend(token_synsets[:max_synsets_per_token])
+                except:
+                    # Skip tokens that can't be converted to synsets
+                    continue
+                    
+        return synsets
 
     def extract_subjects_from_gloss(self, gloss_doc):
         """Extract subject tokens from a parsed gloss."""

@@ -1,5 +1,9 @@
 import networkx as nx
-import nltk.corpus.wordnet as wn
+
+import nltk
+nltk.download('wordnet', quiet=True)
+from nltk.corpus import wordnet as wn
+
 from typing import List, Tuple, Dict
 from .EmbeddingHelper import EmbeddingHelper
 

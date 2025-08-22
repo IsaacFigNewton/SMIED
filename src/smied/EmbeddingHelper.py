@@ -1,6 +1,10 @@
 
 import numpy as np
-import nltk.corpus.wordnet as wn
+
+import nltk
+nltk.download('wordnet', quiet=True)
+from nltk.corpus import wordnet as wn
+
 from typing import Dict, List, Tuple, Optional, Callable, Set
 from collections import defaultdict
 
