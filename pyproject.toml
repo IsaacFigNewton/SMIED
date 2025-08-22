@@ -3,7 +3,7 @@ requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "noske"
+name = "smied"
 version = "0.1.0"
 authors = [
   { name="Isaac Rudnick", email = "48895941+IsaacFigNewton@users.noreply.github.com"},
@@ -27,10 +27,10 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["noske*"]
+include = ["smied*"]
 
 [tool.setuptools.package-dir]
 "" = "src"
 
 [tool.setuptools.package-data]
-"noske.patterns" = ["*.json"]
+"smied.patterns" = ["*.json"]

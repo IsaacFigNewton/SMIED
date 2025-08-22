@@ -7,9 +7,9 @@ import os
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from noske.SemanticMetagraph import SemanticMetagraph
-from noske.PatternLoader import PatternLoader
-from noske.PatternMatcher import PatternMatcher
+from smied.SemanticMetagraph import SemanticMetagraph
+from smied.PatternLoader import PatternLoader
+from smied.PatternMatcher import PatternMatcher
 
 class TestPatternMatcher(unittest.TestCase):
     @classmethod

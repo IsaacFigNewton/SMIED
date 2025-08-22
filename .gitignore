@@ -1,5 +1,7 @@
 build/*
-src/noske.egg-info/*
-src/noske/__pycache__/*
-src/noske/patterns/__pycache__/*
+src/smied.egg-info/*
+src/smied/__pycache__/*
+src/smied/patterns/__pycache__/*
 tests/__pycache__/*
+.claude/settings.local.json
+/.claude

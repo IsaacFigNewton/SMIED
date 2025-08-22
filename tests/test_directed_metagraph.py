@@ -6,7 +6,7 @@ import os
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from noske.DirectedMetagraph import DirectedMetagraph
+from smied.DirectedMetagraph import DirectedMetagraph
 
 
 class TestDirectedMetagraph(unittest.TestCase):
@@ -34,13 +34,13 @@ class TestDirectedMetagraph(unittest.TestCase):
         """Test initialization with no arguments creates empty graph"""
         dg = DirectedMetagraph()
         self.assertEqual(len(dg.metaverts), 0)
-        self.assertIsInstance(dg.metaverts, list)
+        self.assertIsInstance(dg.metaverts, dict)
     
     def test_initialization_none(self):
         """Test initialization with None creates empty graph"""
         dg = DirectedMetagraph(None)
         self.assertEqual(len(dg.metaverts), 0)
-        self.assertIsInstance(dg.metaverts, list)
+        self.assertIsInstance(dg.metaverts, dict)
     
     def test_initialization_with_vert_list(self):
         """Test initialization with valid vertex list"""
@@ -55,7 +55,7 @@ class TestDirectedMetagraph(unittest.TestCase):
         dg = DirectedMetagraph(self.complex_vert_list)
         self.assertEqual(len(dg.metaverts), 6)
         # Check that undirected metaedge is canonicalized (sorted)
-        last_vert = dg.metaverts[-1]
+        last_vert = dg.metaverts[5]  # Last vertex (index 5)
         self.assertEqual(last_vert[0], [0, 1, 2])  # Should be sorted
 
 
@@ -323,7 +323,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         self.graph.add_vert("word4", {"pos": "ADV"})
         
         self.assertEqual(len(self.graph.metaverts), initial_length + 1)
-        self.assertEqual(self.graph.metaverts[-1], ("word4", {"pos": "ADV"}))
+        self.assertEqual(self.graph.metaverts[initial_length], ("word4", {"pos": "ADV"}))
     
     def test_add_vert_atomic_no_metadata(self):
         """Test adding atomic vertex without metadata"""
@@ -331,7 +331,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         self.graph.add_vert("word4", None)
         
         self.assertEqual(len(self.graph.metaverts), initial_length + 1)
-        self.assertEqual(self.graph.metaverts[-1], ("word4", None))
+        self.assertEqual(self.graph.metaverts[initial_length], ("word4", None))
     
     def test_add_vert_directed_relation(self):
         """Test adding directed relation vertex"""
@@ -339,7 +339,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         self.graph.add_vert((0, 2), {"relation": "direct_relation"})
         
         self.assertEqual(len(self.graph.metaverts), initial_length + 1)
-        self.assertEqual(self.graph.metaverts[-1], ((0, 2), {"relation": "direct_relation"}))
+        self.assertEqual(self.graph.metaverts[initial_length], ((0, 2), {"relation": "direct_relation"}))
     
     def test_add_vert_undirected_relation(self):
         """Test adding undirected relation vertex"""
@@ -348,7 +348,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         
         self.assertEqual(len(self.graph.metaverts), initial_length + 1)
         # Should be canonicalized (sorted)
-        self.assertEqual(self.graph.metaverts[-1], ([0, 1, 2], {"relation": "group"}))
+        self.assertEqual(self.graph.metaverts[initial_length], ([0, 1, 2], {"relation": "group"}))
     
     def test_add_vert_undirected_relation_unsorted(self):
         """Test adding unsorted undirected relation vertex gets canonicalized"""
@@ -357,7 +357,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         
         self.assertEqual(len(self.graph.metaverts), initial_length + 1)
         # Should be canonicalized (sorted)
-        self.assertEqual(self.graph.metaverts[-1], ([0, 1, 2], {"relation": "group"}))
+        self.assertEqual(self.graph.metaverts[initial_length], ([0, 1, 2], {"relation": "group"}))
     
     def test_add_vert_invalid_forward_reference(self):
         """Test that adding vertex with forward reference fails"""
@@ -395,7 +395,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
         self.assertLess(len(self.graph.metaverts), initial_length)
         
         # Check that no remaining relations reference the removed vertex
-        for mv in self.graph.metaverts:
+        for mv in self.graph.metaverts.values():
             if isinstance(mv[0], tuple) and len(mv[0]) == 2:
                 self.assertNotIn(0, mv[0])
             elif isinstance(mv[0], list):
@@ -427,58 +427,54 @@ class TestDirectedMetagraphRemoveVertsHelper(unittest.TestCase):
     
     def test_remove_verts_empty_set(self):
         """Test _remove_verts with empty removal set"""
-        metaverts = [("word1",), ("word2",)]
+        metaverts = {0: ("word1",), 1: ("word2",)}
         result = DirectedMetagraph._remove_verts(set(), 0, metaverts)
         self.assertEqual(result, metaverts)
     
     def test_remove_verts_empty_metaverts(self):
         """Test _remove_verts with empty metaverts list"""
-        result = DirectedMetagraph._remove_verts({0}, 0, [])
-        self.assertEqual(result, [])
+        result = DirectedMetagraph._remove_verts({0}, 0, {})
+        self.assertEqual(result, {})
     
     def test_remove_verts_atomic_vertex(self):
         """Test _remove_verts with atomic vertices"""
-        metaverts = [("word1", {"pos": "NOUN"}), ("word2", {"pos": "VERB"})]
-        result = DirectedMetagraph._remove_verts({0}, 1, metaverts[1:])
-        self.assertEqual(result, [("word2", {"pos": "VERB"})])
+        metaverts = {1: ("word2", {"pos": "VERB"})}  # Only vertex 1, vertex 0 already removed
+        result = DirectedMetagraph._remove_verts({0}, 1, metaverts)
+        self.assertEqual(result, {1: ("word2", {"pos": "VERB"})})
     
     def test_remove_verts_directed_relation_partial_removal(self):
         """Test _remove_verts with directed relation that gets partially cleaned"""
-        metaverts = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ((0, 1), {"relation": "subject"})
-        ]
-        # Remove vertex 0, which should also remove the relation
-        result = DirectedMetagraph._remove_verts({0}, 1, metaverts[1:])
+        metaverts = {
+            1: ("word2", {"pos": "VERB"}),
+            2: ((0, 1), {"relation": "subject"})
+        }
+        # Remove vertex 0, which should also remove the relation (since it references vertex 0)
+        result = DirectedMetagraph._remove_verts({0}, 1, metaverts)
         # The relation should be removed because it references vertex 0
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0], ("word2", {"pos": "VERB"}))
+        self.assertEqual(result[1], ("word2", {"pos": "VERB"}))
     
     def test_remove_verts_undirected_relation_partial_removal(self):
         """Test _remove_verts with undirected relation that gets partially cleaned"""
-        metaverts = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ("word3", {"pos": "ADJ"}),
-            ([0, 1, 2], {"relation": "group"})
-        ]
+        metaverts = {
+            1: ("word2", {"pos": "VERB"}),
+            2: ("word3", {"pos": "ADJ"}),
+            3: ([0, 1, 2], {"relation": "group"})
+        }
         # Remove vertex 0, relation should be updated to [1, 2]
-        result = DirectedMetagraph._remove_verts({0}, 1, metaverts[1:])
+        result = DirectedMetagraph._remove_verts({0}, 1, metaverts)
         
         # Should have word2, word3, and updated group relation
         expected_group = ([1, 2], {"relation": "group"})
-        self.assertIn(expected_group, result)
+        self.assertEqual(result[3], expected_group)
     
     def test_remove_verts_undirected_relation_complete_removal(self):
         """Test _remove_verts with undirected relation that gets completely removed"""
-        metaverts = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ([0, 1], {"relation": "group"})
-        ]
+        metaverts = {
+            2: ([0, 1], {"relation": "group"})
+        }
         # Remove both vertices, relation should be completely removed
-        result = DirectedMetagraph._remove_verts({0, 1}, 2, metaverts[2:])
+        result = DirectedMetagraph._remove_verts({0, 1}, 2, metaverts)
         
         # Should be empty since the group relation depends on removed vertices
         self.assertEqual(len(result), 0)
@@ -538,7 +534,7 @@ class TestDirectedMetagraphEdgeCases(unittest.TestCase):
         self.assertLess(len(dg.metaverts), initial_length)
         
         # Verify no relations reference the removed vertex
-        for mv in dg.metaverts:
+        for mv in dg.metaverts.values():
             if isinstance(mv[0], tuple) and len(mv[0]) == 2:
                 self.assertNotIn(1, mv[0])
             elif isinstance(mv[0], list):
@@ -593,7 +589,7 @@ class TestDirectedMetagraphIntegration(unittest.TestCase):
         dg = DirectedMetagraph(vert_list)
         
         # Check that it was canonicalized
-        last_vert = dg.metaverts[-1]
+        last_vert = dg.metaverts[3]  # Last vertex has index 3
         self.assertEqual(last_vert[0], [0, 1, 2])  # Should be sorted
     
     def test_validation_prevents_invalid_graphs(self):

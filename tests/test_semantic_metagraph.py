@@ -9,7 +9,7 @@ import os
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from noske.SemanticMetagraph import SemanticMetagraph
+from smied.SemanticMetagraph import SemanticMetagraph
 
 
 class TestSemanticMetagraph(unittest.TestCase):
@@ -41,7 +41,7 @@ class TestSemanticMetagraph(unittest.TestCase):
         """Test initialization from a spaCy Doc object"""
         sg = SemanticMetagraph(doc=self.doc)
         self.assertIsNotNone(sg)
-        self.assertIsInstance(sg.metaverts, list)
+        self.assertIsInstance(sg.metaverts, dict)
         self.assertGreater(len(sg.metaverts), 0)
         self.assertEqual(sg.doc, self.doc)
     
@@ -211,7 +211,7 @@ class TestSemanticMetagraph(unittest.TestCase):
         self.assertLess(len(sg.metaverts), initial_length)
         
         # The relation depending on vertex 0 should also be removed
-        for mv in sg.metaverts:
+        for mv in sg.metaverts.values():
             if isinstance(mv[0], tuple):
                 self.assertNotIn(0, mv[0])
     
@@ -242,7 +242,7 @@ class TestSemanticMetagraph(unittest.TestCase):
         
         # Check that entity types are added
         has_entity_relations = False
-        for mv in sg.metaverts:
+        for mv in sg.metaverts.values():
             if len(mv) > 1 and mv[1].get("relation") == "has_entity_type":
                 has_entity_relations = True
                 break

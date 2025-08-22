@@ -33,6 +33,7 @@ class SemanticMetagraph(DirectedMetagraph):
         token_idx_map = {}  # Map token indices to metavert indices
         
         # First pass: add all tokens as atomic metaverts
+        mv_idx = 0
         for t in doc:
             # Create metadata for the token
             metadata = {
@@ -46,7 +47,8 @@ class SemanticMetagraph(DirectedMetagraph):
             
             # Add as atomic metavert (string with metadata)
             metaverts.append((t.text, metadata))
-            token_idx_map[t.i] = len(metaverts) - 1
+            token_idx_map[t.i] = mv_idx
+            mv_idx += 1
         
         # Second pass: add NER and dependency relations as complex metaverts
         for t in doc:
@@ -64,13 +66,15 @@ class SemanticMetagraph(DirectedMetagraph):
                 # If not, add it
                 if ent_type_mv is None:
                     metaverts.append((t.ent_type_, {"is_entity_type": True}))
-                    ent_type_mv = len(metaverts) - 1
+                    ent_type_mv = mv_idx
+                    mv_idx += 1
                 
                 # Add relation between token and entity type
                 metaverts.append((
                     (curr_idx, ent_type_mv),
                     {"relation": "has_entity_type"}
                 ))
+                mv_idx += 1
             
             # Add dependency relations
             for child in t.children:
@@ -80,6 +84,7 @@ class SemanticMetagraph(DirectedMetagraph):
                     (curr_idx, child_idx),
                     {"relation": child.dep_, "rel_pos": rel_pos}
                 ))
+                mv_idx += 1
         
         return metaverts
     
@@ -88,16 +93,18 @@ class SemanticMetagraph(DirectedMetagraph):
         """Convert the metagraph to JSON format"""
         # Convert metaverts to JSON-serializable format
         json_metaverts = []
-        for mv in self.metaverts:
+        for mv_id, mv in self.metaverts.items():
+            mv_data = {"id": mv_id}
             if len(mv) == 1:
-                json_metaverts.append({"type": "atomic", "value": mv[0]})
+                mv_data.update({"type": "atomic", "value": mv[0]})
             elif len(mv) == 2:
                 if isinstance(mv[0], str):
-                    json_metaverts.append({"type": "atomic", "value": mv[0], "metadata": mv[1]})
+                    mv_data.update({"type": "atomic", "value": mv[0], "metadata": mv[1]})
                 elif isinstance(mv[0], tuple):
-                    json_metaverts.append({"type": "directed", "source": mv[0][0], "target": mv[0][1], "metadata": mv[1]})
+                    mv_data.update({"type": "directed", "source": mv[0][0], "target": mv[0][1], "metadata": mv[1]})
                 elif isinstance(mv[0], list):
-                    json_metaverts.append({"type": "undirected", "nodes": mv[0], "metadata": mv[1]})
+                    mv_data.update({"type": "undirected", "nodes": mv[0], "metadata": mv[1]})
+            json_metaverts.append(mv_data)
         
         return {"metaverts": json.dumps(json_metaverts, indent=4)}
     
@@ -256,7 +263,7 @@ class SemanticMetagraph(DirectedMetagraph):
     def get_tokens(self) -> List[Dict[str, Any]]:
         """Get all token metaverts with their metadata"""
         tokens = []
-        for i, mv in enumerate(self.metaverts):
+        for i, mv in self.metaverts.items():
             if isinstance(mv[0], str) and len(mv) > 1 and 'idx' in mv[1]:
                 tokens.append({"metavert_idx": i, "token_idx": mv[1]['idx'], "text": mv[0], "metadata": mv[1]})
         return tokens
@@ -264,7 +271,7 @@ class SemanticMetagraph(DirectedMetagraph):
     def get_relations(self) -> List[Dict[str, Any]]:
         """Get all relation metaverts"""
         relations = []
-        for i, mv in enumerate(self.metaverts):
+        for i, mv in self.metaverts.items():
             if len(mv) > 1 and 'relation' in mv[1]:
                 if isinstance(mv[0], tuple):
                     relations.append({
