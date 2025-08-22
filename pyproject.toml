@@ -12,9 +12,13 @@ description = ""
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+  "gensim",
+  "heapq",
   "importlib",
   "networkx",
+  "nltk",
   "pytest",
+  "scikit-learn",
   "spacy",
 ]
 classifiers = [
