@@ -14,6 +14,16 @@ class GlossParser:
     def __init__(self):
         pass
 
+    def parse_gloss(self, gloss_text):
+        """
+        Parse a gloss text and return a dictionary with extracted semantic elements.
+        This is a simplified implementation for backward compatibility.
+        """
+        # For now, return None to indicate no structured parsing
+        # In a full implementation, this would parse the gloss and return
+        # a dictionary with keys like 'subject', 'object', 'predicate'
+        return None
+
     def extract_subjects_from_gloss(self, gloss_doc):
         """Extract subject tokens from a parsed gloss."""
         subjects = []

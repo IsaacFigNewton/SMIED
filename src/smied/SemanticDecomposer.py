@@ -53,10 +53,12 @@ class SemanticDecomposer:
         beam_width: int = 3,
         max_results_per_pair: int = 3,
         len_tolerance: int = 1,
-        relax_beam: bool = False
+        relax_beam: bool = False,
+        max_sample_size: int = 5
     ):
         """
         Main entry point for finding semantic paths between subject-predicate-object triples.
+        Uses gloss parsing and hypernym exploration based on the old BFS seeding approach.
         Returns the best connected path in the old format for backward compatibility.
         """
         # Use provided model or fallback to instance model
@@ -86,133 +88,17 @@ class SemanticDecomposer:
 
         # Try each predicate synset as the connector
         for pred in predicate_synsets:
-            # Parse the predicate gloss to get subject and object synsets
-            pred_gloss = self.gloss_parser.parse_gloss(pred.definition())
-            if not pred_gloss:
-                continue
-            # Get subject and object synsets from the predicate gloss
-            matched_subj_pred_synsets = pred_gloss.get('subject', [])
-            matched_pred_obj_synsets = pred_gloss.get('object', [])
-
             # Find paths from all subjects to this specific predicate
-            subject_paths = []
-            for subj in subject_synsets:
-                # if there are matched_pred_subj_synsets,
-                #   try pathing from subject to one of them
-                if matched_subj_pred_synsets:
-                    # todo: implement pathing from subj
-                    #   to one of the matched subj synsets (matched_subj_pred_synsets) to pred
-                    path_finder = PairwiseBidirectionalAStar(
-                        g=g,
-                        src=subj.name(),
-                        tgt=matched_subj_pred_synsets.name(),
-                        get_new_beams_fn=get_new_beams_fn,
-                        beam_width=beam_width,
-                        max_depth=max_depth,
-                        relax_beam=relax_beam
-                    )
-                    paths = path_finder.find_paths(max_results=max_results_per_pair, len_tolerance=len_tolerance)
-                    if paths:
-                        # Convert to synset objects for backward compatibility
-                        for path, cost in paths:
-                            synset_path = [self.wn_module.synset(name) for name in path]
-                            subject_paths.append(synset_path)
-                # otherwise, try parsing the subject gloss
-                #   to find any verbs with suitable synsets to connect to the predicate
-                else:
-                    subj_gloss = self.gloss_parser.parse_gloss(subj.definition())
-                    if not subj_gloss:
-                        continue
-                    matched_subj_pred_synsets = subj_gloss.get('predicate', [])
-                    # If we have found a suitable predicate synset in the subject gloss,
-                    #   we can use it to find paths
-                    #   so try pathing from subject to one of them
-                    if matched_subj_pred_synsets:
-                        # todo: implement pathing from subject gloss's
-                        #   matched pred synsets (matched_subj_pred_synsets) to pred
-                        path_finder = PairwiseBidirectionalAStar(
-                            g=g,
-                            src=matched_subj_pred_synsets.name(),
-                            tgt=pred.name(),
-                            get_new_beams_fn=get_new_beams_fn,
-                            beam_width=beam_width,
-                            max_depth=max_depth,
-                            relax_beam=relax_beam
-                        )
-                        paths = path_finder.find_paths(max_results=max_results_per_pair, len_tolerance=len_tolerance)
-                        if paths:
-                            # Convert to synset objects for backward compatibility
-                            for path, cost in paths:
-                                synset_path = [self.wn_module.synset(name) for name in path]
-                                subject_paths.append(synset_path)
-                    # If we still don't have any matched synsets,
-                    else:
-                        # retry process on predicate and subject hypernyms
-                        pred_hypernyms = pred.hypernyms()
-                        subj_hypernyms = subj.hypernyms()
-                        if pred_hypernyms and subj_hypernyms:
-                            pass
+            subject_paths = self._find_subject_to_predicate_paths(
+                subject_synsets, pred, g, get_new_beams_fn, beam_width, max_depth, 
+                relax_beam, max_results_per_pair, len_tolerance, max_sample_size
+            )
 
-
-            # Find paths from this specific predicate to all objects
-            #   similar to how we did for subjects, but src and tgt are reversed
-            object_paths = []
-            for obj in object_synsets:
-                # if there are matched_pred_subj_synsets,
-                #   try pathing from subject to one of them
-                if matched_pred_obj_synsets:
-                    # todo: implement pathing from pred
-                    #   to one of the matched obj synsets (matched_pred_obj_synsets) to pred
-                    path_finder = PairwiseBidirectionalAStar(
-                        g=g,
-                        src=matched_pred_obj_synsets.name(),
-                        tgt=obj.name(),
-                        get_new_beams_fn=get_new_beams_fn,
-                        beam_width=beam_width,
-                        max_depth=max_depth,
-                        relax_beam=relax_beam
-                    )
-                    paths = path_finder.find_paths(max_results=max_results_per_pair, len_tolerance=len_tolerance)
-                    if paths:
-                        # Convert to synset objects for backward compatibility
-                        for path, cost in paths:
-                            synset_path = [self.wn_module.synset(name) for name in path]
-                            object_paths.append(synset_path)
-                # otherwise, try parsing the object gloss
-                #   to find any verbs with suitable synsets to connect to the predicate
-                else:
-                    subj_gloss = self.gloss_parser.parse_gloss(obj.definition())
-                    if not subj_gloss:
-                        continue
-                    matched_pred_obj_synsets = subj_gloss.get('predicate', [])
-                    # If we have found a suitable predicate synset in the subject gloss,
-                    #   we can use it to find paths
-                    #   so try pathing from subject to one of them
-                    if matched_pred_obj_synsets:
-                        # todo: implement pathing from subject gloss's
-                        #   matched pred synsets (matched_pred_obj_synsets) to pred
-                        path_finder = PairwiseBidirectionalAStar(
-                            g=g,
-                            src=matched_pred_obj_synsets.name(),
-                            tgt=pred.name(),
-                            get_new_beams_fn=get_new_beams_fn,
-                            beam_width=beam_width,
-                            max_depth=max_depth,
-                            relax_beam=relax_beam
-                        )
-                        paths = path_finder.find_paths(max_results=max_results_per_pair, len_tolerance=len_tolerance)
-                        if paths:
-                            # Convert to synset objects for backward compatibility
-                            for path, cost in paths:
-                                synset_path = [self.wn_module.synset(name) for name in path]
-                                object_paths.append(synset_path)
-                    # If we still don't have any matched synsets,
-                    else:
-                        # retry process on predicate and subject hypernyms
-                        pred_hypernyms = pred.hypernyms()
-                        obj_hypernyms = obj.hypernyms()
-                        if pred_hypernyms and obj_hypernyms:
-                            pass
+            # Find paths from this specific predicate to all objects  
+            object_paths = self._find_predicate_to_object_paths(
+                pred, object_synsets, g, get_new_beams_fn, beam_width, max_depth,
+                relax_beam, max_results_per_pair, len_tolerance, max_sample_size
+            )
 
             # If we have both paths through this predicate, check if it's the best
             if subject_paths and object_paths:
@@ -235,6 +121,194 @@ class SemanticDecomposer:
                         best_predicate = pred
 
         return best_subject_path, best_object_path, best_predicate
+
+    def _find_subject_to_predicate_paths(self, subject_synsets, predicate_synset, g, get_new_beams_fn, 
+                                       beam_width, max_depth, relax_beam, max_results_per_pair, 
+                                       len_tolerance, max_sample_size):
+        """Find paths from subject synsets to predicate using gloss parsing strategies."""
+        subject_paths = []
+        
+        # Strategy 1: Look for active subjects in predicate's gloss
+        pred_gloss_doc = self.nlp_func(predicate_synset.definition())
+        active_subjects, _ = self.gloss_parser.extract_subjects_from_gloss(pred_gloss_doc)
+        
+        if active_subjects:
+            # Convert spacy tokens to synsets and get best matches
+            subject_candidates = [self.wn_module.synsets(s.text, pos=self.wn_module.NOUN) 
+                                for s in active_subjects[:max_sample_size]]
+            matched_synsets = self._get_best_synset_matches(subject_candidates, subject_synsets)
+            
+            for subj_synset in subject_synsets:
+                for matched_synset in matched_synsets:
+                    path = self._find_path_between_synsets(
+                        subj_synset, matched_synset, g, get_new_beams_fn, 
+                        beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+                    )
+                    if path:
+                        # Extend path to include predicate
+                        complete_path = path + [predicate_synset]
+                        subject_paths.append(complete_path)
+        
+        # Strategy 2: Look for verbs in subject glosses
+        for subj_synset in subject_synsets:
+            subj_gloss_doc = self.nlp_func(subj_synset.definition())
+            verbs = self.gloss_parser.extract_verbs_from_gloss(subj_gloss_doc, include_passive=False)
+            
+            if verbs:
+                # Convert spacy tokens to synsets  
+                verb_candidates = [self.wn_module.synsets(v.text, pos=self.wn_module.VERB) 
+                                 for v in verbs[:max_sample_size]]
+                matched_synsets = self._get_best_synset_matches(verb_candidates, [predicate_synset])
+                
+                for matched_synset in matched_synsets:
+                    path = self._find_path_between_synsets(
+                        matched_synset, predicate_synset, g, get_new_beams_fn,
+                        beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+                    )
+                    if path:
+                        # Prepend subject to path
+                        complete_path = [subj_synset] + path
+                        subject_paths.append(complete_path)
+        
+        # Strategy 3: Explore hypernyms if no direct paths found
+        if not subject_paths:
+            subject_paths.extend(self._explore_hypernym_paths(
+                subject_synsets, predicate_synset, g, get_new_beams_fn,
+                beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+            ))
+            
+        return subject_paths
+
+    def _find_predicate_to_object_paths(self, predicate_synset, object_synsets, g, get_new_beams_fn,
+                                      beam_width, max_depth, relax_beam, max_results_per_pair,
+                                      len_tolerance, max_sample_size):
+        """Find paths from predicate to object synsets using gloss parsing strategies."""
+        object_paths = []
+        
+        # Strategy 1: Look for objects (including passive subjects) in predicate's gloss
+        pred_gloss_doc = self.nlp_func(predicate_synset.definition())
+        objects = self.gloss_parser.extract_objects_from_gloss(pred_gloss_doc)
+        _, passive_subjects = self.gloss_parser.extract_subjects_from_gloss(pred_gloss_doc)
+        objects.extend(passive_subjects)
+        
+        if objects:
+            # Convert spacy tokens to synsets and get best matches
+            object_candidates = [self.wn_module.synsets(o.text, pos=self.wn_module.NOUN) 
+                               for o in objects[:max_sample_size]]
+            matched_synsets = self._get_best_synset_matches(object_candidates, object_synsets)
+            
+            for matched_synset in matched_synsets:
+                for obj_synset in object_synsets:
+                    path = self._find_path_between_synsets(
+                        matched_synset, obj_synset, g, get_new_beams_fn,
+                        beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+                    )
+                    if path:
+                        # Prepend predicate to path
+                        complete_path = [predicate_synset] + path
+                        object_paths.append(complete_path)
+        
+        # Strategy 2: Look for verbs in object glosses (including instrumental verbs)
+        for obj_synset in object_synsets:
+            obj_gloss_doc = self.nlp_func(obj_synset.definition())
+            verbs = self.gloss_parser.extract_verbs_from_gloss(obj_gloss_doc, include_passive=True)
+            verbs.extend(self.gloss_parser.find_instrumental_verbs(obj_gloss_doc))
+            
+            if verbs:
+                # Convert spacy tokens to synsets
+                verb_candidates = [self.wn_module.synsets(v.text, pos=self.wn_module.VERB) 
+                                 for v in verbs[:max_sample_size]]
+                matched_synsets = self._get_best_synset_matches(verb_candidates, [predicate_synset])
+                
+                for matched_synset in matched_synsets:
+                    path = self._find_path_between_synsets(
+                        predicate_synset, matched_synset, g, get_new_beams_fn,
+                        beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+                    )
+                    if path:
+                        # Extend path to include object
+                        complete_path = path + [obj_synset]
+                        object_paths.append(complete_path)
+        
+        # Strategy 3: Explore hypernyms if no direct paths found
+        if not object_paths:
+            object_paths.extend(self._explore_hypernym_paths(
+                [predicate_synset], object_synsets, g, get_new_beams_fn,
+                beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
+            ))
+            
+        return object_paths
+
+    def _get_best_synset_matches(self, candidate_lists, target_synsets, top_k=3):
+        """Get the best matching synsets from candidates based on similarity to targets."""
+        matches = []
+        
+        for candidates in candidate_lists:
+            if not candidates:
+                continue
+                
+            for candidate in candidates:
+                for target in target_synsets:
+                    try:
+                        # Use path similarity if available, otherwise fall back to simple heuristics
+                        similarity = candidate.path_similarity(target) or 0.0
+                        matches.append((candidate, similarity))
+                    except:
+                        # Fallback for synsets that don't support path_similarity
+                        matches.append((candidate, 0.1))
+        
+        # Sort by similarity and return top matches
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return [match[0] for match in matches[:top_k]]
+
+    def _find_path_between_synsets(self, src_synset, tgt_synset, g, get_new_beams_fn,
+                                 beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance):
+        """Find a path between two synsets using the pathfinder."""
+        if src_synset.name() not in g or tgt_synset.name() not in g:
+            return None
+            
+        path_finder = PairwiseBidirectionalAStar(
+            g=g,
+            src=src_synset.name(),
+            tgt=tgt_synset.name(),
+            get_new_beams_fn=get_new_beams_fn,
+            beam_width=beam_width,
+            max_depth=max_depth,
+            relax_beam=relax_beam
+        )
+        
+        paths = path_finder.find_paths(max_results=max_results_per_pair, len_tolerance=len_tolerance)
+        if paths:
+            # Convert first path back to synset objects
+            path_names, _ = paths[0]
+            return [self.wn_module.synset(name) for name in path_names]
+        
+        return None
+
+    def _explore_hypernym_paths(self, src_synsets, tgt_synsets, g, get_new_beams_fn,
+                              beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance):
+        """Explore paths through hypernyms when direct connections aren't found."""
+        paths = []
+        
+        for src_synset in src_synsets:
+            src_hypernyms = src_synset.hypernyms()
+            
+            for tgt_synset in tgt_synsets:
+                tgt_hypernyms = tgt_synset.hypernyms()
+                
+                # Try connecting through hypernyms
+                for src_hyp in src_hypernyms[:3]:  # Limit to top 3 hypernyms
+                    for tgt_hyp in tgt_hypernyms[:3]:
+                        path = self._find_path_between_synsets(
+                            src_hyp, tgt_hyp, g, get_new_beams_fn,
+                            beam_width, max_depth-2, relax_beam, max_results_per_pair, len_tolerance
+                        )
+                        if path:
+                            # Create complete path: src -> src_hyp -> ... -> tgt_hyp -> tgt
+                            complete_path = [src_synset] + path + [tgt_synset]
+                            paths.append(complete_path)
+        
+        return paths
 
 
     def build_synset_graph(self) -> nx.DiGraph:
