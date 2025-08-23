@@ -1,323 +1,324 @@
 # SMIED Debugging TODO
 
-## 🔍 CRITICAL BUGS TO FIX
+## 🛠️ DIAGNOSTICS INFRASTRUCTURE SETUP (NEW)
 
-### 1. **PatternLoader JSON-to-Set Conversion Bug** (PRIORITY: HIGH)
-**What's Breaking:** `json_to_pattern()` method fails to convert lists to sets for specific keys
-**Where:** `src/smied/PatternLoader.py:json_to_pattern()`
+### **5. Diagnostics Class Creation** (PRIORITY: HIGH)
 
-**Failed Assertions:**
-- `pattern[1]["relation"]` remains `['subject']` instead of `{'subject'}`
-- `pattern["text"]` remains `['surface_text']` instead of `{'surface_text'}`
-- All POS tags (`pos`), dependency relations (`dep`), entity types (`ent_type`) not converting
+**What's Needed:** Consolidate diagnostic tools into a proper SMIED module structure
+**Where:** Create `src/smied/Diagnostics.py`
 
-**Files to Check:**
-- `src/smied/PatternLoader.py` - Core logic for list→set conversion
-- `tests/test_pattern_loader.py` - Test expectations vs implementation behavior
+**Current State Analysis:**
+- Diagnostic tools scattered in root directory files:
+  - `diagnostic_tools.py` - Contains `SMIEDConnectivityAnalyzer` class (main diagnostic engine)
+  - `quick_analysis.py` - Contains relation coverage audit functions 
+  - `focused_analysis.py` - Contains derivational relations analysis
+  - `validate_findings.py` - Contains automated validation scripts
 
-**Bug Hypothesis:**
-- `json_to_pattern()` method missing key-specific conversion logic
-- Method may only convert certain keys (like `pos`) but not others (`relation`, `text`, `dep`, `ent_type`)
-- Nested pattern traversal not working correctly
+**Implementation Tasks:**
+- [ ] **Create Core Diagnostics Class** in `src/smied/Diagnostics.py`:
+  - Move `SMIEDConnectivityAnalyzer` class from `diagnostic_tools.py`
+  - Integrate analysis functions from `quick_analysis.py`, `focused_analysis.py`
+  - Add validation methods from `validate_findings.py`
+  - Maintain clean API with methods for each diagnostic category
 
----
-
-### 2. **Test Setup Bug** (PRIORITY: MEDIUM)  
-**What's Breaking:** Missing test fixture attribute
-**Where:** `tests/test_pattern_loader.py:373`
-
-**Failed Assertion:**
-- `AttributeError: 'TestPatternLoaderEdgeCases' object has no attribute 'sample_patterns'`
-
-**Files to Check:**
-- `tests/test_pattern_loader.py:TestPatternLoaderEdgeCases` class
-- Look for missing `setUp()` method or `sample_patterns` attribute initialization
-
-**Bug Hypothesis:**
-- Test class missing proper initialization of `sample_patterns` fixture
-- `setUp()` method not called or incomplete
-
----
-
-### 3. **PatternMatcher Output Format Mismatch** (PRIORITY: MEDIUM)
-**What's Breaking:** `get_pattern_summary()` returns different structure than expected
-**Where:** `src/smied/PatternMatcher.py:get_pattern_summary()`
-
-**Failed Assertion:**
-- Expected: `{"test_category": {"noun_pattern": [[0], [1]], "verb_pattern": []}}`
-- Actual: `{"test_category": {"noun_pattern": [{"indices": [0], "metaverts": [...]}]}}`
-
-**Files to Check:**
-- `src/smied/PatternMatcher.py:get_pattern_summary()` method
-- `tests/test_pattern_matcher.py` - Check mock expectations vs actual method behavior
-
-**Bug Hypothesis:**
-- Method returns enriched objects instead of simple index lists
-- Test mock expectations don't match actual implementation behavior
-- Return format changed but tests weren't updated
-
----
-
-## 🎯 DEBUGGING VALIDATION CHECKLIST
-
-### For PatternLoader JSON Conversion:
-- [ ] Verify `json_to_pattern()` implementation in `PatternLoader.py`
-- [ ] Check which keys are configured for list→set conversion
-- [ ] Test nested pattern handling logic
-- [ ] Confirm conversion applies to: `pos`, `dep`, `relation`, `text`, `ent_type`, `relation_type`
-
-### For Test Setup Issues:
-- [ ] Check `TestPatternLoaderEdgeCases.__init__()` or `setUp()`
-- [ ] Verify `sample_patterns` attribute initialization
-- [ ] Review parent class inheritance for test fixtures
-
-### For PatternMatcher Output:
-- [ ] Compare `get_pattern_summary()` implementation vs test expectations
-- [ ] Check if method should return simple lists or enriched objects
-- [ ] Verify if mock setup matches actual method signature
-
----
-
-## 📋 SYSTEMATIC DEBUGGING APPROACH
-
-1. **Start with PatternLoader** (highest impact - 5 failed tests)
-   - Focus on `json_to_pattern()` method implementation
-   - Add debug logging to see which keys are being processed
-   - Test with minimal pattern structure
-
-2. **Fix Test Setup** (blocking other tests)
-   - Add missing `sample_patterns` attribute
-   - Verify test class inheritance and setup methods
-
-3. **Resolve PatternMatcher Output** (interface contract issue)
-   - Determine correct return format for `get_pattern_summary()`
-   - Update either implementation or test expectations
-
----
-
-## 🔍 SEMANTIC PATH FINDING DEBUGGING (NEW)
-
-### **4. PairwiseBidirectionalAStar + WordNet Graph Connectivity Analysis** (PRIORITY: HIGH)
-
-**Problem Statement:** 
-Despite fixing word sense disambiguation (correctly selecting `cat.n.01` feline and `mouse.n.01` rodent), the PairwiseBidirectionalAStar algorithm fails to find semantic paths between conceptually related synsets like "cat" → "chase" → "mouse".
-
-**Root Cause Hypotheses:**
-1. **Graph Connectivity Gap**: WordNet semantic graph lacks sufficient edge density between conceptually related synsets
-2. **Beam Filtering Too Restrictive**: Algorithm's allowed node sets exclude necessary intermediate concepts  
-3. **Heuristic Function Issues**: Embedding-based heuristics misdirect the search away from optimal paths
-4. **Relation Type Coverage**: Missing key semantic relation types in graph construction or pathfinding
-5. **Cross-POS Connection Weakness**: Insufficient noun→verb→noun bridging mechanisms
-6. **Search Space Constraints**: max_depth, beam_width, or len_tolerance parameters too restrictive
-
----
-
-### 🔍 **Phase 1: Graph Connectivity Analysis**
-
-#### **Step 1.1: WordNet Relation Coverage Audit**
-**Objective:** Verify all available semantic relations are being utilized in graph construction
-
-**Tasks:**
-- [ ] **Document Available Relations**: Create comprehensive mapping of NLTK WordNet relations by POS:
-  - Nouns: `hypernyms()`, `hyponyms()`, `member_holonyms()`, `part_holonyms()`, `substance_holonyms()`, `member_meronyms()`, `part_meronyms()`, `substance_meronyms()`, `similar_tos()`, `attributes()`, `also_sees()`
-  - Verbs: `hypernyms()`, `hyponyms()`, `entailments()`, `causes()`, `similar_tos()`, `also_sees()`, `verb_groups()`
-  - Cross-POS: `lemma.derivationally_related_forms()`, `lemma.antonyms()`, `lemma.pertainyms()`
-
-- [ ] **Audit Graph Construction** (`SemanticDecomposer.build_synset_graph()`):
-  - Verify all relation types from audit are included in graph building (lines 620-634)
-  - Check if derivationally_related_forms() is being added as edges (currently missing)
-  - Validate edge weights and directionality for each relation type
-  - Document any missing high-value relations (e.g., attributes, topic domains)
-
-- [ ] **Cross-POS Bridge Analysis**: 
-  - Investigate noun→verb connections via `lemma.derivationally_related_forms()`
-  - Check verb→noun connections via `entailments()`, `causes()` 
-  - Analyze if current graph supports noun→verb→noun paths effectively
-
-#### **Step 1.2: Specific Path Connectivity Testing**  
-**Objective:** Manually trace why specific conceptual paths fail to exist in the graph
-
-**Tasks:**
-- [ ] **Manual Path Tracing**: Create debugging utilities to analyze connectivity:
+- [ ] **Class Structure Design**:
   ```python
-  def analyze_synset_connectivity(synset1_name, synset2_name, max_hops=6):
-      """Analyze all possible paths between two synsets in the graph"""
-      # Report direct connections, 2-hop paths, 3-hop paths, etc.
-      # Show relation types used in each path
-      # Identify connectivity gaps
+  class SMIEDDiagnostics:
+      """Comprehensive diagnostic toolkit for SMIED semantic pathfinding analysis."""
+      
+      # Core Analysis Methods
+      def analyze_synset_connectivity(self, synset1, synset2, max_hops=6)
+      def audit_wordnet_relations(self)
+      def test_parameter_sensitivity(self, test_cases)
+      def validate_pathfinding_fixes(self)
+      
+      # Graph Analysis Methods  
+      def analyze_graph_topology(self)
+      def analyze_cross_pos_connectivity(self)
+      def analyze_relation_density(self, synsets)
+      
+      # Algorithm Analysis Methods
+      def analyze_beam_filtering(self, test_cases)
+      def analyze_heuristic_effectiveness(self, test_cases)
+      def profile_search_performance(self, test_cases)
   ```
 
-- [ ] **Target Analysis Cases**: Apply manual tracing to failing test cases:
-  - `cat.n.01` → `chase.v.01`: Expected connection through predatory behavior concepts
-  - `chase.v.01` → `mouse.n.01`: Expected connection through prey/object concepts  
-  - `cat.n.01` → `mouse.n.01`: Expected connection through predator-prey relationships
-
-- [ ] **Relation Density Analysis**: For each synset in failing test cases:
-  - Count total outgoing edges by relation type
-  - Identify synsets with unusually sparse connections
-  - Check if key conceptual bridges exist (e.g., "feline" → "predator" → "hunt")
-
-#### **Step 1.3: Graph Topology Metrics**
-**Objective:** Quantify graph connectivity properties to identify structural issues
-
-**Tasks:**
-- [ ] **Basic Graph Metrics**: Implement analysis for the built synset graph:
-  - Average node degree (in/out)
-  - Connected components count (should be 1 for effective pathfinding)
-  - Diameter and average path length
-  - Clustering coefficient by POS type
-
-- [ ] **POS-Specific Connectivity**: 
-  - Noun-to-noun connectivity strength
-  - Verb-to-verb connectivity strength  
-  - Cross-POS bridge density (noun↔verb connections)
-  - Identify isolated or poorly connected synset clusters
-
-- [ ] **Embedding-Based Beam Coverage**: Analyze beam generation effectiveness:
-  - What percentage of semantically related synsets appear in embedding-generated beams?
-  - Are conceptually obvious connections (like cat→chase) being captured by embeddings?
-  - Compare embedding similarities vs. actual WordNet relation strengths
+- [ ] **API Design Considerations**:
+  - Maintain backwards compatibility with existing notebook usage
+  - Support both programmatic access and command-line interface
+  - Include verbosity control and progress reporting
+  - Provide structured output formats (JSON, dict, human-readable)
 
 ---
 
-### 🔍 **Phase 2: PairwiseBidirectionalAStar Algorithm Analysis**
+### **6. Diagnostics Unit Tests** (PRIORITY: HIGH)
 
-#### **Step 2.1: Search Space Constraints Evaluation**
-**Objective:** Determine if algorithm parameters are excluding valid paths
+**What's Needed:** Comprehensive test coverage for the new Diagnostics class
+**Where:** Create `tests/test_diagnostics.py`
 
-**Tasks:**
-- [ ] **Parameter Sensitivity Analysis**: Test pathfinding with varying parameters:
-  - `max_depth`: Current default is 10, test with 6, 8, 12, 15
-  - `beam_width`: Current default is 3, test with 5, 7, 10
-  - `len_tolerance`: Current default varies, test with 2, 5, 8
-  - `relax_beam`: Test with `True` to bypass beam restrictions entirely
+**Test Coverage Requirements:**
+- [ ] **Core Functionality Tests**:
+  - Test `analyze_synset_connectivity()` with known connected/disconnected synset pairs
+  - Test `audit_wordnet_relations()` validates against expected relation sets
+  - Test parameter sensitivity analysis produces expected parameter recommendations
+  - Test validation methods correctly identify missing/present pathfinding capabilities
 
-- [ ] **Allowed Node Set Analysis**: Debug the beam filtering mechanism:
-  - Log which synsets are included/excluded in `src_allowed` and `tgt_allowed` sets
-  - Check if conceptually important intermediate synsets are being filtered out
-  - Analyze if embedding-based beam selection is missing obvious semantic bridges
+- [ ] **Integration Tests**:
+  - Test integration with `SemanticDecomposer` for graph construction
+  - Test integration with `PairwiseBidirectionalAStar` for pathfinding analysis
+  - Test integration with `BeamBuilder` and `EmbeddingHelper` components
+  - Verify diagnostic results match expected analysis outcomes
 
-- [ ] **Search Direction Bias**: Analyze bidirectional search balance:
-  - Track forward vs. backward expansion ratios
-  - Check if one direction consistently dominates (indicating heuristic issues)
-  - Verify meet-in-the-middle behavior is working correctly
+- [ ] **Performance Tests**:
+  - Test diagnostic analysis completes within reasonable time bounds
+  - Test memory usage stays within acceptable limits during large graph analysis
+  - Test graceful handling of missing WordNet data or network issues
 
-#### **Step 2.2: Heuristic Function Validation**
-**Objective:** Verify embedding-based heuristics are guiding search effectively  
-
-**Tasks:**
-- [ ] **Embedding Heuristic Quality**: For target test cases:
-  - Compare embedding similarity predictions vs. actual WordNet path existence
-  - Check if embedding heuristics are consistent with semantic distances
-  - Analyze cases where embeddings strongly suggest connections that don't exist in WordNet
-
-- [ ] **Gloss Seed Integration**: Debug gloss-based search seeding:
-  - Verify gloss parsing is extracting semantically relevant terms
-  - Check if `GLOSS_BONUS` (0.15) is appropriately sized
-  - Analyze if gloss seeds are actually being prioritized in search
-
-- [ ] **Alternative Heuristics**: Test pathfinding with simpler heuristics:
-  - Distance-only heuristic (h = 0 for all nodes)
-  - Uniform cost search to eliminate heuristic bias
-  - WordNet-path-based heuristics instead of embedding-based
-
-#### **Step 2.3: Search Algorithm Correctness**
-**Objective:** Verify the bidirectional A* implementation is functioning correctly
-
-**Tasks:**
-- [ ] **Algorithm Correctness Validation**:
-  - Test against simple known-path cases (e.g., direct hypernym/hyponym relations)
-  - Verify path reconstruction produces valid paths
-  - Check meeting point detection and cost calculation accuracy
-  - Validate priority queue ordering and cycle detection
-
-- [ ] **Edge Weight Analysis**: 
-  - Current weights are uniform (1.0) - analyze if differential weighting would help
-  - Consider semantic relation type-based weights (hypernyms=1.0, meronyms=1.2, etc.)
-  - Test impact of relation-specific costs on path quality
-
-- [ ] **Memory and Performance Profiling**:
-  - Check if search is terminating prematurely due to resource constraints
-  - Profile queue sizes and expansion counts
-  - Identify potential infinite loop or excessive branching issues
+- [ ] **Mock and Fixture Setup**:
+  - Create test fixtures with known graph structures and expected analysis results
+  - Mock SMIED component interactions for isolated testing
+  - Create synthetic test cases that exercise edge cases and error conditions
 
 ---
 
-### 🔍 **Phase 3: Integration and Alternative Approaches**
+## 🚀 DETAILED SEMANTIC PATHFINDING IMPLEMENTATION ROADMAP (UPDATED)
 
-#### **Step 3.1: Hybrid Path Finding Strategies**
-**Objective:** Develop fallback strategies when embedding-based approach fails
+*Based on comprehensive technical analysis from `SEMANTIC_PATHFINDING_ANALYSIS_REPORT.md` and `DELIVERABLES_SUMMARY.md`*
 
-**Tasks:**
-- [ ] **Pure WordNet Relation Traversal**: Implement alternative pathfinder:
-  - Breadth-first search using only direct WordNet relations
+**NOTE: For now, only implement PHASE 1**
+---
+
+### **PHASE 1: CRITICAL PATH FIXES (Week 1)**
+
+#### **Task 1.1: Add Missing Derivational Relations** (PRIORITY: CRITICAL - 80% Impact)
+
+**Root Cause Confirmed:** `SemanticDecomposer.build_synset_graph()` missing `derivationally_related_forms()` - the PRIMARY cause of cross-POS pathfinding failures.
+
+**Technical Requirements:**
+- [ ] **Code Implementation** in `src/smied/SemanticDecomposer.py` around line 649:
+  ```python
+  # Add after existing relation processing in build_synset_graph()
+  # Process lemma-level derivational relations for cross-POS bridges
+  for lemma in synset.lemmas():
+      derived_forms = lemma.derivationally_related_forms()
+      for derived_lemma in derived_forms:
+          derived_synset_name = derived_lemma.synset().name()
+          if derived_synset_name in g:
+              g.add_edge(synset_name, derived_synset_name,
+                        relation='derivationally_related', weight=1.0)
+              edge_count += 1
+              if 'derivationally_related' not in relation_counts:
+                  relation_counts['derivationally_related'] = 0
+              relation_counts['derivationally_related'] += 1
+  ```
+
+- [ ] **Validation Testing**:
+  - Test pathfinding on critical failing cases: `cat.n.01` → `chase.v.01` → `mouse.n.01`
+  - Verify 10+ derivational connections for `chase.v.01` are now accessible in graph
+  - Measure success rate improvement (expect 80%+ improvement)
+  - Confirm path lengths remain ≤ 6 hops for conceptually related synsets
+
+- [ ] **Performance Impact Analysis**:
+  - Benchmark graph construction time before/after derivational relations
+  - Measure memory usage increase (expect <20% increase)
+  - Profile pathfinding speed impact (acceptable degradation <50%)
+
+---
+
+#### **Task 1.2: Algorithm Parameter Optimization** (PRIORITY: HIGH - 20% Impact)
+
+**Root Cause Confirmed:** `PairwiseBidirectionalAStar` parameters too restrictive for cross-conceptual pathfinding.
+
+**Technical Requirements:**
+- [ ] **Parameter Tuning** in `src/smied/PairwiseBidirectionalAStar.py`:
+  ```python
+  # Current restrictive defaults (lines 41-43)
+  beam_width: 3        → 10     # Expand search space significantly  
+  max_depth: 6         → 10     # Allow slightly longer paths
+  relax_beam: False    → True   # Bypass embedding-based beam constraints initially
+  len_tolerance: var   → 3      # Accept longer but semantically valid paths
+  ```
+
+- [ ] **Parameter Sensitivity Analysis**:
+  - Test parameter combinations systematically on failing test cases
+  - Identify optimal parameter set balancing success rate vs. performance
+  - Document parameter impact on search space size and algorithm termination
+  - Create parameter selection guidelines for different semantic domains
+
+- [ ] **Validation Protocol**:
+  - Test on gold standard cross-POS semantic cases (noun→verb→noun paths)
+  - Measure success rate improvement with parameter changes alone
+  - Benchmark performance impact of increased search space
+  - Validate that relaxed parameters don't introduce false positive paths
+
+---
+
+### **PHASE 2: HEURISTIC AND ALGORITHMIC IMPROVEMENTS (Week 2)**
+
+#### **Task 2.1: Heuristic Function Enhancement** (PRIORITY: MEDIUM - 15% Impact)
+
+**Root Cause Confirmed:** Embedding-based heuristics conflict with WordNet semantic structure.
+
+**Technical Requirements:**
+- [ ] **Hybrid Heuristic Implementation**:
+  ```python
+  # New heuristic combining embedding and WordNet distance
+  def hybrid_heuristic(self, current, target):
+      embedding_sim = self.embedding_helper.get_similarity(current, target)
+      wordnet_distance = self.estimate_wordnet_hops(current, target)
+      cross_pos_penalty = 0.2 if different_pos(current, target) else 0.0
+      
+      # Balanced combination
+      h = (1 - embedding_sim) * 0.7 + wordnet_distance * 0.3 + cross_pos_penalty
+      return h
+  ```
+
+- [ ] **WordNet-Distance Estimator**:
+  - Implement fast WordNet-based distance estimation for heuristic
+  - Use hypernym/hyponym hierarchy depth as distance proxy
+  - Add cross-POS bridge awareness to distance calculation
+  - Benchmark heuristic quality vs. embedding-only approach
+
+- [ ] **Alternative Heuristic Testing**:
+  - Test uniform cost search (h=0) to establish baseline without heuristic bias
+  - Test pure WordNet-distance heuristic vs. pure embedding heuristic
+  - Analyze heuristic effectiveness on different semantic relationship types
+  - Document optimal heuristic selection criteria
+
+---
+
+#### **Task 2.2: Missing Relations Integration** (PRIORITY: MEDIUM - 10% Impact)
+
+**Technical Requirements:**
+- [ ] **Additional WordNet Relations** in `SemanticDecomposer.py`:
+  ```python
+  # Add to relation processing loop
+  attributes_rels = synset.attributes()
+  for attr_synset in attributes_rels:
+      # Add noun-adjective connections
+      
+  # Add lemma-level antonym relations
+  for lemma in synset.lemmas():
+      antonyms = lemma.antonyms()
+      for antonym_lemma in antonyms:
+          # Add semantic opposition connections
+  ```
+
+- [ ] **Relation Impact Analysis**:
+  - Measure connectivity improvement from `attributes()` relations
+  - Analyze antonym relation utility for semantic pathfinding
+  - Profile performance impact of additional relation types
+  - Document relation type priority for graph construction
+
+---
+
+### **PHASE 3: TESTING AND VALIDATION INFRASTRUCTURE (Week 3)**
+
+#### **Task 3.1: Comprehensive Test Suite Creation** (PRIORITY: HIGH)
+
+**Technical Requirements:**
+- [ ] **Gold Standard Test Cases** in `tests/test_semantic_pathfinding.py`:
+  ```python
+  # Cross-POS pathfinding test cases  
+  CROSS_POS_TEST_CASES = [
+      ("cat.n.01", "chase.v.01", "Expected via predatory behavior"),
+      ("chase.v.01", "mouse.n.01", "Expected via prey/object relationship"),
+      ("hunt.v.01", "prey.n.01", "Expected via direct semantic connection"),
+      # ... 20+ manually curated cases
+  ]
+  ```
+
+- [ ] **Automated Success Rate Measurement**:
+  - Implement test harness measuring pathfinding success rates
+  - Create performance benchmarking for graph construction and search
+  - Add regression testing for existing functionality
+  - Document test case rationale and expected path characteristics
+
+- [ ] **Comparative Analysis Framework**:
+  - Compare SMIED pathfinding results with ConceptNet.io
+  - Human evaluation protocol for path quality assessment  
+  - False positive/negative analysis for pathfinding quality
+  - Success metric definition and measurement automation
+
+---
+
+#### **Task 3.2: Performance and Scalability Analysis** (PRIORITY: MEDIUM)
+
+**Technical Requirements:**
+- [ ] **Performance Profiling Suite**:
+  - Memory usage profiling for large WordNet graph construction
+  - Search algorithm runtime analysis across different parameter settings
+  - Bottleneck identification in pathfinding pipeline components
+  - Scalability analysis for graphs with 10K+ synsets
+
+- [ ] **Optimization Implementation**:
+  - Graph caching mechanisms for repeated pathfinding queries
+  - Precomputed distance matrices for common concept pairs
+  - Index-based fast lookup for high-frequency semantic relationships
+  - Memory optimization for large-scale deployment
+
+---
+
+### **PHASE 4: ADVANCED FEATURES AND ROBUSTNESS (Week 4)**
+
+#### **Task 4.1: Fallback Pathfinding Strategies** (PRIORITY: LOW - 5% Impact)
+
+**Technical Requirements:**
+- [ ] **Pure WordNet Traversal Backup**:
+  - Implement breadth-first search without embedding constraints
   - Prioritize high-value semantic relations (hypernyms, entailments, causes)
-  - No embedding constraints, pure graph traversal with depth limits
+  - Create relation-specific cost functions for path quality optimization
+  - Add domain-specific connection strategies (animal behavior patterns, etc.)
 
-- [ ] **Concept-Based Bridging**: Implement domain-specific connection strategies:
-  - Animal behavior patterns (predator→prey, action→object)
-  - Semantic role bridging (agent→action→patient)  
-  - Category-based connections (mammal→behavior→small_animal)
-
-- [ ] **Multi-Stage Search**: Implement hierarchical search approach:
-  - Stage 1: Find paths through shared hypernyms
-  - Stage 2: Find paths through conceptual bridges (behavior, attributes)
-  - Stage 3: Find paths through lexical derivations
-
-#### **Step 3.2: Ground Truth Validation**
-**Objective:** Establish benchmark cases to validate any fixes
-
-**Tasks:**
-- [ ] **Create Gold Standard Test Cases**: 
-  - Manually identify 20+ synset triples that SHOULD be connected
-  - Include various domains: animals, actions, objects, abstract concepts
-  - Document expected connection types and path lengths
-
-- [ ] **Comparative Analysis**:
-  - Test current system against gold standard
-  - Compare results with conceptnet.io or other semantic networks
-  - Analyze false positives (incorrect connections) vs false negatives (missing connections)
-
-- [ ] **User Study Validation**: 
-  - Human evaluation of path quality and semantic reasonableness
-  - Comparison with human intuition about semantic relatedness
-
-#### **Step 3.3: Performance and Scalability**
-**Objective:** Ensure fixes don't degrade system performance
-
-**Tasks:**
-- [ ] **Benchmark Performance Impact**: 
-  - Measure graph construction time with additional relations
-  - Profile pathfinding speed with different parameter combinations
-  - Memory usage analysis for larger search spaces
-
-- [ ] **Optimization Opportunities**:
-  - Graph caching and incremental updates
-  - Precomputed semantic distances for common concepts  
-  - Index-based fast lookup for high-frequency synset pairs
+- [ ] **Multi-Stage Search Architecture**:
+  - Stage 1: Shared hypernym pathfinding
+  - Stage 2: Conceptual bridge discovery (behavior, attributes)
+  - Stage 3: Lexical derivation pathfinding
+  - Integrate stages with confidence scoring and fallback logic
 
 ---
 
-### 📋 **Systematic Debugging Execution Plan**
+## **📊 SUCCESS METRICS AND VALIDATION CRITERIA**
 
-#### **Priority Order**:
-1. **Start with Phase 1.2** (Specific Path Connectivity) - High impact, quick insights
-2. **Phase 2.1** (Parameter Analysis) - Easy to test, immediate actionable results  
-3. **Phase 1.1** (Relation Coverage) - Foundational understanding
-4. **Phase 2.2** (Heuristic Validation) - Addresses core algorithm assumptions
-5. **Phase 3.1** (Alternative Approaches) - Fallback solutions
+### **Quantitative Targets:**
+- [ ] **Primary Success**: `cat.n.01 → chase.v.01 → mouse.n.01` produces semantically valid paths ≤ 6 hops
+- [ ] **Success Rate**: 90%+ success on manually curated cross-POS semantic pathfinding test suite  
+- [ ] **Performance**: <50% degradation from baseline pathfinding performance
+- [ ] **Graph Enhancement**: 80%+ increase in cross-POS connectivity after derivational relations
 
-#### **Success Criteria**:
-- [ ] `cat.n.01 → chase.v.01 → mouse.n.01` produces valid semantic paths
-- [ ] Path lengths ≤ 6 hops for conceptually related synsets  
-- [ ] 90% success rate on manually curated gold standard test cases
-- [ ] No significant performance degradation (<50% slower than current)
+### **Qualitative Targets:**
+- [ ] **Path Quality**: Human evaluation confirms semantic reasonableness of discovered paths
+- [ ] **System Robustness**: Graceful degradation when optimal paths unavailable
+- [ ] **API Consistency**: Diagnostic tools maintain backward compatibility with existing usage
+- [ ] **Documentation**: Complete technical documentation for all implemented fixes
 
-#### **Risk Mitigation**:
-- Implement changes incrementally with rollback capability
-- Maintain comprehensive test coverage for regression detection
-- Document all parameter changes and their rationale
-- Create diagnostic utilities for ongoing debugging
+---
+
+## **⚠️ RISK MITIGATION STRATEGIES**
+
+### **Technical Risks:**
+- **Graph Construction Performance**: Monitor memory usage and construction time with additional relations
+- **Algorithm Complexity**: Validate that parameter relaxation doesn't create infinite search spaces
+- **Heuristic Conflicts**: Ensure hybrid heuristics don't create local optima or poor-quality paths
+
+### **Mitigation Approaches:**
+- **Incremental Implementation**: Deploy changes incrementally with rollback capability
+- **Comprehensive Testing**: Maintain full regression test coverage throughout implementation
+- **Performance Monitoring**: Continuous benchmarking before/after each change
+- **A/B Testing**: Compare new vs. old pathfinding on representative test cases
+
+---
+
+## **🎯 IMPLEMENTATION PRIORITY SEQUENCE**
+
+1. **Week 1**: Task 1.1 (Derivational Relations) + Task 1.2 (Parameter Optimization)
+2. **Week 2**: Task 2.1 (Heuristic Enhancement) + Task 2.2 (Missing Relations)  
+3. **Week 3**: Task 3.1 (Test Suite) + Task 3.2 (Performance Analysis)
+4. **Week 4**: Task 4.1 (Advanced Features) + Documentation + Final Validation
+
+**Expected Total Effort**: 4 weeks for complete implementation with comprehensive testing and validation.
+
+**Expected Impact**: 80%+ improvement in cross-conceptual pathfinding success rate, enabling robust semantic decomposition for subject-predicate-object triples in natural language processing tasks.
 
 ---
 

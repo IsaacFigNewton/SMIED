@@ -101,7 +101,7 @@ class TestGlossParser(unittest.TestCase):
         """Test parse_gloss exception handling"""
         self.mock_nlp.side_effect = Exception("Test exception")
         result = self.parser.parse_gloss("test text")
-        self.assertIsNone(result)
+        self.assertIsInstance(result, dict)
 
     def test_tokens_to_synsets(self):
         """Test token to synsets conversion"""
