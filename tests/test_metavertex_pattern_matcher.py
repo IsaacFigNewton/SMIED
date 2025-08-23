@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from smied.SemanticMetagraph import SemanticMetagraph
 from smied.PatternMatcher import PatternMatcher
 from smied.PatternLoader import PatternLoader
+from tests.mocks.metavertex_pattern_matcher_mocks import MetavertexPatternMatcherMockFactory
 
 
 class TestMetavertexPatternMatcher(unittest.TestCase):

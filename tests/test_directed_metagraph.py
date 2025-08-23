@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.DirectedMetagraph import DirectedMetagraph
+from tests.mocks.directed_metagraph_mocks import DirectedMetagraphMockFactory
 
 
 class TestDirectedMetagraph(unittest.TestCase):
@@ -14,6 +15,9 @@ class TestDirectedMetagraph(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize mock factory
+        self.mock_factory = DirectedMetagraphMockFactory()
+        
         # Basic test vertex lists
         self.simple_vert_list = [
             ("word1", {"pos": "NOUN"}),

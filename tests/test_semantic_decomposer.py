@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.SemanticDecomposer import SemanticDecomposer
+from tests.mocks.semantic_decomposer_mocks import SemanticDecomposerMockFactory
 
 
 class TestSemanticDecomposer(unittest.TestCase):
@@ -15,14 +16,24 @@ class TestSemanticDecomposer(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.mock_wn = Mock()
-        self.mock_nlp = Mock()
-        self.mock_embedding_model = Mock()
+        # Initialize mock factory
+        self.mock_factory = SemanticDecomposerMockFactory()
+        
+        # Create mocks using factory
+        self.mock_wn = self.mock_factory('MockWordNetForDecomposer')
+        self.mock_nlp = self.mock_factory('MockNLPForDecomposer')
+        self.mock_embedding_model = self.mock_factory('MockEmbeddingModelForDecomposer')
         
         # Create decomposer instance
-        with patch('smied.SemanticDecomposer.EmbeddingHelper'), \
-             patch('smied.SemanticDecomposer.BeamBuilder'), \
-             patch('smied.SemanticDecomposer.GlossParser'):
+        with patch('smied.SemanticDecomposer.EmbeddingHelper') as mock_eh, \
+             patch('smied.SemanticDecomposer.BeamBuilder') as mock_bb, \
+             patch('smied.SemanticDecomposer.GlossParser') as mock_gp:
+            
+            # Configure the patches to return mock instances from factory
+            mock_eh.return_value = self.mock_factory('MockEmbeddingHelperForDecomposer')
+            mock_bb.return_value = self.mock_factory('MockBeamBuilderForDecomposer')
+            mock_gp.return_value = self.mock_factory('MockGlossParserForDecomposer')
+            
             self.decomposer = SemanticDecomposer(
                 wn_module=self.mock_wn,
                 nlp_func=self.mock_nlp,
@@ -34,6 +45,11 @@ class TestSemanticDecomposer(unittest.TestCase):
         with patch('smied.SemanticDecomposer.EmbeddingHelper') as mock_eh, \
              patch('smied.SemanticDecomposer.BeamBuilder') as mock_bb, \
              patch('smied.SemanticDecomposer.GlossParser') as mock_gp:
+            
+            # Configure patches to return factory mocks
+            mock_eh.return_value = self.mock_factory('MockEmbeddingHelperForDecomposer')
+            mock_bb.return_value = self.mock_factory('MockBeamBuilderForDecomposer')
+            mock_gp.return_value = self.mock_factory('MockGlossParserForDecomposer')
             
             decomposer = SemanticDecomposer(
                 wn_module=self.mock_wn,
@@ -53,15 +69,10 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_find_connected_shortest_paths_basic(self):
         """Test basic functionality of find_connected_shortest_paths"""
-        # Mock synsets
-        mock_subj_synset = Mock()
-        mock_subj_synset.name.return_value = "cat.n.01"
-        
-        mock_pred_synset = Mock()
-        mock_pred_synset.name.return_value = "run.v.01"
-        
-        mock_obj_synset = Mock()
-        mock_obj_synset.name.return_value = "park.n.01"
+        # Mock synsets using factory
+        mock_subj_synset = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("cat.n.01")
+        mock_pred_synset = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("run.v.01")
+        mock_obj_synset = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("park.n.01")
         
         # Mock WordNet synsets calls
         self.mock_wn.synsets.side_effect = [
@@ -72,11 +83,10 @@ class TestSemanticDecomposer(unittest.TestCase):
         self.mock_wn.NOUN = 'n'
         self.mock_wn.VERB = 'v'
         
-        # Mock graph
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("run.v.01")
-        mock_graph.add_node("park.n.01")
+        # Mock graph using factory
+        mock_graph = self.mock_factory('MockNetworkXGraph')
+        mock_graph.nodes.return_value = ["cat.n.01", "run.v.01", "park.n.01"]
+        mock_graph.has_node.side_effect = lambda n: n in ["cat.n.01", "run.v.01", "park.n.01"]
         
         # Mock path finding methods
         with patch.object(self.decomposer, '_find_subject_to_predicate_paths') as mock_subj_paths, \
@@ -99,7 +109,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         self.mock_wn.synsets.return_value = []
         
         with patch.object(self.decomposer, 'build_synset_graph') as mock_build_graph:
-            mock_build_graph.return_value = nx.DiGraph()
+            mock_build_graph.return_value = self.mock_factory('MockNetworkXGraph')
             
             result = self.decomposer.find_connected_shortest_paths("cat", "run", "park")
             
@@ -111,7 +121,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         self.mock_wn.synsets.return_value = []
         
         with patch.object(self.decomposer, 'build_synset_graph') as mock_build_graph:
-            mock_build_graph.return_value = nx.DiGraph()
+            mock_build_graph.return_value = self.mock_factory('MockNetworkXGraph')
             
             result = self.decomposer.find_connected_shortest_paths("cat", "run", "park")
             
@@ -120,14 +130,14 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_find_subject_to_predicate_paths(self):
         """Test _find_subject_to_predicate_paths method"""
-        mock_subj_synset = Mock()
-        mock_pred_synset = Mock()
-        mock_graph = nx.DiGraph()
+        mock_subj_synset = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("cat.n.01")
+        mock_pred_synset = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("run.v.01")
+        mock_graph = self.mock_factory('MockNetworkXGraph')
         
-        # Mock gloss parser
+        # Mock gloss parser using factory
         mock_parsed_gloss = {
-            'subjects': [Mock()],
-            'predicates': [Mock()]
+            'subjects': [self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("subj.n.01")],
+            'predicates': [self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("pred.v.01")]
         }
         self.decomposer.gloss_parser.parse_gloss.return_value = mock_parsed_gloss
         
@@ -135,7 +145,7 @@ class TestSemanticDecomposer(unittest.TestCase):
              patch.object(self.decomposer, '_find_path_between_synsets') as mock_path, \
              patch.object(self.decomposer, '_explore_hypernym_paths') as mock_hypernyms:
             
-            mock_matches.return_value = [Mock()]
+            mock_matches.return_value = [mock_subj_synset]
             mock_path.return_value = [mock_subj_synset, mock_pred_synset]
             mock_hypernyms.return_value = []
             
@@ -212,11 +222,9 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_find_path_between_synsets(self):
         """Test _find_path_between_synsets method"""
-        mock_src = Mock()
-        mock_src.name.return_value = "cat.n.01"
+        mock_src = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("cat.n.01")
         
-        mock_tgt = Mock()
-        mock_tgt.name.return_value = "animal.n.01"
+        mock_tgt = self.mock_factory('MockWordNetForDecomposer')._create_mock_synset("animal.n.01")
         
         mock_graph = nx.DiGraph()
         mock_graph.add_node("cat.n.01")
@@ -442,12 +450,22 @@ class TestSemanticDecomposerIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up for integration testing"""
-        self.mock_wn = Mock()
-        self.mock_nlp = Mock()
+        # Initialize mock factory for integration tests
+        self.mock_factory = SemanticDecomposerMockFactory()
+        self.integration_mock = self.mock_factory('MockSemanticDecomposerIntegration')
         
-        with patch('smied.SemanticDecomposer.EmbeddingHelper'), \
-             patch('smied.SemanticDecomposer.BeamBuilder'), \
-             patch('smied.SemanticDecomposer.GlossParser'):
+        self.mock_wn = self.mock_factory('MockRealWordNet')
+        self.mock_nlp = self.mock_factory('MockNLPForDecomposer')
+        
+        with patch('smied.SemanticDecomposer.EmbeddingHelper') as mock_eh, \
+             patch('smied.SemanticDecomposer.BeamBuilder') as mock_bb, \
+             patch('smied.SemanticDecomposer.GlossParser') as mock_gp:
+            
+            # Configure patches to return factory mocks
+            mock_eh.return_value = self.mock_factory('MockEmbeddingHelperForDecomposer')
+            mock_bb.return_value = self.mock_factory('MockBeamBuilderForDecomposer')
+            mock_gp.return_value = self.mock_factory('MockGlossParserForDecomposer')
+            
             self.decomposer = SemanticDecomposer(
                 wn_module=self.mock_wn,
                 nlp_func=self.mock_nlp
@@ -455,12 +473,11 @@ class TestSemanticDecomposerIntegration(unittest.TestCase):
 
     def test_integration_with_real_graph(self):
         """Test integration with a real NetworkX graph"""
-        # Create a small test graph
-        graph = nx.DiGraph()
-        graph.add_node("cat.n.01")
-        graph.add_node("animal.n.01")
-        graph.add_node("run.v.01")
-        graph.add_edge("cat.n.01", "animal.n.01", relation="hypernym")
+        # Create a small test graph using factory
+        graph = self.mock_factory('MockRealNetworkXGraph')
+        # Simulate adding nodes and edges
+        graph._nodes.update(["cat.n.01", "animal.n.01", "run.v.01"])
+        graph._edges.add(("cat.n.01", "animal.n.01"))
         
         # Mock synsets
         self.mock_wn.synsets.side_effect = [

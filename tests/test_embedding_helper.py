@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.EmbeddingHelper import EmbeddingHelper
+from tests.mocks.embedding_helper_mocks import EmbeddingHelperMockFactory
 
 
 class TestEmbeddingHelper(unittest.TestCase):
@@ -15,6 +16,10 @@ class TestEmbeddingHelper(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize mock factory
+        self.mock_factory = EmbeddingHelperMockFactory()
+        
+        # Create embedding helper instance
         self.embedding_helper = EmbeddingHelper()
 
     def test_initialization(self):
@@ -23,6 +28,7 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_simple(self):
         """Test get_synset_embedding_centroid with simple synset"""
+        # Create synset using mock factory
         mock_synset = Mock()
         mock_lemma1 = Mock()
         mock_lemma1.name.return_value = "cat"
@@ -30,10 +36,13 @@ class TestEmbeddingHelper(unittest.TestCase):
         mock_lemma2.name.return_value = "feline"
         mock_synset.lemmas.return_value = [mock_lemma1, mock_lemma2]
         
-        mock_model = {
+        # Create embedding model using factory
+        mock_model = self.mock_factory('MockEmbeddingModelForHelper')
+        mock_model.__getitem__ = lambda self, key: {
             "cat": np.array([1.0, 2.0, 3.0]),
             "feline": np.array([2.0, 3.0, 4.0])
-        }
+        }[key]
+        mock_model.__contains__ = lambda self, key: key in ["cat", "feline"]
         
         result = self.embedding_helper.get_synset_embedding_centroid(mock_synset, mock_model)
         
@@ -48,9 +57,11 @@ class TestEmbeddingHelper(unittest.TestCase):
         mock_lemma.name.return_value = "ice_cream"
         mock_synset.lemmas.return_value = [mock_lemma]
         
-        mock_model = {
+        mock_model = self.mock_factory('MockEmbeddingModelForHelper')
+        mock_model.__getitem__ = lambda self, key: {
             "ice cream": np.array([1.0, 2.0, 3.0])  # Space instead of underscore
-        }
+        }[key]
+        mock_model.__contains__ = lambda self, key: key in ["ice cream"]
         
         result = self.embedding_helper.get_synset_embedding_centroid(mock_synset, mock_model)
         
@@ -109,8 +120,8 @@ class TestEmbeddingHelper(unittest.TestCase):
     def test_get_synset_embedding_centroid_exception_handling(self):
         """Test get_synset_embedding_centroid handles exceptions gracefully"""
         mock_synset = Mock()
-        mock_synset.lemmas.side_effect = Exception("Test exception")
         mock_synset.name.return_value = "test_synset"
+        mock_synset.lemmas.side_effect = Exception("Test exception")
         
         mock_model = {}
         
@@ -124,6 +135,7 @@ class TestEmbeddingHelper(unittest.TestCase):
     def test_embed_lexical_relations(self):
         """Test embed_lexical_relations method"""
         mock_synset = Mock()
+        mock_synset.name.return_value = "cat.n.01"
         
         # Mock related synsets
         mock_hypernym = Mock()
@@ -145,7 +157,7 @@ class TestEmbeddingHelper(unittest.TestCase):
         mock_synset.also_sees.return_value = []
         mock_synset.verb_groups.return_value = []
         
-        mock_model = {}
+        mock_model = self.mock_factory('MockEmbeddingModelForHelper')
         
         with patch.object(self.embedding_helper, 'get_synset_embedding_centroid') as mock_centroid:
             mock_centroid.side_effect = [
@@ -494,7 +506,12 @@ class TestEmbeddingHelperEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize mock factory
+        self.mock_factory = EmbeddingHelperMockFactory()
+        
+        # Create embedding helper and edge case mock
         self.embedding_helper = EmbeddingHelper()
+        self.edge_case_mock = self.mock_factory('MockEmbeddingHelperEdgeCases')
 
     def test_get_embedding_similarities_large_matrices(self):
         """Test get_embedding_similarities with larger input matrices"""
@@ -593,6 +610,10 @@ class TestEmbeddingHelperIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up for integration testing"""
+        # Initialize mock factory for integration tests
+        self.mock_factory = EmbeddingHelperMockFactory()
+        self.integration_mock = self.mock_factory('MockEmbeddingHelperIntegration')
+        
         self.embedding_helper = EmbeddingHelper()
 
     def test_full_embedding_workflow(self):

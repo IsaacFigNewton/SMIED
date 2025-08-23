@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.PatternMatcher import PatternMatcher
+from tests.mocks.pattern_matcher_mocks import PatternMatcherMockFactory
 
 
 class TestPatternMatcher(unittest.TestCase):
@@ -14,16 +15,19 @@ class TestPatternMatcher(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Mock SemanticMetagraph
-        self.mock_semantic_graph = Mock()
+        # Initialize mock factory
+        self.mock_factory = PatternMatcherMockFactory()
+        
+        # Create semantic metagraph using factory
+        self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {
             0: ("cat", {"pos": "NOUN", "text": "cat"}),
             1: ("runs", {"pos": "VERB", "text": "runs"}),
             2: ((0, 1), {"relation": "subject"})
         }
         
-        # Mock PatternLoader
-        self.mock_pattern_loader = Mock()
+        # Create pattern loader using factory
+        self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')
         self.mock_pattern_loader.patterns = {
             "test_category": {
                 "noun_pattern": {

@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.PatternLoader import PatternLoader
+from tests.mocks.pattern_loader_mocks import PatternLoaderMockFactory
 
 
 class TestPatternLoader(unittest.TestCase):
@@ -15,6 +16,9 @@ class TestPatternLoader(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize mock factory
+        self.mock_factory = PatternLoaderMockFactory()
+        
         self.sample_patterns = {
             "test_category": {
                 "test_pattern": {

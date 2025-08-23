@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.GlossParser import GlossParser
+from tests.mocks.gloss_parser_mocks import GlossParserMockFactory
 
 
 class TestGlossParser(unittest.TestCase):
@@ -14,7 +15,11 @@ class TestGlossParser(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.mock_nlp = Mock()
+        # Initialize mock factory
+        self.mock_factory = GlossParserMockFactory()
+        
+        # Create NLP function using factory
+        self.mock_nlp = self.mock_factory('MockNLPForGloss')
         self.parser = GlossParser(nlp_func=self.mock_nlp)
         self.parser_no_nlp = GlossParser()
 
@@ -28,23 +33,18 @@ class TestGlossParser(unittest.TestCase):
 
     def test_parse_gloss_success(self):
         """Test successful gloss parsing"""
-        # Mock spaCy document
-        mock_doc = Mock()
-        mock_token1 = Mock()
+        # Create spaCy document using factory
+        mock_doc = self.mock_factory('MockDocForGloss')
+        
+        # Create tokens using factory
+        mock_token1 = self.mock_factory('MockTokenForGloss', "cat")
         mock_token1.dep_ = "nsubj"
         mock_token1.pos_ = "NOUN"
-        mock_token1.is_punct = False
-        mock_token1.is_stop = False
-        mock_token1.lemma_ = "cat"
-        mock_token1.text = "cat"
         
-        mock_token2 = Mock()
+        mock_token2 = self.mock_factory('MockToken', "runs")
         mock_token2.dep_ = "ROOT"
         mock_token2.pos_ = "VERB"
-        mock_token2.is_punct = False
-        mock_token2.is_stop = False
         mock_token2.lemma_ = "run"
-        mock_token2.text = "runs"
         
         mock_doc.__iter__ = Mock(return_value=iter([mock_token1, mock_token2]))
         mock_doc.noun_chunks = []
@@ -52,9 +52,10 @@ class TestGlossParser(unittest.TestCase):
         
         self.mock_nlp.return_value = mock_doc
         
-        # Mock WordNet synsets
+        # Mock WordNet synsets using factory
+        mock_synset = self.mock_factory('MockSynset', "cat.n.01")
         with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
-            mock_synsets.return_value = [Mock()]
+            mock_synsets.return_value = [mock_synset]
             
             result = self.parser.parse_gloss("The cat runs")
             
@@ -73,8 +74,8 @@ class TestGlossParser(unittest.TestCase):
 
     def test_parse_gloss_with_provided_nlp(self):
         """Test parse_gloss with provided NLP function"""
-        mock_nlp = Mock()
-        mock_doc = Mock()
+        mock_nlp = self.mock_factory('MockNLPForGloss')
+        mock_doc = self.mock_factory('MockDocForGloss')
         mock_doc.__iter__ = Mock(return_value=iter([]))
         mock_doc.noun_chunks = []
         mock_doc.text = "test"
@@ -92,23 +93,26 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets(self):
         """Test token to synsets conversion"""
-        mock_token1 = Mock()
+        # Create tokens using factory
+        mock_token1 = self.mock_factory('MockTokenForGloss', "cat")
         mock_token1.is_punct = False
         mock_token1.is_stop = False
         mock_token1.lemma_ = "cat"
-        mock_token1.text = "cat"
         
-        mock_token2 = Mock()
+        mock_token2 = self.mock_factory('MockTokenForGloss', ".")
         mock_token2.is_punct = True
         mock_token2.is_stop = False
         
-        mock_token3 = Mock()
+        mock_token3 = self.mock_factory('MockTokenForGloss', "the")
         mock_token3.is_punct = False
         mock_token3.is_stop = True
         
         with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
-            mock_synset = Mock()
-            mock_synsets.return_value = [mock_synset, Mock(), Mock()]
+            mock_synsets.return_value = [
+                self.mock_factory('MockSynset', "cat.n.01"),
+                self.mock_factory('MockSynset', "cat.n.02"),
+                self.mock_factory('MockSynset', "cat.n.03")
+            ]
             
             result = self.parser._tokens_to_synsets([mock_token1, mock_token2, mock_token3], pos='n')
             
@@ -118,14 +122,13 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets_fallback(self):
         """Test token to synsets with fallback to original text"""
-        mock_token = Mock()
+        mock_token = self.mock_factory('MockTokenForGloss', "cat")
         mock_token.is_punct = False
         mock_token.is_stop = False
         mock_token.lemma_ = "unknown_lemma"
-        mock_token.text = "cat"
         
         with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
-            mock_synset = Mock()
+            mock_synset = self.mock_factory('MockSynset', "cat.n.01")
             # First call (with lemma) returns empty, second call (with text) returns synsets
             mock_synsets.side_effect = [[], [mock_synset]]
             
@@ -136,11 +139,10 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets_complete_failure(self):
         """Test token to synsets when both lemma and text fail"""
-        mock_token = Mock()
+        mock_token = self.mock_factory('MockToken', "unknown")
         mock_token.is_punct = False
         mock_token.is_stop = False
         mock_token.lemma_ = "unknown"
-        mock_token.text = "unknown"
         
         with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
             mock_synsets.side_effect = Exception("Not found")

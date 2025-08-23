@@ -12,6 +12,7 @@ from typing import Dict, Any
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.SMIED import SMIED, ISMIEDPipeline
+from tests.mocks.smied_mocks import SMIEDMockFactory
 
 
 class TestISMIEDPipeline(unittest.TestCase):

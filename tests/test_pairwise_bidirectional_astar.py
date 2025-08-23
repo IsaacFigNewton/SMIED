@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
+from tests.mocks.pairwise_bidirectional_astar_mocks import PairwiseBidirectionalAStarMockFactory
 
 
 class TestPairwiseBidirectionalAStar(unittest.TestCase):
@@ -16,13 +17,15 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Create a simple test graph
-        self.graph = nx.DiGraph()
-        self.graph.add_node("start")
-        self.graph.add_node("middle")
-        self.graph.add_node("end")
-        self.graph.add_edge("start", "middle", weight=1.0)
-        self.graph.add_edge("middle", "end", weight=1.0)
+        # Initialize mock factory
+        self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        
+        # Create a simple test graph using mock factory
+        self.graph = self.mock_factory('MockGraphForPathfinding')
+        self.graph.nodes.return_value = ["start", "middle", "end"]
+        self.graph.edges.return_value = [("start", "middle"), ("middle", "end")]
+        self.graph.has_node.side_effect = lambda n: n in ["start", "middle", "end"]
+        self.graph.has_edge.side_effect = lambda u, v: (u, v) in [("start", "middle"), ("middle", "end")]
         
         # Basic pathfinder
         self.pathfinder = PairwiseBidirectionalAStar(
@@ -52,7 +55,7 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
 
     def test_initialization_with_options(self):
         """Test initialization with all options"""
-        mock_beams_fn = Mock()
+        mock_beams_fn = self.mock_factory('MockHeuristicFunction')
         gloss_seeds = ["seed1", "seed2"]
         
         pathfinder = PairwiseBidirectionalAStar(
@@ -90,7 +93,7 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
 
     def test_build_allowed_and_heuristics_with_beams_fn(self):
         """Test _build_allowed_and_heuristics with get_new_beams_fn"""
-        mock_beams_fn = Mock()
+        mock_beams_fn = self.mock_factory('MockHeuristicFunction')
         mock_beams_fn.return_value = [
             (("start", "rel1"), ("middle", "rel1"), 0.8),
             (("middle", "rel2"), ("end", "rel2"), 0.7)
@@ -142,7 +145,7 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
 
     def test_build_allowed_and_heuristics_beams_fn_exception(self):
         """Test _build_allowed_and_heuristics handles beams_fn exceptions"""
-        mock_beams_fn = Mock()
+        mock_beams_fn = self.mock_factory('MockHeuristicFunction')
         mock_beams_fn.side_effect = Exception("Beam function error")
         
         pathfinder = PairwiseBidirectionalAStar(
@@ -183,9 +186,21 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
 
     def test_edge_weight_custom(self):
         """Test _edge_weight method with custom weight"""
-        # Add edge with custom weight
-        self.graph.add_edge("middle", "end", weight=2.5)
-        weight = self.pathfinder._edge_weight("middle", "end")
+        # Create a real networkx graph for this test since we need actual edge weights
+        real_graph = nx.DiGraph()
+        real_graph.add_node("start")
+        real_graph.add_node("middle") 
+        real_graph.add_node("end")
+        real_graph.add_edge("start", "middle", weight=1.0)
+        real_graph.add_edge("middle", "end", weight=2.5)
+        
+        pathfinder = PairwiseBidirectionalAStar(
+            g=real_graph,
+            src="start",
+            tgt="end"
+        )
+        
+        weight = pathfinder._edge_weight("middle", "end")
         self.assertEqual(weight, 2.5)
 
     def test_edge_weight_missing_edge(self):
@@ -407,13 +422,20 @@ class TestPairwiseBidirectionalAStarEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.graph = nx.DiGraph()
-        self.graph.add_node("start")
-        self.graph.add_node("end")
+        self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        self.graph = self.mock_factory('MockGraphForPathfinding')
+        self.graph.nodes.return_value = ["start", "end"]
+        self.graph.has_node.side_effect = lambda n: n in ["start", "end"]
+        
+        # Set up edge case mock
+        self.edge_case_mock = self.mock_factory('MockPairwiseBidirectionalAStarEdgeCases')
 
     def test_empty_graph(self):
         """Test with empty graph"""
-        empty_graph = nx.DiGraph()
+        empty_graph = self.mock_factory('MockGraphForPathfinding')
+        empty_graph.nodes.return_value = []
+        empty_graph.edges.return_value = []
+        empty_graph.has_node.return_value = False
         
         pathfinder = PairwiseBidirectionalAStar(
             g=empty_graph,
@@ -426,8 +448,9 @@ class TestPairwiseBidirectionalAStarEdgeCases(unittest.TestCase):
 
     def test_single_node_graph(self):
         """Test with single node graph"""
-        single_graph = nx.DiGraph()
-        single_graph.add_node("only")
+        single_graph = self.mock_factory('MockGraphForPathfinding')
+        single_graph.nodes.return_value = ["only"]
+        single_graph.has_node.side_effect = lambda n: n == "only"
         
         pathfinder = PairwiseBidirectionalAStar(
             g=single_graph,
@@ -542,8 +565,14 @@ class TestPairwiseBidirectionalAStarEdgeCases(unittest.TestCase):
 class TestPairwiseBidirectionalAStarIntegration(unittest.TestCase):
     """Integration tests with realistic scenarios"""
     
+    def setUp(self):
+        """Set up integration test fixtures"""
+        self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        self.integration_mock = self.mock_factory('MockPairwiseBidirectionalAStarIntegration')
+    
     def test_with_embedding_beams_function(self):
         """Test integration with embedding beams function"""
+        # Use real NetworkX graph for integration test
         graph = nx.DiGraph()
         graph.add_edge("cat.n.01", "mammal.n.01")
         graph.add_edge("dog.n.01", "mammal.n.01")
@@ -569,8 +598,8 @@ class TestPairwiseBidirectionalAStarIntegration(unittest.TestCase):
 
     def test_with_gloss_seed_nodes(self):
         """Test integration with gloss seed nodes"""
+        # Use real NetworkX graph for integration test
         graph = nx.DiGraph()
-        # Create path through seed node
         graph.add_edge("start", "seed_node")
         graph.add_edge("seed_node", "end")
         graph.add_edge("start", "alternative")

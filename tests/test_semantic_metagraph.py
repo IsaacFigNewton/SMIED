@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.SemanticMetagraph import SemanticMetagraph
+from tests.mocks.semantic_metagraph_mocks import SemanticMetagraphMockFactory
 
 
 class TestSemanticMetagraph(unittest.TestCase):

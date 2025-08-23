@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.BeamBuilder import BeamBuilder
+from tests.mocks.beam_builder_mocks import BeamBuilderMockFactory
 
 
 class TestBeamBuilder(unittest.TestCase):
@@ -15,7 +16,11 @@ class TestBeamBuilder(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.mock_embedding_helper = Mock()
+        # Initialize mock factory
+        self.mock_factory = BeamBuilderMockFactory()
+        
+        # Create embedding helper using factory
+        self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
         self.beam_builder = BeamBuilder(self.mock_embedding_helper)
 
     def test_initialization(self):
@@ -61,7 +66,7 @@ class TestBeamBuilder(unittest.TestCase):
 
     def test_get_new_beams_basic(self):
         """Test basic functionality of get_new_beams"""
-        # Mock graph
+        # Mock graph using factory - create a more realistic mock
         mock_graph = nx.DiGraph()
         mock_graph.add_node("cat.n.01")
         mock_graph.add_node("dog.n.01")
@@ -69,9 +74,9 @@ class TestBeamBuilder(unittest.TestCase):
         mock_graph.add_edge("cat.n.01", "animal.n.01")
         mock_graph.add_edge("dog.n.01", "animal.n.01")
         
-        # Mock synsets
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        # Mock synsets using factory
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         # Mock embedding helper responses
         mock_src_embeddings = {
@@ -100,7 +105,7 @@ class TestBeamBuilder(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model, beam_width=3
             )
@@ -118,8 +123,8 @@ class TestBeamBuilder(unittest.TestCase):
         mock_graph.add_node("cat.n.01")
         mock_graph.add_node("dog.n.01")
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         # Empty embeddings
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [{}, {}]
@@ -128,7 +133,7 @@ class TestBeamBuilder(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model
             )
@@ -144,8 +149,8 @@ class TestBeamBuilder(unittest.TestCase):
         mock_graph.add_node("dog.n.01")
         # No edges, so no neighbors
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         # Embeddings claim to have neighbors that aren't in the graph
         mock_src_embeddings = {
@@ -160,7 +165,7 @@ class TestBeamBuilder(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             with self.assertRaises(ValueError) as context:
                 self.beam_builder.get_new_beams(
                     mock_graph, "cat.n.01", "dog.n.01", mock_model
@@ -319,8 +324,15 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.mock_embedding_helper = Mock()
+        # Initialize mock factory
+        self.mock_factory = BeamBuilderMockFactory()
+        
+        # Create mocks using factory
+        self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
         self.beam_builder = BeamBuilder(self.mock_embedding_helper)
+        
+        # Set up edge cases mock
+        self.edge_case_mock = self.mock_factory('MockBeamBuilderEdgeCases')
 
     def test_get_new_beams_with_zero_beam_width(self):
         """Test get_new_beams with beam_width=0"""
@@ -428,7 +440,12 @@ class TestBeamBuilderIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up for integration testing"""
-        self.mock_embedding_helper = Mock()
+        # Initialize mock factory for integration tests
+        self.mock_factory = BeamBuilderMockFactory()
+        self.integration_mock = self.mock_factory('MockBeamBuilderIntegration')
+        
+        # Create embedding helper using factory
+        self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
         self.beam_builder = BeamBuilder(self.mock_embedding_helper)
 
     def test_realistic_wordnet_scenario(self):
