@@ -269,3 +269,35 @@ class SemanticMetagraphMockConfig:
                 ]
             }
         }
+
+    @staticmethod
+    def get_basic_test_vertex_structures():
+        """Get basic vertex structures for testing."""
+        return {
+            'simple_vertices': [
+                ("word1", {"pos": "NOUN"}),
+                ("word2", {"pos": "VERB"}),
+                ("word3", {"pos": "ADJ"})
+            ],
+            'complex_vertices': [
+                ("Apple", {"pos": "PROPN", "ent_type": "ORG"}),
+                ("technology", {"pos": "NOUN", "ent_type": ""}),
+                ("company", {"pos": "NOUN", "ent_type": ""})
+            ]
+        }
+
+    @staticmethod
+    def get_basic_test_edge_structures():
+        """Get basic edge structures for testing."""
+        return {
+            'simple_edges': [
+                ((0, 1), {"relation": "subject"}),
+                ((1, 2), {"relation": "object"}),
+                ((0, 2), {"relation": "modifier"})
+            ],
+            'complex_edges': [
+                ((0, 1), {"relation": "nsubj", "weight": 1.0}),
+                ((1, 2), {"relation": "compound", "weight": 0.8}),
+                ((2, 3), {"relation": "dobj", "weight": 0.9})
+            ]
+        }

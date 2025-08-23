@@ -223,6 +223,22 @@ class TestDirectedMetagraphNetworkXConversion(TestDirectedMetagraph):
         vertex_structures = self.mock_config.get_basic_vertex_structures()
         edge_structures = self.mock_config.get_edge_structures()
         
+        # Set up vertex lists used by parent class tests
+        self.simple_vert_list = [
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
+        ]
+        
+        self.complex_vert_list = [
+            vertex_structures['person_action_vertices'][0],  # ("John", {"type": "person", "pos": "NOUN"})
+            vertex_structures['person_action_vertices'][1],  # ("runs", {"type": "action", "pos": "VERB"})
+            ("fast", {"type": "manner", "pos": "ADV"}),
+            ((0, 1), {"relation": "agent"}),
+            ((1, 2), {"relation": "manner"}),
+            ([0, 1, 2], {"relation": "action_group"})
+        ]
+        
         self.simple_graph = DirectedMetagraph([
             vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
             vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
@@ -358,6 +374,22 @@ class TestDirectedMetagraphManipulation(TestDirectedMetagraph):
         # Get vertex and edge structures from config
         vertex_structures = self.mock_config.get_basic_vertex_structures()
         edge_structures = self.mock_config.get_edge_structures()
+        
+        # Set up vertex lists used by parent class tests
+        self.simple_vert_list = [
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
+        ]
+        
+        self.complex_vert_list = [
+            vertex_structures['person_action_vertices'][0],  # ("John", {"type": "person", "pos": "NOUN"})
+            vertex_structures['person_action_vertices'][1],  # ("runs", {"type": "action", "pos": "VERB"})
+            ("fast", {"type": "manner", "pos": "ADV"}),
+            ((0, 1), {"relation": "agent"}),
+            ((1, 2), {"relation": "manner"}),
+            ([0, 1, 2], {"relation": "action_group"})
+        ]
         
         self.graph = DirectedMetagraph([
             vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
@@ -582,31 +614,28 @@ class TestDirectedMetagraphEdgeCases(TestDirectedMetagraph):
     
     def test_complex_removal_scenario(self):
         """Test complex vertex removal scenario"""
-        dg = DirectedMetagraph([
-            ("A", {}),           # 0
-            ("B", {}),           # 1
-            ("C", {}),           # 2
-            ("D", {}),           # 3
-            ((0, 1), {"relation": "r1"}),  # 4
-            ((1, 2), {"relation": "r2"}),  # 5
-            ([0, 2, 3], {"relation": "r3"}), # 6
-            ((4, 5), {"relation": "r4"})   # 7
-        ])
+        # Get complex removal scenario from config
+        removal_scenarios = self.mock_config.get_complex_removal_scenarios()
+        scenario = removal_scenarios['scenario_1']
+        
+        # Build vertex list from scenario
+        vert_list = scenario['initial_vertices'] + scenario['initial_edges']
+        dg = DirectedMetagraph(vert_list)
         
         initial_length = len(dg.metaverts)
         
-        # Remove vertex B (index 1)
-        # This should cascade to remove r1, r2, r3 (partially), and r4
-        dg.remove_vert(1)
+        # Remove vertex using scenario data
+        vertex_to_remove = scenario['vertex_to_remove']
+        dg.remove_vert(vertex_to_remove)
         
         self.assertLess(len(dg.metaverts), initial_length)
         
         # Verify no relations reference the removed vertex
         for mv in dg.metaverts.values():
             if isinstance(mv[0], tuple) and len(mv[0]) == 2:
-                self.assertNotIn(1, mv[0])
+                self.assertNotIn(vertex_to_remove, mv[0])
             elif isinstance(mv[0], list):
-                self.assertNotIn(1, mv[0])
+                self.assertNotIn(vertex_to_remove, mv[0])
 
 
 class TestDirectedMetagraphIntegration(TestDirectedMetagraph):
@@ -621,17 +650,21 @@ class TestDirectedMetagraphIntegration(TestDirectedMetagraph):
         # Start with empty graph
         dg = DirectedMetagraph()
         
-        # Add atomic vertices using realistic linguistic structure
-        dg.add_vert("The", {"pos": "DET"})      # 0
-        dg.add_vert("cat", {"pos": "NOUN"})     # 1
-        dg.add_vert("runs", {"pos": "VERB"})    # 2
-        dg.add_vert("fast", {"pos": "ADV"})     # 3
+        # Get linguistic test structure from config
+        linguistic_structures = self.mock_config.get_linguistic_test_structures()
+        simple_sentence = linguistic_structures['simple_sentence']
+        
+        # Add atomic vertices using config data
+        for vertex in simple_sentence['vertices']:
+            dg.add_vert(vertex[0], vertex[1])
         
         # Add relations
-        dg.add_vert((0, 1), {"relation": "det"})           # 4
-        dg.add_vert((1, 2), {"relation": "nsubj"})         # 5
-        dg.add_vert((2, 3), {"relation": "advmod"})        # 6
-        dg.add_vert([1, 2, 3], {"relation": "predicate"})  # 7
+        for edge in simple_sentence['edges']:
+            dg.add_vert(edge[0], edge[1])
+        
+        # Add groups  
+        for group in simple_sentence['groups']:
+            dg.add_vert(group[0], group[1])
         
         self.assertEqual(len(dg.metaverts), 8)
         
@@ -654,19 +687,24 @@ class TestDirectedMetagraphIntegration(TestDirectedMetagraph):
         complex_structures = self.mock_config.get_complex_graph_structures()
         hierarchical = complex_structures['hierarchical_structure']
         
+        # Get canonicalization test scenario from config
+        canonicalization_scenarios = self.mock_config.get_canonicalization_test_scenarios()
+        test_case = canonicalization_scenarios['unsorted_groups']
+        
         # Create graph with unsorted undirected relations
         vert_list = [
             ("A", {}),
-            ("B", {}),
+            ("B", {}), 
             ("C", {}),
-            ([2, 0, 1], {"relation": "group"})  # Unsorted
+            test_case['input_group']
         ]
         
         dg = DirectedMetagraph(vert_list)
         
         # Check that it was canonicalized
         last_vert = dg.metaverts[3]  # Last vertex has index 3
-        self.assertEqual(last_vert[0], [0, 1, 2])  # Should be sorted
+        expected_canonical = test_case['expected_canonical']
+        self.assertEqual(last_vert[0], expected_canonical[0])  # Should be sorted
     
     def test_validation_prevents_invalid_graphs(self):
         """Test that validation prevents creation of invalid graphs"""

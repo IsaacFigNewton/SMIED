@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.PatternLoader import PatternLoader
 from tests.mocks.pattern_loader_mocks import PatternLoaderMockFactory
+from tests.config.pattern_loader_config import PatternLoaderMockConfig
 
 
 class TestPatternLoader(unittest.TestCase):
@@ -16,20 +17,12 @@ class TestPatternLoader(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = PatternLoaderMockFactory()
+        self.mock_config = PatternLoaderMockConfig()
         
-        self.sample_patterns = {
-            "test_category": {
-                "test_pattern": {
-                    "description": "Test pattern",
-                    "pattern": [
-                        {"text": ["cat"], "pos": ["NOUN"]},
-                        {"relation": ["subject"]}
-                    ]
-                }
-            }
-        }
+        # Get sample patterns from config
+        self.sample_patterns = self.mock_config.get_sample_patterns()
 
     @patch('smied.PatternLoader.PatternLoader._get_default_patterns')
     def test_initialization_default(self, mock_get_default):

@@ -237,5 +237,169 @@ class EmbeddingHelperMockConfig:
             'transitive_relations': ['hypernyms', 'hyponyms'],
             'part_relations': ['part_meronyms', 'part_holonyms'],
             'member_relations': ['member_meronyms', 'member_holonyms'],
-            'substance_relations': ['substance_meronyms', 'substance_holonyms']
+            'substance_relations': ['substance_meronyms', 'substance_holonyms'],
+            'all_relation_types': [
+                'part_holonyms', 'substance_holonyms', 'member_holonyms',
+                'part_meronyms', 'substance_meronyms', 'member_meronyms',
+                'hypernyms', 'hyponyms', 'entailments', 'causes',
+                'also_sees', 'verb_groups'
+            ]
+        }
+
+    @staticmethod
+    def get_test_lemma_names():
+        """Get test lemma names for consistent testing."""
+        return {
+            'simple_lemmas': ["cat", "feline"],
+            'compound_lemmas': ["ice_cream", "hot_dog"],
+            'space_separated': ["ice cream", "hot dog"], 
+            'multi_word_examples': [
+                {"lemma": "hot_dog", "components": ["hot", "dog"]},
+                {"lemma": "ice_cream", "components": ["ice", "cream"]},
+                {"lemma": "multi word", "components": ["multi", "word"]},
+                {"lemma": "partial multi", "components": ["partial", "multi"]}
+            ],
+            'mixed_availability_lemmas': ["available", "not_available", "multi word", "partial multi"]
+        }
+
+    @staticmethod
+    def get_mock_synset_names():
+        """Get mock synset names for testing."""
+        return {
+            'animal_synsets': {
+                'cat': 'cat.n.01',
+                'dog': 'dog.n.01', 
+                'animal': 'animal.n.01',
+                'mammal': 'mammal.n.01',
+                'kitten': 'kitten.n.01',
+                'puppy': 'puppy.n.01',
+                'feline': 'feline.n.01',
+                'canine': 'canine.n.01'
+            },
+            'action_synsets': {
+                'run': 'run.v.01',
+                'walk': 'walk.v.01',
+                'jump': 'jump.v.01',
+                'sprint': 'sprint.v.01'
+            },
+            'test_synsets': {
+                'test': 'test.n.01',
+                'related': 'related.n.01',
+                'target': 'target.n.01'
+            }
+        }
+
+    @staticmethod
+    def get_embedding_test_vectors():
+        """Get specific embedding vectors for testing scenarios."""
+        return {
+            'simple_vectors': {
+                'cat': np.array([1.0, 2.0, 3.0]),
+                'feline': np.array([2.0, 3.0, 4.0]),
+                'ice cream': np.array([1.0, 2.0, 3.0]),
+                'ice_cream': np.array([1.0, 2.0, 3.0])
+            },
+            'multi_word_vectors': {
+                'hot': np.array([1.0, 2.0, 3.0]),
+                'dog': np.array([3.0, 4.0, 5.0]),
+                'ice': np.array([2.0, 3.0, 4.0]),
+                'cream': np.array([1.0, 2.0, 3.0])
+            },
+            'similarity_test_vectors': {
+                'synset1': np.array([1.0, 0.0, 0.0]),
+                'synset2': np.array([1.0, 1.0, 0.0]),
+                'synset3': np.array([0.0, 1.0, 0.0]),
+                'synset4': np.array([1.0, 1.0, 0.0])
+            },
+            'zero_norm_vectors': {
+                'zero': np.array([0.0, 0.0]),
+                'normal': np.array([1.0, 1.0])
+            },
+            'mixed_availability_vectors': {
+                'available': np.array([1.0, 1.0]),
+                'multi': np.array([2.0, 2.0]),
+                'word': np.array([3.0, 3.0]),
+                'partial': np.array([4.0, 4.0])
+            }
+        }
+
+    @staticmethod
+    def get_relation_mapping_test_data():
+        """Get relation mapping test data for alignment tests."""
+        return {
+            'basic_mapping': {
+                "hypernyms": "hyponyms",
+                "hyponyms": "hypernyms"
+            },
+            'extended_mapping': {
+                "hypernyms": "hyponyms",
+                "hyponyms": "hypernyms",
+                "meronyms": "holonyms",
+                "holonyms": "meronyms"
+            },
+            'missing_relation_mapping': {
+                "hypernyms": "hyponyms",
+                "missing_relation": "also_missing"
+            }
+        }
+
+    @staticmethod
+    def get_beam_test_parameters():
+        """Get beam test parameters for various scenarios."""
+        return {
+            'small_beam': {'width': 2, 'expected_results': 2},
+            'medium_beam': {'width': 3, 'expected_results': 3},
+            'large_beam': {'width': 10, 'expected_results': 10},
+            'zero_beam': {'width': 0, 'expected_behavior': 'return_all'},
+            'negative_beam': {'width': -1, 'expected_behavior': 'return_all'}
+        }
+
+    @staticmethod
+    def get_gloss_test_data():
+        """Get gloss test data for predicate testing."""
+        return {
+            'test_definitions': [
+                "test definition",
+                "a small carnivorous mammal",
+                "move fast by using legs"
+            ],
+            'wordnet_pos_constants': {
+                'NOUN': 'n',
+                'VERB': 'v',
+                'ADJ': 'a',
+                'ADV': 'r'
+            },
+            'extraction_modes': ['subjects', 'objects', 'predicates'],
+            'sample_tokens': {
+                'subject': 'subject',
+                'object': 'object', 
+                'predicate': 'predicate'
+            },
+            'max_sample_sizes': [3, 5, 10, 20],
+            'target_synset_examples': ["target", "subject.n.01", "object.n.01"]
+        }
+
+    @staticmethod
+    def get_integration_test_scenarios():
+        """Get integration test scenarios for realistic testing."""
+        return {
+            'cat_synset_scenario': {
+                'main_synset': 'cat.n.01',
+                'lemmas': ['cat', 'feline'],
+                'hypernym': 'mammal.n.01',
+                'hyponym': 'kitten.n.01',
+                'expected_relations': ['hypernyms', 'hyponyms']
+            },
+            'dog_synset_scenario': {
+                'main_synset': 'dog.n.01',
+                'lemmas': ['dog', 'canine'],
+                'hypernym': 'mammal.n.01', 
+                'hyponym': 'puppy.n.01',
+                'expected_relations': ['hypernyms', 'hyponyms']
+            },
+            'workflow_parameters': {
+                'embedding_dims': 100,
+                'similarity_threshold': 0.5,
+                'max_relations': 10
+            }
         }

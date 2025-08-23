@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.SemanticMetagraph import SemanticMetagraph
 from tests.mocks.semantic_metagraph_mocks import SemanticMetagraphMockFactory
+from tests.config.semantic_metagraph_config import SemanticMetagraphMockConfig
 
 
 class TestSemanticMetagraph(unittest.TestCase):
@@ -27,15 +28,22 @@ class TestSemanticMetagraph(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Create a simple test document
-        self.test_text = "Apple is a technology company based in California."
+        # Initialize config
+        self.mock_config = SemanticMetagraphMockConfig()
+        
+        # Get test text from config
+        test_texts = self.mock_config.get_test_texts()
+        self.test_text = test_texts['complex_sentence']
         self.doc = self.nlp(self.test_text)
         
-        # Create a test vertex list for direct initialization
+        # Create a test vertex list for direct initialization from config
+        vertex_structures = self.mock_config.get_basic_test_vertex_structures()
+        edge_structures = self.mock_config.get_basic_test_edge_structures()
+        
         self.test_vert_list = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ((0, 1), {"relation": "subject"})
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
         ]
     
     def test_initialization_from_doc(self):

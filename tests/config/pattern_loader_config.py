@@ -315,3 +315,50 @@ class PatternLoaderMockConfig:
                 'expected_behavior': 'timeout_gracefully'
             }
         }
+
+    @staticmethod
+    def get_sample_patterns():
+        """Get sample pattern structure for basic testing."""
+        return {
+            "test_category": {
+                "test_pattern": {
+                    "description": "Test pattern",
+                    "pattern": [
+                        {"text": ["cat"], "pos": ["NOUN"]},
+                        {"relation": ["subject"]}
+                    ]
+                }
+            }
+        }
+
+    @staticmethod
+    def get_json_conversion_test_data():
+        """Get test data for JSON pattern conversion."""
+        return {
+            'basic_conversion': {
+                "test_category": {
+                    "test_pattern": {
+                        "description": "Basic conversion test",
+                        "pattern": [
+                            {"pos": ["NOUN"], "labels": ["PERSON"]},
+                            {"pos": ["VERB"], "root_type": ["LEXICAL"]},
+                            {"relation": ["agent"], "relation_type": ["SEMANTIC"]}
+                        ]
+                    }
+                }
+            },
+            'complex_conversion': {
+                "complex_category": {
+                    "complex_pattern": {
+                        "description": "Complex pattern conversion",
+                        "pattern": [
+                            {"pos": ["NOUN", "PROPN"], "labels": ["PERSON", "ORG"]},
+                            {"pos": ["VERB"], "tense": ["PAST"], "root_type": ["ACTION"]},
+                            {"pos": ["NOUN"], "labels": ["OBJECT"]},
+                            {"relation": ["nsubj"], "relation_type": ["GRAMMATICAL"]},
+                            {"relation": ["dobj"], "relation_type": ["GRAMMATICAL"]}
+                        ]
+                    }
+                }
+            }
+        }

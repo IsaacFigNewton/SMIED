@@ -189,3 +189,89 @@ class DirectedMetagraphMockConfig:
                 'operation_types': ['add_vertex', 'add_edge', 'remove_vertex', 'update_vertex']
             }
         }
+
+    @staticmethod
+    def get_linguistic_test_structures():
+        """Get linguistic test structures for realistic testing."""
+        return {
+            'simple_sentence': {
+                'vertices': [
+                    ("The", {"pos": "DET"}),
+                    ("cat", {"pos": "NOUN"}),
+                    ("runs", {"pos": "VERB"}),
+                    ("fast", {"pos": "ADV"})
+                ],
+                'edges': [
+                    ((0, 1), {"relation": "det"}),
+                    ((1, 2), {"relation": "nsubj"}),
+                    ((2, 3), {"relation": "advmod"})
+                ],
+                'groups': [
+                    ([1, 2, 3], {"relation": "predicate"})
+                ]
+            },
+            'complex_sentence': {
+                'vertices': [
+                    ("John", {"type": "person"}),
+                    ("runs", {"type": "action"}),
+                    ("fast", {"type": "manner"})
+                ],
+                'edges': [
+                    ((0, 1), {"relation": "agent"}),
+                    ([1, 2], {"relation": "manner_group"})
+                ]
+            }
+        }
+
+    @staticmethod
+    def get_complex_removal_scenarios():
+        """Get complex removal scenarios for testing cascading deletions."""
+        return {
+            'scenario_1': {
+                'initial_vertices': [
+                    ("A", {}),           # 0
+                    ("B", {}),           # 1
+                    ("C", {}),           # 2
+                    ("D", {}),           # 3
+                ],
+                'initial_edges': [
+                    ((0, 1), {"relation": "r1"}),    # 4
+                    ((1, 2), {"relation": "r2"}),    # 5
+                    ([0, 2, 3], {"relation": "r3"}), # 6
+                    ((4, 5), {"relation": "r4"})     # 7
+                ],
+                'vertex_to_remove': 1,  # Remove vertex B
+                'expected_cascading_removals': ['r1', 'r2', 'r3', 'r4']
+            },
+            'scenario_2': {
+                'initial_vertices': [
+                    ("word1", {"pos": "NOUN"}),
+                    ("word2", {"pos": "VERB"}),
+                    ("word3", {"pos": "ADJ"})
+                ],
+                'initial_edges': [
+                    ((0, 1), {"relation": "subject"}),
+                    ((0, 2), {"relation": "modifier"})
+                ],
+                'vertex_to_remove': 0,  # Remove word1
+                'expected_cascading_removals': ['subject', 'modifier']
+            }
+        }
+
+    @staticmethod
+    def get_canonicalization_test_scenarios():
+        """Get canonicalization test scenarios."""
+        return {
+            'unsorted_groups': {
+                'input_group': ([2, 0, 1], {"relation": "group"}),
+                'expected_canonical': ([0, 1, 2], {"relation": "group"})
+            },
+            'already_sorted_groups': {
+                'input_group': ([0, 1, 2], {"relation": "group"}),
+                'expected_canonical': ([0, 1, 2], {"relation": "group"})
+            },
+            'single_element_group': {
+                'input_group': ([5], {"relation": "singleton"}),
+                'expected_canonical': ([5], {"relation": "singleton"})
+            }
+        }
