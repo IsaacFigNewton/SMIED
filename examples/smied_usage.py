@@ -20,7 +20,8 @@ def main():
     pipeline = SMIED(
         nlp_model=None,  # Set to "en_core_web_sm" if spaCy is installed
         embedding_model=None,  # Can add embedding model for better similarity
-        auto_download=True  # Automatically download required NLTK data
+        auto_download=True,  # Automatically download required NLTK data,
+        verbosity=2  # Enable verbose output
     )
     
     # Example 1: Analyze a triple
@@ -75,7 +76,7 @@ def main():
     print("Example 4: Silent analysis (non-verbose)")
     print("=" * 60)
     
-    result = pipeline.analyze_triple("bird", "fly", "sky", verbose=False)
+    result = pipeline.analyze_triple("bird", "fly", "sky", verbose=True)
     subject_path, object_path, predicate = result
     
     if subject_path and object_path:

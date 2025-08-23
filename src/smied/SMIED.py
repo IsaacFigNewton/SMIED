@@ -19,6 +19,11 @@ class SMIED(ISMIEDPipeline):
     
     This class provides a unified interface for analyzing semantic relationships
     between words using WordNet and optional NLP models.
+    
+    Verbosity levels:
+    - 0: Silent mode - only critical errors are shown
+    - 1: Progress mode - initialization, high-level progress, and results (default)
+    - 2: Detailed mode - comprehensive debugging output from all components
     """
     
     def __init__(
@@ -26,7 +31,8 @@ class SMIED(ISMIEDPipeline):
         nlp_model: Optional[str] = "en_core_web_sm",
         embedding_model: Optional[Any] = None,
         auto_download: bool = True,
-        build_graph_on_init: bool = False
+        build_graph_on_init: bool = False,
+        verbosity: int = 1
     ):
         """
         Initialize the SMIED pipeline and all its components.
@@ -36,36 +42,54 @@ class SMIED(ISMIEDPipeline):
             embedding_model: Optional embedding model for similarity
             auto_download: Whether to automatically download required data
             build_graph_on_init: Whether to build the synset graph during initialization
+            verbosity: Debug verbosity level (0=silent, 1=progress, 2=detailed)
         """
+        self.verbosity = verbosity
         self.nlp_model_name = nlp_model
         self.embedding_model = embedding_model
         self.auto_download = auto_download
         
+        if self.verbosity >= 1:
+            print(f"[SMIED] Initializing SMIED pipeline with verbosity level {verbosity}")
+        
         # Download required NLTK data if needed
         if self.auto_download:
+            if self.verbosity >= 2:
+                print("[SMIED] Downloading NLTK data (wordnet, omw-1.4)...")
             nltk.download('wordnet', quiet=True)
             nltk.download('omw-1.4', quiet=True)
         
         # Set up NLP pipeline
+        if self.verbosity >= 2:
+            print(f"[SMIED] Setting up NLP pipeline with model: {nlp_model}")
         self.nlp = self._setup_nlp()
         
-        # Initialize semantic decomposer
+        # Initialize semantic decomposer with verbosity
+        if self.verbosity >= 1:
+            print("[SMIED] Initializing SemanticDecomposer...")
         self.decomposer = SemanticDecomposer(
             wn_module=wn,
             nlp_func=self.nlp,
-            embedding_model=self.embedding_model
+            embedding_model=self.embedding_model,
+            verbosity=self.verbosity
         )
         
         # Build graph if requested
         if build_graph_on_init:
+            if self.verbosity >= 1:
+                print("[SMIED] Building synset graph during initialization...")
             self.synset_graph = self.build_synset_graph()
         else:
             self.synset_graph = None
+            
+        if self.verbosity >= 1:
+            print("[SMIED] SMIED pipeline initialization complete")
         
     def reinitialize(
         self,
         nlp_model: Optional[str] = None,
-        embedding_model: Optional[Any] = None
+        embedding_model: Optional[Any] = None,
+        verbosity: Optional[int] = None
     ) -> None:
         """
         Reinitialize the pipeline with new settings.
@@ -73,56 +97,85 @@ class SMIED(ISMIEDPipeline):
         Args:
             nlp_model: New spaCy model name (optional)
             embedding_model: New embedding model (optional)
+            verbosity: New verbosity level (optional)
         """
+        # Update verbosity if provided
+        if verbosity is not None:
+            self.verbosity = verbosity
+            if self.verbosity >= 1:
+                print(f"[SMIED] Reinitializing with verbosity level {verbosity}")
+        
         # Update settings if provided
         if nlp_model is not None:
+            if self.verbosity >= 2:
+                print(f"[SMIED] Updating NLP model from {self.nlp_model_name} to {nlp_model}")
             self.nlp_model_name = nlp_model
             self.nlp = self._setup_nlp()
         
         if embedding_model is not None:
+            if self.verbosity >= 2:
+                print("[SMIED] Updating embedding model")
             self.embedding_model = embedding_model
         
         # Reinitialize decomposer with new settings
+        if self.verbosity >= 1:
+            print("[SMIED] Reinitializing SemanticDecomposer...")
         self.decomposer = SemanticDecomposer(
             wn_module=wn,
             nlp_func=self.nlp,
-            embedding_model=self.embedding_model
+            embedding_model=self.embedding_model,
+            verbosity=self.verbosity
         )
         
         # Clear cached graph to force rebuild with new settings
         self.synset_graph = None
+        
+        if self.verbosity >= 1:
+            print("[SMIED] Reinitialization complete")
     
     def _setup_nlp(self) -> Optional[Any]:
         """Set up spaCy NLP pipeline."""
         if not self.nlp_model_name:
+            if self.verbosity >= 2:
+                print("[SMIED] No NLP model specified, skipping spaCy setup")
             return None
             
         try:
             import spacy
+            if self.verbosity >= 2:
+                print(f"[SMIED] Loading spaCy model: {self.nlp_model_name}")
             nlp = spacy.load(self.nlp_model_name)
+            if self.verbosity >= 2:
+                print(f"[SMIED] Successfully loaded spaCy model: {self.nlp_model_name}")
             return nlp
         except OSError:
-            print(f"Warning: spaCy '{self.nlp_model_name}' model not found.")
-            print(f"Install with: python -m spacy download {self.nlp_model_name}")
+            if self.verbosity >= 0:
+                print(f"[WARNING] spaCy '{self.nlp_model_name}' model not found.")
+                print(f"[WARNING] Install with: python -m spacy download {self.nlp_model_name}")
             return None
     
-    def build_synset_graph(self, verbose: bool = True) -> Any:
+    def build_synset_graph(self, verbose: Optional[bool] = None) -> Any:
         """
         Build or retrieve the synset graph.
         
         Args:
-            verbose: Whether to print progress messages
+            verbose: Whether to print progress messages (overrides class verbosity if provided)
             
         Returns:
             NetworkX graph of WordNet synsets
         """
+        # Use provided verbose parameter or fall back to class verbosity
+        show_progress = verbose if verbose is not None else (self.verbosity >= 1)
+        
         if self.synset_graph is None:
-            if verbose:
-                print("Building WordNet synset graph... (this may take a moment)")
+            if show_progress:
+                print("[SMIED] Building WordNet synset graph... (this may take a moment)")
             self.synset_graph = self.decomposer.build_synset_graph()
-            if verbose:
-                print(f"Graph built with {self.synset_graph.number_of_nodes()} nodes "
+            if show_progress:
+                print(f"[SMIED] Graph built with {self.synset_graph.number_of_nodes()} nodes "
                       f"and {self.synset_graph.number_of_edges()} edges")
+        elif self.verbosity >= 2:
+            print(f"[SMIED] Using cached synset graph with {self.synset_graph.number_of_nodes()} nodes")
         
         return self.synset_graph
     
@@ -131,11 +184,11 @@ class SMIED(ISMIEDPipeline):
         subject: str,
         predicate: str,
         object: str,
-        max_depth: int = 6,
+        max_depth: int = 10,
         beam_width: int = 3,
-        max_results_per_pair: int = 2,
-        len_tolerance: int = 2,
-        verbose: bool = True
+        max_results_per_pair: int = 4,
+        len_tolerance: int = 5,
+        verbose: Optional[bool] = None
     ) -> Tuple[Optional[List], Optional[List], Optional[Any]]:
         """
         Analyze a subject-predicate-object triple.
@@ -148,27 +201,32 @@ class SMIED(ISMIEDPipeline):
             beam_width: Beam width for search
             max_results_per_pair: Maximum results per word pair
             len_tolerance: Path length tolerance
-            verbose: Whether to print progress
+            verbose: Whether to print progress (overrides class verbosity if provided)
             
         Returns:
             Tuple of (subject_path, object_path, connecting_predicate)
         """
-        if verbose:
+        # Use provided verbose parameter or fall back to class verbosity
+        show_output = verbose if verbose is not None else (self.verbosity >= 1)
+        
+        if show_output:
             print("=" * 80)
             print("SEMANTIC DECOMPOSITION ANALYSIS")
             print(f"Finding semantic paths linking: {subject} -> {predicate} -> {object}")
             print("=" * 80)
             print()
+        elif self.verbosity >= 2:
+            print(f"[SMIED] Starting analysis: {subject} -> {predicate} -> {object}")
         
         # Build graph if needed
-        graph = self.build_synset_graph(verbose=verbose)
+        graph = self.build_synset_graph(verbose=show_output)
         
         # Show available synsets if verbose
-        if verbose:
+        if show_output:
             self._display_synsets(subject, predicate, object)
         
         # Find connected paths
-        if verbose:
+        if show_output:
             print("Searching for semantic paths...")
             print("-" * 40)
         
@@ -186,18 +244,47 @@ class SMIED(ISMIEDPipeline):
             
             subject_path, object_path, connecting_predicate = result
             
-            if verbose:
+            if show_output:
                 self.display_results(
                     subject_path, object_path, connecting_predicate,
                     subject, predicate, object
                 )
+            elif self.verbosity >= 2:
+                success = subject_path and object_path and connecting_predicate
+                print(f"[SMIED] Analysis complete: {'SUCCESS' if success else 'NO PATH FOUND'}")
             
             return result
             
         except Exception as e:
-            if verbose:
-                print(f"Error during semantic decomposition: {e}")
+            if self.verbosity >= 0:
+                print(f"[ERROR] Error during semantic decomposition: {e}")
             raise
+    
+    def set_verbosity(self, verbosity: int) -> None:
+        """
+        Set the verbosity level for the SMIED pipeline.
+        
+        Args:
+            verbosity: Verbosity level (0=silent, 1=progress, 2=detailed)
+        """
+        old_verbosity = self.verbosity
+        self.verbosity = verbosity
+        
+        # Update the decomposer's verbosity as well
+        if hasattr(self.decomposer, 'verbosity'):
+            self.decomposer.verbosity = verbosity
+            
+        if self.verbosity >= 1:
+            print(f"[SMIED] Verbosity changed from {old_verbosity} to {verbosity}")
+    
+    def get_verbosity(self) -> int:
+        """
+        Get the current verbosity level.
+        
+        Returns:
+            Current verbosity level (0=silent, 1=progress, 2=detailed)
+        """
+        return self.verbosity
     
     def get_synsets(self, word: str, pos: Optional[str] = None) -> List:
         """
