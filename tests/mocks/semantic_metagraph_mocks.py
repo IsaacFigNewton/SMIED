@@ -5,6 +5,13 @@ Mock classes for SemanticMetagraph tests.
 from unittest.mock import Mock
 from typing import List, Dict, Any, Optional, Set, Tuple
 
+# Import abstract base classes
+from tests.mocks.base.library_wrapper_mock import AbstractLibraryWrapperMock
+from tests.mocks.base.integration_mock import AbstractIntegrationMock
+from tests.mocks.base.collection_mock import AbstractCollectionMock
+from tests.mocks.base.entity_mock import AbstractEntityMock, EntityType
+from tests.mocks.base.reasoning_mock import AbstractReasoningMock, InferenceResult
+
 
 class SemanticMetagraphMockFactory:
     """Factory class for creating SemanticMetagraph mock instances."""
@@ -87,7 +94,7 @@ class MockSemanticMetagraph(Mock):
         self.relations.add(relation)
 
 
-class MockSemanticMetagraphIntegration(Mock):
+class MockSemanticMetagraphIntegration(AbstractIntegrationMock):
     """Mock for SemanticMetagraph integration testing."""
     
     def __init__(self, *args, **kwargs):
@@ -96,13 +103,48 @@ class MockSemanticMetagraphIntegration(Mock):
         self.wordnet_integration = MockWordNetIntegration()
         self.knowledge_base = MockKnowledgeBase()
         self.reasoning_engine = MockReasoningEngine()
+        
+        # Register components
+        self.register_component("wordnet", self.wordnet_integration)
+        self.register_component("knowledge_base", self.knowledge_base)
+        self.register_component("reasoning_engine", self.reasoning_engine)
+    
+    # Implement required abstract methods from AbstractIntegrationMock
+    def setup_integration_components(self) -> Dict[str, Any]:
+        """Setup SemanticMetagraph integration components."""
+        return {
+            'wordnet_integration': self.wordnet_integration,
+            'knowledge_base': self.knowledge_base,
+            'reasoning_engine': self.reasoning_engine,
+            'semantic_metagraph': Mock()
+        }
+    
+    def configure_component_interactions(self) -> None:
+        """Configure SemanticMetagraph component interactions."""
+        # Configure interactions between components
+        pass  # Mock implementation
+    
+    def validate_integration_state(self) -> bool:
+        """Validate SemanticMetagraph integration state."""
+        return (hasattr(self, 'wordnet_integration') and 
+                hasattr(self, 'knowledge_base') and 
+                hasattr(self, 'reasoning_engine'))
 
 
-class MockOntology(Mock):
+class MockOntology(AbstractCollectionMock):
     """Mock ontology for SemanticMetagraph."""
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        # Initialize with initial data for the collection aspects
+        initial_data = kwargs.pop('initial_data', {})
+        super().__init__(initial_data=initial_data, *args, **kwargs)
+        
+        # Set collection-specific attributes
+        self.collection_type = "ontology"
+        self.is_mutable = True
+        self.is_ordered = False
+        self.allows_duplicates = False
+        
         # Ontology structure
         self.classes = set()
         self.properties = set()
@@ -114,17 +156,39 @@ class MockOntology(Mock):
         self.is_subclass_of = Mock(return_value=False)
         self.get_instances = Mock(return_value=[])
         self.infer_class = Mock(return_value=None)
+    
+    # Implement required abstract methods from AbstractCollectionMock
+    def get_collection_info(self) -> Dict[str, Any]:
+        """Get ontology collection information."""
+        return {
+            'type': 'ontology',
+            'classes_count': len(self.classes),
+            'properties_count': len(self.properties),
+            'individuals_count': len(self.individuals),
+            'supports_inference': True,
+            'supports_hierarchy': True
+        }
+    
+    def validate_item(self, item: Any) -> bool:
+        """Validate that an item can be stored in the ontology."""
+        # Accept classes, properties, individuals, or general ontology items
+        return True  # Flexible validation for mock
+    
+    def transform_item(self, item: Any) -> Any:
+        """Transform an item before storing it in the ontology."""
+        # For ontology, items are stored as-is
+        return item
 
 
-class MockConcept(Mock):
+class MockConcept(AbstractEntityMock):
     """Mock concept for SemanticMetagraph."""
     
     def __init__(self, concept_id="c1", label="test_concept", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = concept_id
+        super().__init__(entity_id=concept_id, entity_type=EntityType.CONCEPT, *args, **kwargs)
+        # Set concept-specific attributes
         self.label = label
-        self.type = "concept"
-        self.properties = {}
+        self.name = label
+        self.type = "concept"  # Keep for backwards compatibility
         self.semantic_features = {}
         
         # Concept methods
@@ -133,18 +197,32 @@ class MockConcept(Mock):
         self.add_feature = Mock()
         self.remove_feature = Mock()
         self.similarity = Mock(return_value=0.8)
+    
+    # Implement required abstract methods from AbstractEntityMock
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this concept."""
+        return self.label
+    
+    def validate_entity(self) -> bool:
+        """Validate that the concept is consistent and valid."""
+        return bool(self.id and self.label)
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this concept."""
+        return f"concept:{self.id}:{self.label}"
 
 
-class MockRelation(Mock):
+class MockRelation(AbstractEntityMock):
     """Mock relation for SemanticMetagraph."""
     
     def __init__(self, relation_id="r1", relation_type="relates_to", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = relation_id
-        self.type = relation_type
+        super().__init__(entity_id=relation_id, entity_type=EntityType.RELATION, *args, **kwargs)
+        # Set relation-specific attributes
+        self.type = relation_type  # Keep for backwards compatibility
+        self.name = relation_type
+        self.relation_type = relation_type
         self.domain = None
         self.range = None
-        self.properties = {}
         
         # Relation methods
         self.is_symmetric = Mock(return_value=False)
@@ -152,25 +230,87 @@ class MockRelation(Mock):
         self.is_reflexive = Mock(return_value=False)
         self.get_inverse = Mock(return_value=None)
         self.validate = Mock(return_value=True)
+    
+    # Implement required abstract methods from AbstractEntityMock
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this relation."""
+        return self.relation_type
+    
+    def validate_entity(self) -> bool:
+        """Validate that the relation is consistent and valid."""
+        return bool(self.id and self.relation_type)
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this relation."""
+        return f"relation:{self.id}:{self.relation_type}"
 
 
-class MockWordNetIntegration(Mock):
+class MockWordNetIntegration(AbstractIntegrationMock, AbstractLibraryWrapperMock):
     """Mock WordNet integration for SemanticMetagraph."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set library-specific attributes
+        self.library_name = "wordnet"
+        self.library_version = "3.1"
+        
         # WordNet integration methods
         self.import_synsets = Mock()
         self.map_concepts = Mock(return_value={})
         self.sync_relations = Mock()
         self.get_wordnet_concept = Mock(return_value=None)
+    
+    # Implement required abstract methods from AbstractLibraryWrapperMock
+    def initialize_library(self, **config) -> bool:
+        """Initialize WordNet library."""
+        self.is_initialized = True
+        return True
+    
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get WordNet library information."""
+        return {
+            'name': self.library_name,
+            'version': self.library_version,
+            'type': 'lexical_database',
+            'synsets_available': True
+        }
+    
+    def check_compatibility(self) -> bool:
+        """Check WordNet compatibility."""
+        return True
+    
+    # Implement required abstract methods from AbstractIntegrationMock
+    def setup_integration_components(self) -> Dict[str, Any]:
+        """Setup WordNet integration components."""
+        return {
+            'wordnet': Mock(),
+            'synset_mapper': Mock(),
+            'relation_syncer': Mock()
+        }
+    
+    def configure_component_interactions(self) -> None:
+        """Configure WordNet component interactions."""
+        pass  # Mock implementation
+    
+    def validate_integration_state(self) -> bool:
+        """Validate WordNet integration state."""
+        return self.is_initialized
 
 
-class MockKnowledgeBase(Mock):
+class MockKnowledgeBase(AbstractCollectionMock):
     """Mock knowledge base for SemanticMetagraph."""
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        # Initialize with initial data for the collection aspects
+        initial_data = kwargs.pop('initial_data', set())
+        super().__init__(initial_data=initial_data, *args, **kwargs)
+        
+        # Set collection-specific attributes
+        self.collection_type = "knowledge_base"
+        self.is_mutable = True
+        self.is_ordered = False
+        self.allows_duplicates = False
+        
         # Knowledge base structure
         self.facts = set()
         self.rules = set()
@@ -182,13 +322,40 @@ class MockKnowledgeBase(Mock):
         self.query = Mock(return_value=[])
         self.infer = Mock(return_value=[])
         self.is_consistent = Mock(return_value=True)
+    
+    # Implement required abstract methods from AbstractCollectionMock
+    def get_collection_info(self) -> Dict[str, Any]:
+        """Get knowledge base collection information."""
+        return {
+            'type': 'knowledge_base',
+            'facts_count': len(self.facts),
+            'rules_count': len(self.rules),
+            'axioms_count': len(self.axioms),
+            'supports_inference': True,
+            'supports_queries': True,
+            'is_consistent': True
+        }
+    
+    def validate_item(self, item: Any) -> bool:
+        """Validate that an item can be stored in the knowledge base."""
+        # Accept facts, rules, axioms, or general knowledge items
+        return True  # Flexible validation for mock
+    
+    def transform_item(self, item: Any) -> Any:
+        """Transform an item before storing it in the knowledge base."""
+        # For knowledge base, items are stored as-is
+        return item
 
 
-class MockReasoningEngine(Mock):
+class MockReasoningEngine(AbstractReasoningMock):
     """Mock reasoning engine for SemanticMetagraph."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set reasoning engine specific attributes
+        self.engine_name = "semantic_metagraph_reasoning_engine"
+        self.engine_version = "1.0"
+        
         # Reasoning capabilities
         self.forward_chaining = Mock(return_value=[])
         self.backward_chaining = Mock(return_value=[])
@@ -198,14 +365,61 @@ class MockReasoningEngine(Mock):
         # Reasoning validation
         self.validate_inference = Mock(return_value=True)
         self.explain_inference = Mock(return_value="")
+    
+    # Implement required abstract methods from AbstractReasoningMock
+    def infer(self, query: Any, context: Optional[Dict[str, Any]] = None) -> InferenceResult:
+        """Perform inference on a query."""
+        self.inference_count += 1
+        
+        # Mock inference result
+        return InferenceResult(
+            conclusion=f"Inferred result for {query}",
+            confidence=0.8,
+            reasoning_path=["Mock reasoning step 1", "Mock reasoning step 2"],
+            evidence=[query],
+            metadata={
+                'engine': self.engine_name,
+                'query_type': str(type(query)),
+                'context': context or {}
+            }
+        )
+    
+    def compute_similarity(self, entity1: Any, entity2: Any) -> float:
+        """Compute similarity between two entities."""
+        # Mock similarity computation
+        if entity1 == entity2:
+            return 1.0
+        
+        # Use simple hash-based mock similarity
+        hash1 = hash(str(entity1)) % 1000
+        hash2 = hash(str(entity2)) % 1000
+        similarity = 1.0 - abs(hash1 - hash2) / 1000.0
+        
+        return max(0.0, similarity)
+    
+    def explain_reasoning(self, inference_result: InferenceResult) -> List[str]:
+        """Generate explanation for reasoning process."""
+        explanations = [
+            f"Query processed: {inference_result.metadata.get('query_type', 'unknown')}",
+            f"Confidence level: {inference_result.confidence}",
+            f"Evidence considered: {len(inference_result.evidence)} items",
+            f"Reasoning steps: {len(inference_result.reasoning_path)}"
+        ]
+        
+        # Add reasoning path details
+        for i, step in enumerate(inference_result.reasoning_path, 1):
+            explanations.append(f"Step {i}: {step}")
+        
+        return explanations
 
 
-class MockSemanticCluster(Mock):
+class MockSemanticCluster(AbstractEntityMock):
     """Mock semantic cluster for SemanticMetagraph."""
     
     def __init__(self, cluster_id="cluster1", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = cluster_id
+        super().__init__(entity_id=cluster_id, entity_type=EntityType.CLUSTER, *args, **kwargs)
+        # Set cluster-specific attributes
+        self.name = f"cluster_{cluster_id}"
         self.concepts = set()
         self.centroid = None
         self.coherence_score = 0.8
@@ -217,14 +431,28 @@ class MockSemanticCluster(Mock):
         self.get_coherence = Mock(return_value=self.coherence_score)
         self.split_cluster = Mock(return_value=[])
         self.merge_with = Mock()
+    
+    # Implement required abstract methods from AbstractEntityMock
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this cluster."""
+        return len(self.concepts)
+    
+    def validate_entity(self) -> bool:
+        """Validate that the cluster is consistent and valid."""
+        return bool(self.id and 0.0 <= self.coherence_score <= 1.0)
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this cluster."""
+        return f"cluster:{self.id}:{len(self.concepts)}:{self.coherence_score}"
 
 
-class MockSemanticPath(Mock):
+class MockSemanticPath(AbstractEntityMock):
     """Mock semantic path for SemanticMetagraph."""
     
     def __init__(self, path_id="path1", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id = path_id
+        super().__init__(entity_id=path_id, entity_type=EntityType.PATH, *args, **kwargs)
+        # Set path-specific attributes
+        self.name = f"path_{path_id}"
         self.nodes = []
         self.edges = []
         self.length = 0
@@ -237,3 +465,16 @@ class MockSemanticPath(Mock):
         self.get_weight = Mock(return_value=self.semantic_weight)
         self.reverse = Mock()
         self.validate = Mock(return_value=True)
+    
+    # Implement required abstract methods from AbstractEntityMock
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this path."""
+        return self.length
+    
+    def validate_entity(self) -> bool:
+        """Validate that the path is consistent and valid."""
+        return bool(self.id and len(self.nodes) >= 0 and len(self.edges) >= 0)
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this path."""
+        return f"path:{self.id}:{len(self.nodes)}:{len(self.edges)}:{self.semantic_weight}"

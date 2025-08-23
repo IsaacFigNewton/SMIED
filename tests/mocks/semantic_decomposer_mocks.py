@@ -6,6 +6,13 @@ from unittest.mock import Mock
 import networkx as nx
 from typing import List, Optional, Any, Dict, Tuple
 
+# Import abstract base classes
+from tests.mocks.base.nlp_doc_mock import AbstractNLPDocMock
+from tests.mocks.base.nlp_token_mock import AbstractNLPTokenMock
+from tests.mocks.base.nlp_function_mock import AbstractNLPFunctionMock
+from tests.mocks.base.algorithmic_function_mock import AbstractAlgorithmicFunctionMock
+from tests.mocks.base.reasoning_mock import AbstractReasoningMock, ReasoningType, InferenceStrategy
+
 
 class SemanticDecomposerMockFactory:
     """Factory class for creating SemanticDecomposer mock instances."""
@@ -290,63 +297,311 @@ class MockWordNetForDecomposer(Mock):
         return synset
 
 
-class MockNLPForDecomposer(Mock):
+class MockNLPForDecomposer(AbstractNLPFunctionMock):
     """Mock NLP function for SemanticDecomposer."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.return_value = MockDocForDecomposer()
+        # Configure for semantic decomposer usage
+        self.model_name = "semantic_decomposer_nlp"
+        self.lang = "en"
+    
+    def process_text(self, text: str, **kwargs) -> Any:
+        """Process a single text and return a Doc object."""
+        return MockDocForDecomposer(text)
+    
+    def create_doc_mock(self, text: str, **kwargs) -> Any:
+        """Create a mock Doc object for the given text."""
+        return MockDocForDecomposer(text)
+    
+    def configure_pipeline(self, components: List[str]) -> None:
+        """Configure the processing pipeline."""
+        self.pipe_names = components
+        self.enabled_components = set(components)
+        self.disabled_components = set()
 
 
-class MockDocForDecomposer(Mock):
+class MockDocForDecomposer(AbstractNLPDocMock):
     """Mock document for SemanticDecomposer NLP processing."""
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = "test document"
+    def __init__(self, text="test document", *args, **kwargs):
+        super().__init__(text, *args, **kwargs)
+        # Preserve original behavior while using base class functionality
         self.tokens = [MockTokenForDecomposer("test")]
         self.ents = []
         self.noun_chunks = []
+        
+        # Set up basic processing using base class methods
+        self.setup_basic_tokenization()
+    
+    def create_tokens(self) -> List[Any]:
+        """Create token objects for the document."""
+        words = self.text.split()
+        tokens = []
+        for word in words:
+            token = MockTokenForDecomposer(word)
+            tokens.append(token)
+        return tokens
+    
+    def create_entities(self) -> List[Any]:
+        """Create named entity objects for the document."""
+        # Return empty list for semantic decomposer - no entities by default
+        return []
+    
+    def create_sentences(self) -> List[Any]:
+        """Create sentence span objects for the document."""
+        # Simple sentence creation
+        sent_mock = Mock()
+        sent_mock.text = self.text
+        sent_mock.tokens = self.tokens
+        return [sent_mock]
 
 
-class MockTokenForDecomposer(Mock):
+class MockTokenForDecomposer(AbstractNLPTokenMock):
     """Mock token for SemanticDecomposer NLP processing."""
     
     def __init__(self, text="test", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = text
+        super().__init__(text, *args, **kwargs)
+        # Set specific attributes for semantic decomposer
         self.lemma_ = text.lower()
         self.pos_ = "NOUN"
         self.dep_ = "ROOT"
+    
+    def get_linguistic_features(self) -> Dict[str, Any]:
+        """Get linguistic features specific to this token type."""
+        return {
+            'text': self.text,
+            'lemma': self.lemma_,
+            'pos': self.pos_,
+            'dep': self.dep_,
+            'is_alpha': self.is_alpha,
+            'is_stop': self.is_stop
+        }
+    
+    def set_linguistic_attributes(self, **kwargs) -> None:
+        """Set linguistic attributes for the token."""
+        for attr, value in kwargs.items():
+            if hasattr(self, attr):
+                setattr(self, attr, value)
+    
+    def validate_token_consistency(self) -> bool:
+        """Validate that token attributes are consistent."""
+        # Basic consistency checks
+        if not isinstance(self.text, str):
+            return False
+        if not isinstance(self.lemma_, str):
+            return False
+        if not isinstance(self.pos_, str):
+            return False
+        return True
 
 
-class MockEmbeddingModelForDecomposer(Mock):
+class MockEmbeddingModelForDecomposer(AbstractReasoningMock):
     """Mock embedding model for SemanticDecomposer."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configure for embedding model reasoning
+        self.engine_name = "embedding_model_reasoning"
+        self.reasoning_type = ReasoningType.SIMILARITY
+        self.inference_strategy = InferenceStrategy.BEST_FIRST
+        
+        # Set up embedding-specific methods
         self.get_vector = Mock(return_value=[0.1, 0.2, 0.3])
         self.most_similar = Mock(return_value=[("similar", 0.9)])
         self.similarity = Mock(return_value=0.8)
+        
+        # Configure similarity engine for embeddings
+        self.similarity_engine.get_vector = self.get_vector
+        self.similarity_engine.most_similar = self.most_similar
+        self.similarity_engine.similarity = self.similarity
+    
+    def infer(self, query: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Perform embedding-based inference on a query."""
+        from tests.mocks.base.reasoning_mock import InferenceResult
+        
+        # Mock embedding inference - find similar embeddings
+        if hasattr(query, '__iter__') and not isinstance(query, str):
+            # Query is a vector
+            similar_items = self.most_similar.return_value
+        else:
+            # Query is a string/token
+            vector = self.get_vector(query) if callable(self.get_vector) else self.get_vector.return_value
+            similar_items = self.most_similar.return_value
+        
+        return InferenceResult(
+            conclusion=similar_items[0] if similar_items else ("unknown", 0.0),
+            confidence=0.8,
+            reasoning_path=["Embedding similarity computation"],
+            evidence=[query],
+            metadata={
+                'inference_type': 'embedding_similarity',
+                'vector_dimensions': len(self.get_vector.return_value),
+                'model_type': 'embedding_model'
+            }
+        )
+    
+    def compute_similarity(self, entity1: Any, entity2: Any) -> float:
+        """Compute embedding similarity between two entities."""
+        # Mock embedding similarity computation
+        if entity1 == entity2:
+            return 1.0
+        
+        # Get cached similarity if available
+        cache_key = f"{hash(str(entity1))}_{hash(str(entity2))}"
+        if self.enable_caching and cache_key in self.similarity_cache:
+            return self.similarity_cache[cache_key]
+        
+        # Compute mock similarity based on embedding vectors
+        vector1 = self.get_vector(entity1) if callable(self.get_vector) else self.get_vector.return_value
+        vector2 = self.get_vector(entity2) if callable(self.get_vector) else self.get_vector.return_value
+        
+        # Simple cosine similarity mock
+        similarity_score = 0.8  # Default mock similarity
+        
+        if self.enable_caching:
+            self.similarity_cache[cache_key] = similarity_score
+        
+        return similarity_score
+    
+    def explain_reasoning(self, inference_result) -> List[str]:
+        """Generate explanation for embedding reasoning process."""
+        explanations = [
+            "Used embedding model to compute vector representations",
+            "Performed similarity computation in embedding space",
+            f"Found similarity score: {inference_result.confidence}"
+        ]
+        
+        if 'vector_dimensions' in inference_result.metadata:
+            explanations.append(f"Embedding dimensions: {inference_result.metadata['vector_dimensions']}")
+        
+        return explanations
 
 
-class MockEmbeddingHelperForDecomposer(Mock):
+class MockEmbeddingHelperForDecomposer(AbstractReasoningMock):
     """Mock EmbeddingHelper for SemanticDecomposer."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configure for embedding helper reasoning
+        self.engine_name = "embedding_helper_reasoning"
+        self.reasoning_type = ReasoningType.SIMILARITY
+        self.inference_strategy = InferenceStrategy.BEST_FIRST
+        
+        # Set up embedding helper methods
         self.get_similarity = Mock(return_value=0.8)
         self.get_most_similar = Mock(return_value=[])
         self.has_embedding = Mock(return_value=True)
+        
+        # Configure similarity engine for embedding operations
+        self.similarity_engine.get_similarity = self.get_similarity
+        self.similarity_engine.get_most_similar = self.get_most_similar
+        self.similarity_engine.has_embedding = self.has_embedding
+    
+    def infer(self, query: Any, context: Optional[Dict[str, Any]] = None) -> Any:
+        """Perform embedding helper inference on a query."""
+        from tests.mocks.base.reasoning_mock import InferenceResult
+        
+        # Mock embedding helper inference - similarity reasoning
+        has_emb = self.has_embedding(query) if callable(self.has_embedding) else self.has_embedding.return_value
+        
+        if not has_emb:
+            return InferenceResult(
+                conclusion=None,
+                confidence=0.0,
+                reasoning_path=["No embedding available for query"],
+                evidence=[query],
+                metadata={
+                    'inference_type': 'embedding_availability_check',
+                    'has_embedding': False
+                }
+            )
+        
+        # Get most similar items
+        similar_items = self.get_most_similar(query) if callable(self.get_most_similar) else self.get_most_similar.return_value
+        
+        return InferenceResult(
+            conclusion=similar_items,
+            confidence=0.8,
+            reasoning_path=["Embedding similarity search", "Retrieved most similar items"],
+            evidence=[query],
+            metadata={
+                'inference_type': 'embedding_similarity_search',
+                'has_embedding': True,
+                'similar_items_count': len(similar_items)
+            }
+        )
+    
+    def compute_similarity(self, entity1: Any, entity2: Any) -> float:
+        """Compute similarity using embedding helper."""
+        # Check if both entities have embeddings
+        has_emb1 = self.has_embedding(entity1) if callable(self.has_embedding) else self.has_embedding.return_value
+        has_emb2 = self.has_embedding(entity2) if callable(self.has_embedding) else self.has_embedding.return_value
+        
+        if not (has_emb1 and has_emb2):
+            return 0.0
+        
+        # Use the get_similarity method
+        similarity_score = self.get_similarity(entity1, entity2) if callable(self.get_similarity) else self.get_similarity.return_value
+        
+        return similarity_score
+    
+    def explain_reasoning(self, inference_result) -> List[str]:
+        """Generate explanation for embedding helper reasoning process."""
+        explanations = [
+            "Used embedding helper for similarity reasoning",
+            "Checked embedding availability for entities"
+        ]
+        
+        if inference_result.metadata.get('has_embedding', False):
+            explanations.append("Embeddings found - computed similarity scores")
+            if 'similar_items_count' in inference_result.metadata:
+                explanations.append(f"Retrieved {inference_result.metadata['similar_items_count']} similar items")
+        else:
+            explanations.append("No embeddings available - unable to compute similarity")
+        
+        return explanations
 
 
-class MockBeamBuilderForDecomposer(Mock):
+class MockBeamBuilderForDecomposer(AbstractAlgorithmicFunctionMock):
     """Mock BeamBuilder for SemanticDecomposer."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configure for beam search algorithm
+        self.algorithm_name = "beam_builder"
+        self.algorithm_type = "search"
+        self.complexity_class = "O(b^d)"
+        self.beam_width = 10
+        
+        # Set up mock methods with proper return values
         self.build_beam = Mock(return_value=[])
         self.expand_candidates = Mock(return_value=[])
+    
+    def compute(self, *args, **kwargs) -> Any:
+        """Compute the main beam building algorithm."""
+        # Mock beam building computation
+        if "query" in kwargs:
+            return self.build_beam(kwargs["query"])
+        return []
+    
+    def validate_inputs(self, *args, **kwargs) -> bool:
+        """Validate input arguments for beam building."""
+        # Basic validation for beam building
+        if "beam_width" in kwargs:
+            return isinstance(kwargs["beam_width"], int) and kwargs["beam_width"] > 0
+        return True
+    
+    def get_algorithm_properties(self) -> Dict[str, Any]:
+        """Get properties specific to beam building algorithm."""
+        return {
+            "beam_width": self.beam_width,
+            "search_type": "best_first",
+            "heuristic_based": True,
+            "complete": False,
+            "optimal": False
+        }
 
 
 class MockGlossParserForDecomposer(Mock):
@@ -416,19 +671,85 @@ class MockRealNetworkXGraph(Mock):
         self.number_of_edges = Mock(return_value=len(self._edges))
 
 
-class MockPairwiseBidirectionalAStar(Mock):
+class MockPairwiseBidirectionalAStar(AbstractAlgorithmicFunctionMock):
     """Mock for PairwiseBidirectionalAStar pathfinding."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configure for A* pathfinding algorithm
+        self.algorithm_name = "pairwise_bidirectional_astar"
+        self.algorithm_type = "pathfinding"
+        self.complexity_class = "O(b^d)"
+        
+        # Set up pathfinding methods
         self.find_paths = Mock(return_value=[(["start", "end"], 1.0)])
         self.find_shortest_path = Mock(return_value=["start", "end"])
+    
+    def compute(self, *args, **kwargs) -> Any:
+        """Compute A* pathfinding algorithm."""
+        # Mock A* pathfinding computation
+        if "start" in kwargs and "end" in kwargs:
+            return self.find_shortest_path(kwargs["start"], kwargs["end"])
+        elif "paths" in kwargs:
+            return self.find_paths()
+        return []
+    
+    def validate_inputs(self, *args, **kwargs) -> bool:
+        """Validate input arguments for A* pathfinding."""
+        # Basic validation for pathfinding
+        if "start" in kwargs and "end" in kwargs:
+            return kwargs["start"] is not None and kwargs["end"] is not None
+        return True
+    
+    def get_algorithm_properties(self) -> Dict[str, Any]:
+        """Get properties specific to A* pathfinding algorithm."""
+        return {
+            "bidirectional": True,
+            "optimal": True,
+            "complete": True,
+            "heuristic_based": True,
+            "memory_usage": "exponential",
+            "pathfinding_type": "informed_search"
+        }
 
 
-class MockPatternMatcher(Mock):
+class MockPatternMatcher(AbstractAlgorithmicFunctionMock):
     """Mock PatternMatcher for SemanticDecomposer tests."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Configure for pattern matching algorithm
+        self.algorithm_name = "pattern_matcher"
+        self.algorithm_type = "matching"
+        self.complexity_class = "O(nm)"
+        
+        # Set up mock methods with proper return values
         self.match = Mock(return_value=[])
         self.find_patterns = Mock(return_value=[])
+    
+    def compute(self, *args, **kwargs) -> Any:
+        """Compute pattern matching."""
+        if "pattern" in kwargs and "text" in kwargs:
+            return self.match(kwargs["pattern"], kwargs["text"])
+        elif "patterns" in kwargs:
+            return self.find_patterns(kwargs["patterns"])
+        return []
+    
+    def validate_inputs(self, *args, **kwargs) -> bool:
+        """Validate input arguments for pattern matching."""
+        # Check for required pattern matching inputs
+        if "pattern" in kwargs:
+            return kwargs["pattern"] is not None
+        if "patterns" in kwargs:
+            return isinstance(kwargs["patterns"], (list, tuple))
+        return True
+    
+    def get_algorithm_properties(self) -> Dict[str, Any]:
+        """Get properties specific to pattern matching algorithm."""
+        return {
+            "pattern_type": "regex",
+            "case_sensitive": True,
+            "multiline": False,
+            "greedy": True,
+            "supports_groups": True
+        }

@@ -5,6 +5,8 @@ Mock classes for PatternLoader tests.
 from unittest.mock import Mock
 from typing import List, Dict, Any, Optional, Union
 import json
+from tests.mocks.base.handler_mock import AbstractHandlerMock
+from tests.mocks.base.edge_case_mock import AbstractEdgeCaseMock
 
 
 class PatternLoaderMockFactory:
@@ -83,16 +85,45 @@ class MockPatternLoader(Mock):
         self.serialize_pattern = Mock(return_value="")
 
 
-class MockPatternLoaderEdgeCases(Mock):
+class MockPatternLoaderEdgeCases(AbstractEdgeCaseMock):
     """Mock for PatternLoader edge cases testing."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Edge case scenarios
-        self.invalid_file = Mock(side_effect=FileNotFoundError("File not found"))
-        self.malformed_json = Mock(side_effect=json.JSONDecodeError("Invalid JSON", "", 0))
-        self.invalid_pattern = Mock(side_effect=ValueError("Invalid pattern"))
-        self.permission_error = Mock(side_effect=PermissionError("Permission denied"))
+        # Edge case scenarios - using parent class methods
+        self.invalid_file = self.file_not_found_error
+        self.malformed_json = self.json_decode_error
+        self.invalid_pattern = self.value_error
+        self.permission_error = self.permission_error
+    
+    def setup_edge_case_scenario(self, scenario_name: str) -> None:
+        """Set up a specific edge case scenario for PatternLoader."""
+        scenarios = {
+            "file_not_found": lambda: setattr(self, 'load_patterns', self.file_not_found_error),
+            "malformed_json": lambda: setattr(self, 'load_from_file', self.json_decode_error),
+            "invalid_pattern": lambda: setattr(self, 'validate_pattern', self.value_error),
+            "permission_denied": lambda: setattr(self, 'save_patterns', self.permission_error),
+            "empty_patterns": lambda: setattr(self, 'get_all_patterns', self.return_empty_list),
+            "memory_error": lambda: setattr(self, 'load_from_directory', self.memory_error),
+            "io_error": lambda: setattr(self, 'save_to_file', self.io_error)
+        }
+        
+        if scenario_name in scenarios:
+            scenarios[scenario_name]()
+        else:
+            raise ValueError(f"Unknown edge case scenario: {scenario_name}")
+    
+    def get_edge_case_scenarios(self) -> List[str]:
+        """Get list of available edge case scenarios for PatternLoader."""
+        return [
+            "file_not_found",
+            "malformed_json", 
+            "invalid_pattern",
+            "permission_denied",
+            "empty_patterns",
+            "memory_error",
+            "io_error"
+        ]
 
 
 class MockPatternLoaderIntegration(Mock):
@@ -193,31 +224,91 @@ class MockFormatHandlers(Mock):
         self.supported_formats = Mock(return_value=[".json", ".yaml", ".xml"])
 
 
-class MockJSONHandler(Mock):
+class MockJSONHandler(AbstractHandlerMock):
     """Mock JSON format handler."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.load = Mock(return_value={})
-        self.save = Mock()
-        self.validate = Mock(return_value=True)
+        # Set format-specific attributes
+        self.format_name = "json"
+        self.supported_extensions = [".json", ".jsonl"]
+        self.parse_options = {"ensure_ascii": False, "indent": 2}
+        
+        # Set up JSON-specific validation rules
+        self.validation_rules = {
+            "require_dict": True,
+            "allow_null": True,
+            "max_depth": 100
+        }
+    
+    def load(self, source: Union[str, Any]) -> Any:
+        """Load JSON data from source."""
+        return {}
+    
+    def save(self, data: Any, target: Union[str, Any]) -> None:
+        """Save data as JSON to target."""
+        pass
+    
+    def validate(self, data: Any) -> bool:
+        """Validate JSON data structure."""
+        return True
 
 
-class MockYAMLHandler(Mock):
+class MockYAMLHandler(AbstractHandlerMock):
     """Mock YAML format handler."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.load = Mock(return_value={})
-        self.save = Mock()
-        self.validate = Mock(return_value=True)
+        # Set format-specific attributes
+        self.format_name = "yaml"
+        self.supported_extensions = [".yaml", ".yml"]
+        self.parse_options = {"default_flow_style": False, "allow_unicode": True}
+        
+        # Set up YAML-specific validation rules
+        self.validation_rules = {
+            "require_dict": True,
+            "allow_anchors": True,
+            "safe_load": True
+        }
+    
+    def load(self, source: Union[str, Any]) -> Any:
+        """Load YAML data from source."""
+        return {}
+    
+    def save(self, data: Any, target: Union[str, Any]) -> None:
+        """Save data as YAML to target."""
+        pass
+    
+    def validate(self, data: Any) -> bool:
+        """Validate YAML data structure."""
+        return True
 
 
-class MockXMLHandler(Mock):
+class MockXMLHandler(AbstractHandlerMock):
     """Mock XML format handler."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.load = Mock(return_value={})
-        self.save = Mock()
-        self.validate = Mock(return_value=True)
+        # Set format-specific attributes
+        self.format_name = "xml"
+        self.supported_extensions = [".xml", ".xsd"]
+        self.parse_options = {"remove_blank_text": True, "strip_cdata": False}
+        
+        # Set up XML-specific validation rules
+        self.validation_rules = {
+            "require_root": True,
+            "validate_schema": False,
+            "namespace_aware": True
+        }
+    
+    def load(self, source: Union[str, Any]) -> Any:
+        """Load XML data from source."""
+        return {}
+    
+    def save(self, data: Any, target: Union[str, Any]) -> None:
+        """Save data as XML to target."""
+        pass
+    
+    def validate(self, data: Any) -> bool:
+        """Validate XML data structure."""
+        return True

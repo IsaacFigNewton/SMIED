@@ -5,6 +5,11 @@ Mock classes for BeamBuilder tests.
 from unittest.mock import Mock
 from typing import List, Dict, Any, Optional
 
+# Import abstract base classes
+from tests.mocks.base.nlp_doc_mock import AbstractNLPDocMock
+from tests.mocks.base.nlp_token_mock import AbstractNLPTokenMock
+from tests.mocks.base.nlp_function_mock import AbstractNLPFunctionMock
+
 
 
 class BeamBuilderMockFactory:
@@ -213,35 +218,111 @@ class MockEmbeddingModel(Mock):
         self.vocab.__contains__ = Mock(return_value=True)
 
 
-class MockNLPFunction(Mock):
+class MockNLPFunction(AbstractNLPFunctionMock):
     """Mock NLP function for BeamBuilder."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Mock spaCy-like behavior
         self.return_value = MockDoc()
+    
+    def process_text(self, text: str, **kwargs) -> Any:
+        """Process a single text and return a MockDoc object."""
+        return MockDoc(text=text)
+    
+    def create_doc_mock(self, text: str, **kwargs) -> Any:
+        """Create a mock Doc object for the given text."""
+        return MockDoc(text=text)
+    
+    def configure_pipeline(self, components: List[str]) -> None:
+        """Configure the processing pipeline."""
+        self.pipe_names = components
+        self.enabled_components = set(components)
+        self.disabled_components = set(self.components.keys()) - set(components)
 
 
-class MockDoc(Mock):
+class MockDoc(AbstractNLPDocMock):
     """Mock spaCy Doc object."""
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = "test document"
-        self.tokens = [MockToken("test"), MockToken("document")]
-        self.ents = []
-        self.noun_chunks = []
+    def __init__(self, text="test document", *args, **kwargs):
+        super().__init__(text=text, *args, **kwargs)
+        # Override tokens with MockToken instances
+        self.tokens = self.create_tokens()
+        self.ents = self.create_entities()
+        self.sents = self.create_sentences()
+        # Set up noun chunks
+        self.setup_basic_noun_chunks()
+    
+    def create_tokens(self) -> List[Any]:
+        """Create token objects for the document."""
+        words = self.text.split()
+        tokens = []
+        for i, word in enumerate(words):
+            token = MockToken(text=word)
+            token.set_position(i, sum(len(w) + 1 for w in words[:i]))
+            tokens.append(token)
+        return tokens
+    
+    def create_entities(self) -> List[Any]:
+        """Create named entity objects for the document."""
+        # Use the base class method for basic entity detection
+        self.setup_basic_entities()
+        return self.ents
+    
+    def create_sentences(self) -> List[Any]:
+        """Create sentence span objects for the document."""
+        # Use the base class method for basic sentence segmentation
+        self.setup_basic_sentences()
+        return self.sents
 
 
-class MockToken(Mock):
+class MockToken(AbstractNLPTokenMock):
     """Mock spaCy Token object."""
     
     def __init__(self, text="test", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = text
+        super().__init__(text=text, *args, **kwargs)
+        # Override defaults for BeamBuilder specific behavior
         self.lemma_ = text.lower()
         self.pos_ = "NOUN"
         self.tag_ = "NN"
         self.dep_ = "ROOT"
         self.is_stop = False
         self.is_alpha = True
+    
+    def get_linguistic_features(self) -> Dict[str, Any]:
+        """Get linguistic features specific to this token type."""
+        return {
+            'text': self.text,
+            'lemma': self.lemma_,
+            'pos': self.pos_,
+            'tag': self.tag_,
+            'dep': self.dep_,
+            'is_stop': self.is_stop,
+            'is_alpha': self.is_alpha
+        }
+    
+    def set_linguistic_attributes(self, **kwargs) -> None:
+        """Set linguistic attributes for the token."""
+        if 'lemma' in kwargs:
+            self.set_lemma(kwargs['lemma'])
+        if 'pos' in kwargs:
+            self.set_pos_tag(kwargs['pos'], kwargs.get('tag'))
+        if 'dep' in kwargs:
+            self.set_dependency(kwargs['dep'], kwargs.get('head'))
+        if 'ent_type' in kwargs:
+            self.set_entity_annotation(
+                kwargs.get('ent_type', ''),
+                kwargs.get('ent_iob', 'O'),
+                kwargs.get('ent_id', '')
+            )
+    
+    def validate_token_consistency(self) -> bool:
+        """Validate that token attributes are consistent."""
+        # Basic consistency checks
+        if not self.text:
+            return False
+        if self.is_alpha and not self.text.isalpha():
+            return False
+        if self.pos_ and self.tag_ and self.pos_ == "NOUN" and not self.tag_.startswith("N"):
+            return False
+        return True

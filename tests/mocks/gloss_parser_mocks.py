@@ -4,6 +4,10 @@ Mock classes for GlossParser tests.
 
 from unittest.mock import Mock
 from typing import List, Dict, Any, Optional
+from tests.mocks.base.nlp_doc_mock import AbstractNLPDocMock
+from tests.mocks.base.nlp_token_mock import AbstractNLPTokenMock
+from tests.mocks.base.entity_mock import AbstractEntityMock, EntityType
+from tests.mocks.base.nlp_function_mock import AbstractNLPFunctionMock
 
 
 class GlossParserMockFactory:
@@ -192,52 +196,170 @@ class MockGlossParserIntegration(Mock):
         }
 
 
-class MockNLPForGloss(Mock):
+class MockNLPForGloss(AbstractNLPFunctionMock):
     """Mock NLP function for GlossParser."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.return_value = MockDocForGloss()
+    
+    def process_text(self, text: str, **kwargs) -> Any:
+        """Process a single text and return a Doc object."""
+        return MockDocForGloss(text=text)
+    
+    def create_doc_mock(self, text: str, **kwargs) -> Any:
+        """Create a mock Doc object for the given text."""
+        return MockDocForGloss(text=text)
+    
+    def configure_pipeline(self, components: List[str]) -> None:
+        """Configure the processing pipeline."""
+        self.pipe_names = components
+        self.enabled_components = set(components)
 
 
-class MockDocForGloss(Mock):
+class MockDocForGloss(AbstractNLPDocMock):
     """Mock document for GlossParser NLP processing."""
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = "test gloss definition"
-        self.tokens = [MockTokenForGloss("test"), MockTokenForGloss("gloss")]
-        self.ents = [MockEntityForGloss("test", "NOUN")]
+    def __init__(self, text="test gloss definition", *args, **kwargs):
+        super().__init__(text=text, *args, **kwargs)
+        # Initialize specific tokens and entities for gloss parsing
+        self.tokens = self.create_tokens()
+        self.ents = self.create_entities()
         self.noun_chunks = [MockChunkForGloss("test gloss")]
-        self.sents = [MockSentenceForGloss("test gloss definition")]
+        self.sents = self.create_sentences()
+    
+    def create_tokens(self) -> List[Any]:
+        """Create token objects for the document."""
+        words = self.text.split()
+        tokens = []
+        for word in words:
+            token = MockTokenForGloss(word)
+            tokens.append(token)
+        return tokens
+    
+    def create_entities(self) -> List[Any]:
+        """Create named entity objects for the document."""
+        # Create a basic entity for testing
+        entities = []
+        words = self.text.split()
+        if words:
+            entity = MockEntityForGloss(words[0], "TEST")
+            entities.append(entity)
+        return entities
+    
+    def create_sentences(self) -> List[Any]:
+        """Create sentence span objects for the document."""
+        return [MockSentenceForGloss(self.text)]
 
 
-class MockTokenForGloss(Mock):
+class MockTokenForGloss(AbstractNLPTokenMock):
     """Mock token for GlossParser NLP processing."""
     
     def __init__(self, text="test", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = text
-        self.lemma_ = text.lower()
-        self.pos_ = "NOUN"
-        self.tag_ = "NN"
-        self.dep_ = "ROOT"
+        super().__init__(text=text, *args, **kwargs)
+        # Override defaults for gloss-specific behavior
         self.head = self
         self.children = []
-        self.is_stop = False
-        self.is_alpha = True
-        self.is_punct = False
+    
+    def get_linguistic_features(self) -> Dict[str, Any]:
+        """Get linguistic features specific to this token type."""
+        return {
+            'text': self.text,
+            'lemma': self.lemma_,
+            'pos': self.pos_,
+            'tag': self.tag_,
+            'dep': self.dep_,
+            'is_stop': self.is_stop,
+            'is_alpha': self.is_alpha,
+            'is_punct': self.is_punct,
+            'gloss_specific': True
+        }
+    
+    def set_linguistic_attributes(self, **kwargs) -> None:
+        """Set linguistic attributes for the token."""
+        for attr, value in kwargs.items():
+            if hasattr(self, attr):
+                setattr(self, attr, value)
+    
+    def validate_token_consistency(self) -> bool:
+        """Validate that token attributes are consistent."""
+        # Basic validation for gloss parser tokens
+        if not self.text:
+            return False
+        if not self.lemma_:
+            return False
+        return True
 
 
-class MockEntityForGloss(Mock):
-    """Mock entity for GlossParser NLP processing."""
+class MockEntityForGloss(AbstractNLPTokenMock, AbstractEntityMock):
+    """Mock entity for GlossParser NLP processing with both NLP token capabilities and entity-like behavior."""
     
     def __init__(self, text="test", label="NOUN", *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.text = text
+        # Extract entity-specific parameters for AbstractEntityMock
+        entity_id = kwargs.pop('entity_id', f"entity_{text}")
+        entity_type = kwargs.pop('entity_type', EntityType.CONCEPT)
+        
+        # Initialize Mock base class first to avoid MRO issues
+        Mock.__init__(self, *args, **kwargs)
+        
+        # Manually set up attributes from both parent classes
+        # Set up token attributes
+        AbstractNLPTokenMock._setup_common_attributes(self, text)
+        AbstractNLPTokenMock._setup_linguistic_attributes(self)  
+        AbstractNLPTokenMock._setup_token_properties(self)
+        
+        # Set up entity attributes  
+        AbstractEntityMock._setup_common_attributes(self, entity_id, entity_type)
+        AbstractEntityMock._setup_entity_properties(self)
+        AbstractEntityMock._setup_relationship_management(self)
+        
+        # Add NLP entity-specific attributes
         self.label_ = label
         self.start = 0
         self.end = len(text)
+        
+        # Sync between token and entity interfaces
+        self.name = text
+        self.label = label
+        
+        # Set entity-specific named entity annotations
+        self.set_entity_annotation(ent_type=label, ent_iob="B", ent_id=entity_id)
+    
+    def get_linguistic_features(self) -> Dict[str, Any]:
+        """Get linguistic features specific to this token type."""
+        return {
+            'text': self.text,
+            'lemma': self.lemma_,
+            'pos': self.pos_,
+            'entity_label': self.label_,
+            'start': self.start,
+            'end': self.end,
+            'is_entity': True,
+            'entity_id': self.id,
+            'entity_type': self.entity_type.value
+        }
+    
+    def set_linguistic_attributes(self, **kwargs) -> None:
+        """Set linguistic attributes for the token."""
+        for attr, value in kwargs.items():
+            if hasattr(self, attr):
+                setattr(self, attr, value)
+    
+    def validate_token_consistency(self) -> bool:
+        """Validate that token attributes are consistent."""
+        return bool(self.text and self.label_)
+    
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this entity."""
+        return self.text
+    
+    def validate_entity(self) -> bool:
+        """Validate that the entity is consistent and valid."""
+        return bool(self.text and self.label_ and self.id)
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this entity."""
+        return f"{self.entity_type.value}:{self.text}:{self.label_}"
 
 
 class MockChunkForGloss(Mock):
@@ -262,24 +384,48 @@ class MockSentenceForGloss(Mock):
         self.end = len(text.split())
 
 
-class MockRealNLPForGloss(Mock):
+class MockRealNLPForGloss(AbstractNLPFunctionMock):
     """Mock representing real NLP behavior for GlossParser."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # More realistic NLP processing
         self.complex_processing = Mock(return_value=MockComplexDoc())
+    
+    def process_text(self, text: str, **kwargs) -> Any:
+        """Process a single text and return a realistic Doc object."""
+        return self.create_realistic_doc(text)
+    
+    def create_doc_mock(self, text: str, **kwargs) -> Any:
+        """Create a mock Doc object for the given text."""
+        doc = MockComplexDoc()
+        doc.text = text
+        return doc
+    
+    def configure_pipeline(self, components: List[str]) -> None:
+        """Configure the processing pipeline."""
+        self.pipe_names = components
+        self.enabled_components = set(components)
+        # Enable more complex processing for specified components
+        if 'parser' in components:
+            self.parser = Mock(return_value="parsed")
+        if 'ner' in components:
+            self.ner = Mock(return_value="ner_processed")
 
 
-class MockComplexDoc(Mock):
+class MockComplexDoc(AbstractNLPDocMock):
     """Mock complex document for realistic NLP processing."""
     
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, text="The cat sat on the mat", *args, **kwargs):
+        super().__init__(text=text, *args, **kwargs)
         # Complex document structure
         self.complex_tokens = self._create_complex_tokens()
         self.complex_entities = self._create_complex_entities()
         self.complex_dependencies = self._create_complex_dependencies()
+        
+        # Override tokens and entities with complex versions
+        self.tokens = self.complex_tokens
+        self.ents = self.complex_entities
     
     def _create_complex_tokens(self):
         """Create complex token structure."""
@@ -294,6 +440,18 @@ class MockComplexDoc(Mock):
         dependencies = []
         # Mock dependency relations
         return dependencies
+    
+    def create_tokens(self) -> List[Any]:
+        """Create token objects for the document."""
+        return self._create_complex_tokens()
+    
+    def create_entities(self) -> List[Any]:
+        """Create named entity objects for the document."""
+        return self._create_complex_entities()
+    
+    def create_sentences(self) -> List[Any]:
+        """Create sentence span objects for the document."""
+        return [MockSentenceForGloss(self.text)]
 
 
 class MockComplexGlosses(Mock):

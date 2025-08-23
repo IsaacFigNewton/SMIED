@@ -10,6 +10,7 @@ from smied.SemanticMetagraph import SemanticMetagraph
 from smied.PatternMatcher import PatternMatcher
 from smied.PatternLoader import PatternLoader
 from tests.mocks.metavertex_pattern_matcher_mocks import MetavertexPatternMatcherMockFactory
+from tests.config.metavertex_pattern_matcher_config import MetavertexPatternMatcherMockConfig
 
 
 class TestMetavertexPatternMatcher(unittest.TestCase):
@@ -27,9 +28,13 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Create test sentences
-        self.simple_doc = self.nlp("The cat runs fast.")
-        self.complex_doc = self.nlp("John gives Mary a book because she studies hard.")
+        # Initialize config
+        self.config = MetavertexPatternMatcherMockConfig()
+        
+        # Get test sentences from config
+        sentence_patterns = self.config.get_test_sentence_patterns()
+        self.simple_doc = self.nlp(sentence_patterns['simple_sentences'][0])
+        self.complex_doc = self.nlp(sentence_patterns['complex_sentences'][0])
         
         # Create semantic metagraphs
         self.simple_graph = SemanticMetagraph(doc=self.simple_doc)
@@ -38,6 +43,9 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         # Create pattern matchers
         self.simple_matcher = PatternMatcher(self.simple_graph)
         self.complex_matcher = PatternMatcher(self.complex_graph)
+        
+        # Initialize mock factory from config
+        self.mock_factory = MetavertexPatternMatcherMockFactory()
     
     def test_metavertex_structure_analysis(self):
         """Test the analyze_metavertex_patterns method"""
@@ -264,6 +272,18 @@ class TestMetavertexPatternIntegration(unittest.TestCase):
             import subprocess
             subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
             cls.nlp = spacy.load("en_core_web_sm")
+    
+    def setUp(self):
+        """Set up test fixtures for integration tests"""
+        # Initialize config
+        self.config = MetavertexPatternMatcherMockConfig()
+        
+        # Initialize mock factory from config
+        self.mock_factory = MetavertexPatternMatcherMockFactory()
+        
+        # Get configuration options
+        self.processing_options = self.config.get_configuration_options()['processing_options']
+        self.pattern_matching_options = self.config.get_configuration_options()['pattern_matching_options']
     
     def test_full_pipeline_with_metavertex_patterns(self):
         """Test full pipeline from text to pattern matching"""

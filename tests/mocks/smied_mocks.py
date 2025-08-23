@@ -4,6 +4,7 @@ Mock classes for SMIED tests.
 
 from unittest.mock import Mock
 from typing import Optional, List, Any, Dict
+from tests.mocks.base.library_wrapper_mock import AbstractLibraryWrapperMock
 
 
 class SMIEDMockFactory:
@@ -156,32 +157,235 @@ class MockSMIEDIntegration(Mock):
         return patches
 
 
-class MockNLTK(Mock):
+class MockNLTK(AbstractLibraryWrapperMock):
     """Mock for NLTK module."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.library_name = "nltk"
+        self.library_version = "3.8.1"
+        self.minimum_required_version = "3.7.0"
+        self.maximum_supported_version = "4.0.0"
+        
+        # Set up NLTK-specific attributes
         self.download = Mock()
+        self.data = Mock()
+        self.corpus = Mock()
+        self.tokenize = Mock()
+        self.chunk = Mock()
+        self.tag = Mock()
+        self.parse = Mock()
+        self.sem = Mock()
+        self.metrics = Mock()
+        
+        # Set default configuration
+        self.default_config = {
+            'required_data': ['punkt', 'wordnet', 'stopwords'],
+            'download_dir': '/mock/nltk_data'
+        }
+        self.required_config_keys = []
+        
+        # Set available features
+        self.available_features = {
+            'tokenization', 'pos_tagging', 'parsing', 'corpora', 'wordnet',
+            'chunking', 'classification', 'sentiment', 'metrics'
+        }
+        
+        # Initialize if no explicit config needed
+        if not kwargs.get('defer_initialization', False):
+            self.initialize_library(**self.default_config)
+            self.is_initialized = True
+            self.is_available = True
+    
+    def initialize_library(self, **config) -> bool:
+        """Initialize the NLTK library mock."""
+        # Simulate NLTK initialization
+        try:
+            # Check for required data downloads
+            required_data = config.get('required_data', ['punkt', 'wordnet', 'stopwords'])
+            for data_name in required_data:
+                self.simulate_library_download(data_name)
+            
+            self.is_initialized = True
+            return True
+        except Exception as e:
+            self.initialization_error = e
+            return False
+    
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get NLTK library information."""
+        return {
+            'name': self.library_name,
+            'version': self.library_version,
+            'type': 'natural_language_toolkit',
+            'capabilities': ['tokenization', 'pos_tagging', 'parsing', 'corpora', 'wordnet'],
+            'data_path': '/mock/nltk_data',
+            'available_corpora': ['brown', 'reuters', 'gutenberg', 'wordnet'],
+            'available_models': ['punkt', 'averaged_perceptron_tagger', 'maxent_ne_chunker']
+        }
+    
+    def check_compatibility(self) -> bool:
+        """Check NLTK version compatibility."""
+        # Mock compatibility check
+        return True
 
 
-class MockSpacy(Mock):
+class MockSpacy(AbstractLibraryWrapperMock):
     """Mock for spaCy module."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.library_name = "spacy"
+        self.library_version = "3.4.4"
+        self.minimum_required_version = "3.2.0"
+        self.maximum_supported_version = "4.0.0"
+        
+        # Set up spaCy-specific attributes
         self.load = Mock()
+        self.util = Mock()
+        self.tokens = Mock()
+        self.vocab = Mock()
+        self.lang = Mock()
+        self.pipeline = Mock()
+        self.matcher = Mock()
+        self.displacy = Mock()
+        
+        # Set default configuration
+        self.default_config = {
+            'model_name': 'en_core_web_sm'
+        }
+        self.required_config_keys = []
+        
+        # Set available features
+        self.available_features = {
+            'tokenization', 'pos_tagging', 'ner', 'dependency_parsing', 
+            'lemmatization', 'sentence_segmentation', 'similarity'
+        }
+        
+        # Initialize if no explicit config needed
+        if not kwargs.get('defer_initialization', False):
+            self.initialize_library(**self.default_config)
+            self.is_initialized = True
+            self.is_available = True
+    
+    def initialize_library(self, **config) -> bool:
+        """Initialize the spaCy library mock."""
+        try:
+            # Simulate spaCy model loading
+            model_name = config.get('model_name', 'en_core_web_sm')
+            if model_name not in self.get_available_models():
+                raise ValueError(f"Model '{model_name}' not found")
+            
+            # Load the model
+            self.load_model(model_name)
+            self.is_initialized = True
+            return True
+        except Exception as e:
+            self.initialization_error = e
+            return False
+    
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get spaCy library information."""
+        return {
+            'name': self.library_name,
+            'version': self.library_version,
+            'type': 'nlp_pipeline',
+            'capabilities': ['tokenization', 'pos_tagging', 'ner', 'dependency_parsing', 'lemmatization'],
+            'available_models': self.get_available_models(),
+            'loaded_models': list(self.models.keys()),
+            'pipeline_components': ['tagger', 'parser', 'ner', 'lemmatizer']
+        }
+    
+    def check_compatibility(self) -> bool:
+        """Check spaCy version compatibility."""
+        # Mock compatibility check
+        return True
+    
+    def get_available_models(self) -> List[str]:
+        """Get list of available spaCy models."""
+        return ["en_core_web_sm", "en_core_web_md", "en_core_web_lg", "en_core_web_trf"]
 
 
-class MockWordNet(Mock):
+class MockWordNet(AbstractLibraryWrapperMock):
     """Mock for WordNet corpus."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.synsets = Mock(return_value=[])
+        self.library_name = "wordnet"
+        self.library_version = "3.0"
+        self.minimum_required_version = "3.0"
+        self.maximum_supported_version = "3.1"
+        
+        # WordNet POS constants
         self.NOUN = 'n'
         self.VERB = 'v'
         self.ADJ = 'a'
         self.ADV = 'r'
+        
+        # Set up WordNet-specific attributes
+        self.synsets = Mock(return_value=[])
+        self.lemmas = Mock(return_value=[])
+        self.words = Mock(return_value=[])
+        self.all_synsets = Mock(return_value=[])
+        self.morphy = Mock()
+        self.path_similarity = Mock(return_value=0.5)
+        self.wup_similarity = Mock(return_value=0.8)
+        self.lch_similarity = Mock(return_value=2.5)
+        self.res_similarity = Mock(return_value=1.2)
+        self.jcn_similarity = Mock(return_value=0.3)
+        self.lin_similarity = Mock(return_value=0.6)
+        
+        # Set default configuration
+        self.default_config = {
+            'corpus_path': '/mock/wordnet'
+        }
+        self.required_config_keys = []
+        
+        # Set available features
+        self.available_features = {
+            'synsets', 'lemmas', 'similarity_measures', 'semantic_relations',
+            'pos_tagging', 'morphological_analysis'
+        }
+        
+        # Initialize if no explicit config needed
+        if not kwargs.get('defer_initialization', False):
+            self.initialize_library(**self.default_config)
+            self.is_initialized = True
+            self.is_available = True
+    
+    def initialize_library(self, **config) -> bool:
+        """Initialize the WordNet library mock."""
+        try:
+            # Simulate WordNet corpus availability check
+            corpus_path = config.get('corpus_path', '/mock/wordnet')
+            if not corpus_path:
+                raise ValueError("WordNet corpus path not specified")
+            
+            # Simulate loading corpus data
+            self.simulate_library_download('wordnet_corpus')
+            self.is_initialized = True
+            return True
+        except Exception as e:
+            self.initialization_error = e
+            return False
+    
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get WordNet library information."""
+        return {
+            'name': self.library_name,
+            'version': self.library_version,
+            'type': 'lexical_database',
+            'capabilities': ['synsets', 'lemmas', 'similarity_measures', 'semantic_relations'],
+            'pos_tags': [self.NOUN, self.VERB, self.ADJ, self.ADV],
+            'similarity_measures': ['path', 'wup', 'lch', 'res', 'jcn', 'lin'],
+            'total_synsets': 117659,  # Mock number
+            'total_lemmas': 206941   # Mock number
+        }
+    
+    def check_compatibility(self) -> bool:
+        """Check WordNet version compatibility."""
+        # Mock compatibility check
+        return True
 
 
 class MockSynset(Mock):
@@ -228,16 +432,106 @@ class MockSemanticDecomposer(Mock):
         self.show_connected_paths = Mock()
 
 
-class MockGraph(Mock):
+class MockGraph(AbstractLibraryWrapperMock):
     """Mock for NetworkX graph objects."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.library_name = "networkx"
+        self.library_version = "3.1"
+        self.minimum_required_version = "2.8.0"
+        self.maximum_supported_version = "4.0.0"
+        
+        # Graph structure attributes
         self.number_of_nodes = Mock(return_value=100)
         self.number_of_edges = Mock(return_value=200)
         self.nodes = Mock(return_value=[])
         self.edges = Mock(return_value=[])
+        
+        # Graph manipulation methods
         self.add_node = Mock()
         self.add_edge = Mock()
+        self.remove_node = Mock()
+        self.remove_edge = Mock()
         self.has_node = Mock(return_value=True)
         self.has_edge = Mock(return_value=True)
+        
+        # Graph analysis methods
+        self.degree = Mock(return_value={})
+        self.neighbors = Mock(return_value=[])
+        self.shortest_path = Mock(return_value=[])
+        self.connected_components = Mock(return_value=[])
+        self.subgraph = Mock()
+        self.copy = Mock()
+        self.clear = Mock()
+        
+        # Graph properties
+        self.name = Mock(return_value="MockGraph")
+        self.graph = Mock(return_value={})
+        self.adj = Mock(return_value={})
+        
+        # Set up NetworkX-specific attributes
+        self.algorithms = Mock()
+        self.drawing = Mock()
+        self.convert = Mock()
+        
+        # Set default configuration
+        self.default_config = {
+            'graph_type': 'Graph',
+            'directed': False
+        }
+        self.required_config_keys = []
+        
+        # Set available features
+        self.available_features = {
+            'graph_creation', 'graph_analysis', 'algorithms', 'visualization',
+            'shortest_path', 'centrality', 'clustering', 'connectivity'
+        }
+        
+        # Initialize graph data structure
+        self._graph_data = {}
+        
+        # Initialize if no explicit config needed
+        if not kwargs.get('defer_initialization', False):
+            self.initialize_library(**self.default_config)
+            self.is_initialized = True
+            self.is_available = True
+    
+    def initialize_library(self, **config) -> bool:
+        """Initialize the NetworkX graph mock."""
+        try:
+            # Simulate graph initialization
+            graph_type = config.get('graph_type', 'Graph')
+            directed = config.get('directed', False)
+            
+            # Set graph properties based on configuration
+            if directed:
+                self.is_directed = Mock(return_value=True)
+            else:
+                self.is_directed = Mock(return_value=False)
+            
+            # Initialize empty graph structure
+            self._graph_data = {}
+            self.is_initialized = True
+            return True
+        except Exception as e:
+            self.initialization_error = e
+            return False
+    
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get NetworkX library information."""
+        return {
+            'name': self.library_name,
+            'version': self.library_version,
+            'type': 'graph_library',
+            'capabilities': ['graph_creation', 'graph_analysis', 'algorithms', 'visualization'],
+            'graph_types': ['Graph', 'DiGraph', 'MultiGraph', 'MultiDiGraph'],
+            'algorithms': ['shortest_path', 'centrality', 'clustering', 'connectivity'],
+            'node_count': self.number_of_nodes(),
+            'edge_count': self.number_of_edges()
+        }
+    
+    def check_compatibility(self) -> bool:
+        """Check NetworkX version compatibility."""
+        # Mock compatibility check
+        return True

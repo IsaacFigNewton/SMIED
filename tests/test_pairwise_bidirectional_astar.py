@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
 from tests.mocks.pairwise_bidirectional_astar_mocks import PairwiseBidirectionalAStarMockFactory
+from tests.config.pairwise_bidirectional_astar_config import PairwiseBidirectionalAStarMockConfig
 
 
 class TestPairwiseBidirectionalAStar(unittest.TestCase):
@@ -17,8 +18,14 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize config
+        self.config = PairwiseBidirectionalAStarMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        
+        # Get algorithm parameters from config
+        self.algo_params = self.config.get_algorithm_parameters()['default_params']
         
         # Create a simple test graph using mock factory
         self.graph = self.mock_factory('MockGraphForPathfinding')
@@ -27,13 +34,13 @@ class TestPairwiseBidirectionalAStar(unittest.TestCase):
         self.graph.has_node.side_effect = lambda n: n in ["start", "middle", "end"]
         self.graph.has_edge.side_effect = lambda u, v: (u, v) in [("start", "middle"), ("middle", "end")]
         
-        # Basic pathfinder
+        # Basic pathfinder using config parameters
         self.pathfinder = PairwiseBidirectionalAStar(
             g=self.graph,
             src="start",
             tgt="end",
-            beam_width=3,
-            max_depth=6
+            beam_width=self.algo_params['beam_width'],
+            max_depth=self.algo_params['max_depth']
         )
 
     def test_initialization_basic(self):
@@ -422,7 +429,16 @@ class TestPairwiseBidirectionalAStarEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize config
+        self.config = PairwiseBidirectionalAStarMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        
+        # Get edge case scenarios from config
+        self.edge_case_scenarios = self.config.get_pathfinding_edge_cases()
+        
+        # Create mock graph
         self.graph = self.mock_factory('MockGraphForPathfinding')
         self.graph.nodes.return_value = ["start", "end"]
         self.graph.has_node.side_effect = lambda n: n in ["start", "end"]
@@ -567,7 +583,18 @@ class TestPairwiseBidirectionalAStarIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up integration test fixtures"""
+        # Initialize config
+        self.config = PairwiseBidirectionalAStarMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PairwiseBidirectionalAStarMockFactory()
+        
+        # Get WordNet taxonomy and performance benchmarks from config
+        self.wordnet_data = self.config.get_wordnet_taxonomy_structures()
+        self.performance_benchmarks = self.config.get_performance_benchmarks()
+        self.beam_configs = self.config.get_beam_search_configurations()
+        
+        # Create integration mock
         self.integration_mock = self.mock_factory('MockPairwiseBidirectionalAStarIntegration')
     
     def test_with_embedding_beams_function(self):

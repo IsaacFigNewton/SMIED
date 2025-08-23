@@ -5,6 +5,9 @@ Mock classes for PairwiseBidirectionalAStar tests.
 from unittest.mock import Mock
 import heapq
 from typing import List, Dict, Any, Optional, Tuple, Set
+from tests.mocks.base.algorithmic_function_mock import AbstractAlgorithmicFunctionMock
+from tests.mocks.base.edge_case_mock import AbstractEdgeCaseMock
+from tests.mocks.base.integration_mock import AbstractIntegrationMock
 
 
 class PairwiseBidirectionalAStarMockFactory:
@@ -89,28 +92,165 @@ class MockPairwiseBidirectionalAStar(Mock):
         self.check_termination = Mock(return_value=False)
 
 
-class MockPairwiseBidirectionalAStarEdgeCases(Mock):
+class MockPairwiseBidirectionalAStarEdgeCases(AbstractEdgeCaseMock):
     """Mock for PairwiseBidirectionalAStar edge cases testing."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Edge case scenarios
+        # Edge case scenarios specific to pathfinding
         self.no_path_exists = Mock(return_value=[])
         self.source_equals_target = Mock(return_value=["source"])
         self.disconnected_graph = Mock(return_value=[])
         self.infinite_cost = Mock(return_value=[])
         self.negative_weights = Mock(side_effect=ValueError("Negative weights not supported"))
+    
+    def setup_edge_case_scenario(self, scenario_name: str) -> None:
+        """Set up specific edge case scenario for pathfinding."""
+        if scenario_name == "no_path":
+            self.find_path = self.no_path_exists
+        elif scenario_name == "same_source_target":
+            self.find_path = self.source_equals_target
+        elif scenario_name == "disconnected_graph":
+            self.find_path = self.disconnected_graph
+        elif scenario_name == "infinite_cost":
+            self.find_path = self.infinite_cost
+        elif scenario_name == "negative_weights":
+            self.find_path = self.negative_weights
+        elif scenario_name == "empty_graph":
+            self.find_path = self.return_empty_list
+        elif scenario_name == "invalid_nodes":
+            self.find_path = self.key_error
+        else:
+            raise ValueError(f"Unknown edge case scenario: {scenario_name}")
+    
+    def get_edge_case_scenarios(self) -> List[str]:
+        """Get list of available pathfinding edge case scenarios."""
+        return [
+            "no_path",
+            "same_source_target",
+            "disconnected_graph", 
+            "infinite_cost",
+            "negative_weights",
+            "empty_graph",
+            "invalid_nodes"
+        ]
 
 
-class MockPairwiseBidirectionalAStarIntegration(Mock):
+class MockPairwiseBidirectionalAStarIntegration(AbstractIntegrationMock):
     """Mock for PairwiseBidirectionalAStar integration testing."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Integration components
-        self.real_graph = MockRealGraphForPathfinding()
-        self.performance_metrics = MockPerformanceMetrics()
-        self.memory_manager = MockMemoryManager()
+        # Set integration mode for pathfinding
+        self.integration_mode = "pathfinding"
+        
+        # Initialize integration components automatically
+        if self.auto_setup:
+            self.setup_integration_components()
+    
+    def setup_integration_components(self) -> Dict[str, Any]:
+        """Set up all components required for pathfinding integration testing."""
+        # Create pathfinding components
+        graph_component = MockRealGraphForPathfinding()
+        metrics_component = MockPerformanceMetrics()
+        memory_component = MockMemoryManager()
+        heuristic_component = MockHeuristicFunction()
+        cost_component = MockCostFunction()
+        
+        # Register components with dependencies
+        self.register_component(
+            "graph", graph_component,
+            dependencies=[],
+            config={"topology": "complex", "weighted": True}
+        )
+        
+        self.register_component(
+            "heuristic", heuristic_component,
+            dependencies=["graph"],
+            config={"algorithm": "euclidean", "admissible": True}
+        )
+        
+        self.register_component(
+            "cost_function", cost_component,
+            dependencies=["graph"],
+            config={"optimization": True, "non_negative": True}
+        )
+        
+        self.register_component(
+            "performance_metrics", metrics_component,
+            dependencies=["graph", "heuristic", "cost_function"],
+            config={"tracking_enabled": True}
+        )
+        
+        self.register_component(
+            "memory_manager", memory_component,
+            dependencies=[],
+            config={"max_memory": 1000000, "gc_enabled": True}
+        )
+        
+        # Set up legacy properties for backwards compatibility
+        self.real_graph = graph_component
+        self.performance_metrics = metrics_component
+        self.memory_manager = memory_component
+        
+        return self.components
+    
+    def configure_component_interactions(self) -> None:
+        """Configure how pathfinding components interact with each other."""
+        # Set up graph-heuristic interaction
+        self.create_component_interaction(
+            "graph", "heuristic", "node_distance_calculation"
+        )
+        
+        # Set up graph-cost interaction
+        self.create_component_interaction(
+            "graph", "cost_function", "edge_cost_calculation"
+        )
+        
+        # Set up performance tracking interactions
+        self.create_component_interaction(
+            "heuristic", "performance_metrics", "heuristic_call_tracking"
+        )
+        
+        self.create_component_interaction(
+            "cost_function", "performance_metrics", "cost_call_tracking"
+        )
+        
+        # Set up memory management interactions
+        self.create_component_interaction(
+            "performance_metrics", "memory_manager", "memory_usage_reporting"
+        )
+    
+    def validate_integration_state(self) -> bool:
+        """Validate that the pathfinding integration is in a consistent state."""
+        # Check that all required components are registered
+        required_components = [
+            "graph", "heuristic", "cost_function", 
+            "performance_metrics", "memory_manager"
+        ]
+        
+        for component_name in required_components:
+            if component_name not in self.components:
+                return False
+            
+            # Check that component is initialized
+            if self.component_states.get(component_name) != "initialized":
+                return False
+        
+        # Validate component relationships
+        graph = self.get_component("graph")
+        heuristic = self.get_component("heuristic")
+        cost_function = self.get_component("cost_function")
+        
+        # Ensure graph has nodes and edges for pathfinding
+        if not hasattr(graph, "nodes") or not hasattr(graph, "edges"):
+            return False
+        
+        # Ensure heuristic and cost functions are callable
+        if not (hasattr(heuristic, "compute") and hasattr(cost_function, "compute")):
+            return False
+        
+        return True
 
 
 class MockGraphForPathfinding(Mock):
@@ -141,11 +281,18 @@ class MockGraphForPathfinding(Mock):
         self.is_directed = Mock(return_value=True)
 
 
-class MockHeuristicFunction(Mock):
+class MockHeuristicFunction(AbstractAlgorithmicFunctionMock):
     """Mock heuristic function for A* algorithm."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set algorithm properties
+        self.algorithm_name = "heuristic_function"
+        self.algorithm_type = "heuristic"
+        self.complexity_class = "O(1)"
+        self.is_deterministic = True
+        self.is_continuous = True
+        
         # Heuristic methods
         self.estimate = Mock(return_value=0.0)
         self.is_admissible = Mock(return_value=True)
@@ -155,13 +302,38 @@ class MockHeuristicFunction(Mock):
         self.euclidean_distance = Mock(return_value=1.0)
         self.manhattan_distance = Mock(return_value=1.0)
         self.semantic_distance = Mock(return_value=0.5)
+    
+    def compute(self, source_node, target_node, *args, **kwargs) -> float:
+        """Compute heuristic estimate between two nodes."""
+        return self.estimate(source_node, target_node)
+    
+    def validate_inputs(self, *args, **kwargs) -> bool:
+        """Validate input nodes for heuristic calculation."""
+        return len(args) >= 2  # At least source and target nodes
+    
+    def get_algorithm_properties(self) -> Dict[str, Any]:
+        """Get heuristic function properties."""
+        return {
+            'is_admissible': True,
+            'is_consistent': True,
+            'distance_functions': ['euclidean', 'manhattan', 'semantic'],
+            'domain': 'pathfinding',
+            'complexity': self.complexity_class
+        }
 
 
-class MockCostFunction(Mock):
+class MockCostFunction(AbstractAlgorithmicFunctionMock):
     """Mock cost function for pathfinding."""
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set algorithm properties
+        self.algorithm_name = "cost_function"
+        self.algorithm_type = "cost_calculator"
+        self.complexity_class = "O(1)"
+        self.is_deterministic = True
+        self.codomain_bounds = (0, float('inf'))  # Non-negative costs
+        
         # Cost methods
         self.edge_cost = Mock(return_value=1.0)
         self.path_cost = Mock(return_value=1.0)
@@ -170,6 +342,31 @@ class MockCostFunction(Mock):
         # Cost optimization
         self.optimize_cost = Mock()
         self.validate_cost = Mock(return_value=True)
+    
+    def compute(self, source_node, target_node, *args, **kwargs) -> float:
+        """Compute cost between two nodes."""
+        return self.edge_cost(source_node, target_node)
+    
+    def validate_inputs(self, *args, **kwargs) -> bool:
+        """Validate input nodes for cost calculation."""
+        if len(args) < 2:
+            return False
+        # Check for non-negative costs if computed
+        try:
+            cost = self.compute(*args, **kwargs)
+            return cost >= 0
+        except:
+            return False
+    
+    def get_algorithm_properties(self) -> Dict[str, Any]:
+        """Get cost function properties."""
+        return {
+            'cost_types': ['edge', 'path', 'total'],
+            'domain': 'pathfinding',
+            'non_negative': True,
+            'optimization_supported': True,
+            'complexity': self.complexity_class
+        }
 
 
 class MockPriorityQueue(Mock):

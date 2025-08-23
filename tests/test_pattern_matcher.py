@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.PatternMatcher import PatternMatcher
 from tests.mocks.pattern_matcher_mocks import PatternMatcherMockFactory
+from tests.config.pattern_matcher_config import PatternMatcherMockConfig
 
 
 class TestPatternMatcher(unittest.TestCase):
@@ -15,16 +16,26 @@ class TestPatternMatcher(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize config
+        self.config = PatternMatcherMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PatternMatcherMockFactory()
+        
+        # Get mock semantic graph structure from config
+        graph_structures = self.config.get_mock_semantic_graph_structures()
+        simple_graph = graph_structures['simple_svo_graph']
         
         # Create semantic metagraph using factory
         self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {
             0: ("cat", {"pos": "NOUN", "text": "cat"}),
-            1: ("runs", {"pos": "VERB", "text": "runs"}),
+            1: ("chases", {"pos": "VERB", "text": "chases"}),
             2: ((0, 1), {"relation": "subject"})
         }
+        
+        # Get pattern loader patterns from config
+        pattern_data = self.config.get_pattern_loader_test_patterns()
         
         # Create pattern loader using factory
         self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')
@@ -440,7 +451,7 @@ class TestPatternMatcher(unittest.TestCase):
         
         # Check that summary includes text from atomic metaverts
         self.assertIn("cat", result["summary"])
-        self.assertIn("runs", result["summary"])
+        self.assertIn("chases", result["summary"])
 
     def test_call_method_all_patterns(self):
         """Test __call__ method matching all patterns"""
@@ -596,7 +607,16 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
+        # Initialize config
+        self.config = PatternMatcherMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PatternMatcherMockFactory()
+        
+        # Get edge case patterns from config
+        self.edge_case_scenarios = self.config.get_edge_case_scenarios()
+        
+        # Create empty semantic graph for edge case testing
         self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {}
         
@@ -707,8 +727,17 @@ class TestPatternMatcherIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up realistic test scenario"""
+        # Initialize config
+        self.config = PatternMatcherMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = PatternMatcherMockFactory()
-        # Create realistic metavertex structure representing "The cat runs fast"
+        
+        # Get complex sentence graph from config
+        graph_structures = self.config.get_mock_semantic_graph_structures()
+        complex_graph = graph_structures['complex_sentence_graph']
+        
+        # Create realistic metavertex structure using config data
         self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {
             0: ("The", {"pos": "DET", "text": "The"}),
@@ -719,6 +748,10 @@ class TestPatternMatcherIntegration(unittest.TestCase):
             5: ((1, 2), {"relation": "nsubj"}),   # cat -> runs (subject)
             6: ((2, 3), {"relation": "advmod"})   # runs -> fast (adverbial modifier)
         }
+        
+        # Get realistic patterns from config
+        pattern_data = self.config.get_pattern_loader_test_patterns()
+        self.integration_scenarios = self.config.get_integration_test_data()
         
         # Create realistic patterns
         self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')

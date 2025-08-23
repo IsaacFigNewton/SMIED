@@ -13,10 +13,22 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.SMIED import SMIED, ISMIEDPipeline
 from tests.mocks.smied_mocks import SMIEDMockFactory
+from tests.config.smied_config import SMIEDMockConfig
 
 
 class TestISMIEDPipeline(unittest.TestCase):
     """Test the ISMIEDPipeline interface."""
+    
+    def setUp(self):
+        """Set up test fixtures for interface tests."""
+        # Initialize config
+        self.config = SMIEDMockConfig()
+        
+        # Initialize mock factory from config
+        self.mock_factory = SMIEDMockFactory()
+        
+        # Get model constants from config
+        self.model_constants = self.config.get_model_name_constants()
     
     def test_interface_cannot_be_instantiated(self):
         """Test that the abstract interface cannot be instantiated."""
@@ -37,8 +49,17 @@ class TestSMIED(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        # Initialize mock factory
+        # Initialize config
+        self.config = SMIEDMockConfig()
+        
+        # Initialize mock factory from config
         self.mock_factory = SMIEDMockFactory()
+        
+        # Get test data from config
+        self.model_constants = self.config.get_model_name_constants()
+        self.triple_test_cases = self.config.get_triple_analysis_test_cases()
+        self.synset_structures = self.config.get_mock_synset_structures()
+        
         # Create SMIED instance with mocked components
         with patch('smied.SMIED.nltk'), \
              patch('smied.SMIED.wn'), \
@@ -526,6 +547,7 @@ class TestSMIEDIntegration(unittest.TestCase):
     def setUp(self):
         """Set up integration test fixtures."""
         from tests.mocks.smied_mocks import SMIEDMockFactory
+        from tests.config.smied_config import SMIEDMockConfig
         self.mock_factory = SMIEDMockFactory()
         self.integration_mock = self.mock_factory('MockSMIEDIntegration')
     
