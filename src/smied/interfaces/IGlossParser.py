@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 class IGlossParser(ABC):
@@ -9,6 +9,21 @@ class IGlossParser(ABC):
     Defines the contract for extracting subjects, objects, and verbs from parsed 
     gloss documents using dependency parsing information.
     """
+    
+    @abstractmethod
+    def parse_gloss(self, gloss_text: str, nlp_func=None) -> Optional[Dict]:
+        """
+        Parse a gloss text and return a dictionary with extracted semantic elements.
+        
+        Args:
+            gloss_text: The gloss definition text to parse
+            nlp_func: Optional spaCy NLP function. Uses instance nlp_func if not provided.
+            
+        Returns:
+            Dictionary with keys 'subjects', 'objects', 'predicates' containing lists of synsets,
+            or None if parsing fails.
+        """
+        pass
     
     @abstractmethod
     def extract_subjects_from_gloss(self, gloss_doc) -> Tuple[List, List]:
