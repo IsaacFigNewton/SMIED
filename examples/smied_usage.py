@@ -10,17 +10,27 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from smied.SMIED import SMIED
-
+import gensim.downloader as api
 
 def main():
     """Demonstrate SMIED class usage."""
     
+    # Load Word2Vec model (optional)
+    print("Loading Word2Vec model...")
+    w2v_model = None
+    try:
+        w2v_model = api.load("word2vec-google-news-300")
+        print("Word2Vec model loaded successfully.")
+    except Exception as e:
+        print(f"Failed to load Word2Vec model: {e}")
+
     # Create SMIED instance
     print("Initializing SMIED pipeline...")
     pipeline = SMIED(
-        nlp_model=None,  # Set to "en_core_web_sm" if spaCy is installed
-        embedding_model=None,  # Can add embedding model for better similarity
+        nlp_model="en_core_web_sm",  # Set to "en_core_web_sm" if spaCy is installed
+        embedding_model=w2v_model,  # Can add embedding model for better similarity
         auto_download=True,  # Automatically download required NLTK data,
+        build_graph_on_init=True,  # Build semantic graph on initialization
         verbosity=2  # Enable verbose output
     )
     

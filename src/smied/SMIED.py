@@ -47,6 +47,9 @@ class SMIED(ISMIEDPipeline):
         self.verbosity = verbosity
         self.nlp_model_name = nlp_model
         self.embedding_model = embedding_model
+        if not self.embedding_model:
+            if self.verbosity >= 2:
+                print("[SMIED] No embedding model provided, using WordNet only")
         self.auto_download = auto_download
         
         if self.verbosity >= 1:
@@ -75,12 +78,11 @@ class SMIED(ISMIEDPipeline):
         )
         
         # Build graph if requested
+        self.synset_graph = None
         if build_graph_on_init:
             if self.verbosity >= 1:
                 print("[SMIED] Building synset graph during initialization...")
             self.synset_graph = self.build_synset_graph()
-        else:
-            self.synset_graph = None
             
         if self.verbosity >= 1:
             print("[SMIED] SMIED pipeline initialization complete")
