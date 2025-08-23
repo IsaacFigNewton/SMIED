@@ -400,20 +400,21 @@ class TestPatternMatcher(unittest.TestCase):
 
     def test_get_pattern_summary(self):
         """Test get_pattern_summary method"""
-        with patch.object(self.pattern_matcher, '__call__') as mock_call:
-            mock_results = {
-                "test_category": {
-                    "noun_pattern": [[0], [1]],
-                    "verb_pattern": []
-                }
+        # Test without mocking __call__ to test actual behavior
+        with patch('builtins.print') as mock_print:
+            result = self.pattern_matcher.get_pattern_summary()
+        
+        # Expected summary should contain match counts, not full matches
+        # Based on the mock setup: "cat" matches noun_pattern, "chases" matches verb_pattern
+        expected_summary = {
+            "test_category": {
+                "noun_pattern": 1,  # 1 match: "cat" with pos="NOUN"
+                "verb_pattern": 1   # 1 match: "chases" with pos="VERB"
             }
-            mock_call.return_value = mock_results
-            
-            with patch('builtins.print') as mock_print:
-                result = self.pattern_matcher.get_pattern_summary()
-            
-            self.assertEqual(result, mock_results)
-            mock_print.assert_called()  # Should print pattern information
+        }
+        
+        self.assertEqual(result, expected_summary)
+        mock_print.assert_called()  # Should print pattern information
 
     def test_match_metavertex_pattern(self):
         """Test match_metavertex_pattern method"""

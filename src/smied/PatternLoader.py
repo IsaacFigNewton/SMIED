@@ -54,7 +54,7 @@ class PatternLoader:
             for item in json_pattern:
                 converted_item = {}
                 for key, value in item.items():
-                    if isinstance(value, list) and key in ["root_type", "labels", "pos", "relation_type"]:
+                    if isinstance(value, list) and key in ["root_type", "labels", "pos", "relation_type", "relation", "text", "dep", "ent_type"]:
                         converted_item[key] = set(value)
                     else:
                         converted_item[key] = value
@@ -65,7 +65,11 @@ class PatternLoader:
         for category, patterns in self.patterns.items():
             for name, pattern in patterns.items():
                 if isinstance(pattern, list):
+                    # Direct list format
                     self.patterns[category][name] = convert_pattern_from_json(pattern)
+                elif isinstance(pattern, dict) and "pattern" in pattern and isinstance(pattern["pattern"], list):
+                    # Nested dict format with "pattern" key
+                    self.patterns[category][name]["pattern"] = convert_pattern_from_json(pattern["pattern"])
     
 
     def pattern_to_json(self) -> Dict[str, Dict[str, Any]]:

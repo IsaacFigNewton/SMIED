@@ -229,19 +229,22 @@ class TestPatternLoader(unittest.TestCase):
     @patch('smied.PatternLoader.files')
     def test_get_default_patterns_success(self, mock_files, mock_patterns):
         """Test _get_default_patterns loads patterns successfully"""
-        # Mock the resource file system
-        mock_resource = self.mock_factory('MockFileSystemForLoader')
-        mock_resource.open.return_value.__enter__.return_value.read.return_value = json.dumps({
+        # Configure mock file content
+        test_pattern_data = json.dumps({
             "test_pattern": {"description": "test", "pattern": []}
         })
-        mock_files.return_value.joinpath.return_value = mock_resource
         
-        loader = PatternLoader()
-        
-        with patch.object(loader, 'json_to_pattern'):
-            result = loader._get_default_patterns()
-        
-        self.assertIsInstance(result, dict)
+        # Mock the resource path and file opening using mock_open
+        with patch('builtins.open', mock_open(read_data=test_pattern_data)):
+            mock_path = mock_files.return_value.joinpath.return_value
+            mock_path.open = mock_open(read_data=test_pattern_data)
+            
+            loader = PatternLoader()
+            
+            with patch.object(loader, 'json_to_pattern'):
+                result = loader._get_default_patterns()
+            
+            self.assertIsInstance(result, dict)
 
     @patch('smied.patterns')
     @patch('smied.PatternLoader.files')
@@ -277,6 +280,15 @@ class TestPatternLoader(unittest.TestCase):
 
 class TestPatternLoaderEdgeCases(unittest.TestCase):
     """Test edge cases and error conditions"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        # Initialize mock factory and config
+        self.mock_factory = PatternLoaderMockFactory()
+        self.mock_config = PatternLoaderMockConfig()
+        
+        # Get sample patterns from config
+        self.sample_patterns = self.mock_config.get_sample_patterns()
     
     def test_json_to_pattern_with_convertible_keys(self):
         """Test json_to_pattern only converts specific keys to sets"""

@@ -278,21 +278,26 @@ class PatternMatcher:
         """Get a summary of match counts for all patterns"""
         results = self()
         
-        # Print insights
-        insights = {}
+        # Create summary with match counts
+        summary = {}
         for category, patterns in results.items():
+            summary[category] = {}
             for pattern_name, matches in patterns.items():
-                full_name = f"{category}.{pattern_name}"
-                if len(matches) > 0:
+                match_count = len(matches)
+                summary[category][pattern_name] = match_count
+                
+                # Print insights for non-empty matches
+                if match_count > 0:
+                    full_name = f"{category}.{pattern_name}"
                     pattern_info = self.pattern_loader.patterns[category][pattern_name]
-                    print(f"Found {len(matches)} matches for {full_name}:")
+                    print(f"Found {match_count} matches for {full_name}:")
                     print(f"\tDescription: {pattern_info.get('description', 'No description')}")
                     print(f"\tPattern: {pattern_info['pattern']}")
                     for match in matches:
                         print(f"\t{match}")
                     print()
 
-        return results
+        return summary
 
     def match_metavertex_pattern(self, pattern_dict: dict) -> List[List[int]]:
         """
