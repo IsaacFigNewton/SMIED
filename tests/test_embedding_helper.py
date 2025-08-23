@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.EmbeddingHelper import EmbeddingHelper
 from tests.mocks.embedding_helper_mocks import EmbeddingHelperMockFactory
+from tests.config.embedding_helper_config import EmbeddingHelperMockConfig
 
 
 class TestEmbeddingHelper(unittest.TestCase):
@@ -16,8 +17,9 @@ class TestEmbeddingHelper(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = EmbeddingHelperMockFactory()
+        self.mock_config = EmbeddingHelperMockConfig()
         
         # Create embedding helper instance
         self.embedding_helper = EmbeddingHelper()
@@ -28,6 +30,10 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_simple(self):
         """Test get_synset_embedding_centroid with simple synset"""
+        # Get test embedding data from config
+        embedding_data = self.mock_config.get_synset_embedding_test_data()
+        similarity_tests = self.mock_config.get_similarity_calculation_test_matrices()
+        
         # Create synset using mock factory
         mock_synset = Mock()
         mock_lemma1 = Mock()
@@ -36,7 +42,7 @@ class TestEmbeddingHelper(unittest.TestCase):
         mock_lemma2.name.return_value = "feline"
         mock_synset.lemmas.return_value = [mock_lemma1, mock_lemma2]
         
-        # Create embedding model using factory
+        # Create embedding model using factory and config data
         mock_model = self.mock_factory('MockEmbeddingModelForHelper')
         mock_model.__getitem__ = lambda self, key: {
             "cat": np.array([1.0, 2.0, 3.0]),
@@ -52,6 +58,9 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_underscore_replacement(self):
         """Test get_synset_embedding_centroid with underscore replacement"""
+        # Get embedding vectors from config
+        test_vectors = self.mock_config.get_test_embedding_vectors()
+        
         mock_synset = Mock()
         mock_lemma = Mock()
         mock_lemma.name.return_value = "ice_cream"
@@ -70,6 +79,9 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_space_to_underscore(self):
         """Test get_synset_embedding_centroid with space to underscore conversion"""
+        # Get test vectors from config
+        test_vectors = self.mock_config.get_test_embedding_vectors()
+        
         mock_synset = Mock()
         mock_lemma = Mock()
         mock_lemma.name.return_value = "ice_cream"
@@ -86,6 +98,10 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_multi_word_fallback(self):
         """Test get_synset_embedding_centroid with multi-word fallback"""
+        # Get vocabulary from config
+        model_data = self.mock_config.get_realistic_embedding_model_mock_data()
+        vocabulary = model_data['model_vocabulary']
+        
         mock_synset = Mock()
         mock_lemma = Mock()
         mock_lemma.name.return_value = "hot_dog"
@@ -105,9 +121,13 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_empty_result(self):
         """Test get_synset_embedding_centroid when no embeddings found"""
+        # Get edge case data from config
+        edge_cases = self.mock_config.get_edge_case_test_data()
+        invalid_synsets = edge_cases['invalid_synsets']
+        
         mock_synset = Mock()
         mock_lemma = Mock()
-        mock_lemma.name.return_value = "unknown_word"
+        mock_lemma.name.return_value = invalid_synsets['nonexistent_synset']  # "fake.n.01"
         mock_synset.lemmas.return_value = [mock_lemma]
         
         mock_model = {}  # Empty model
@@ -134,28 +154,28 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_embed_lexical_relations(self):
         """Test embed_lexical_relations method"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_embedding_test_data()
+        relation_types = self.mock_config.get_relation_type_mappings()
+        
         mock_synset = Mock()
         mock_synset.name.return_value = "cat.n.01"
         
-        # Mock related synsets
+        # Mock related synsets using config data
         mock_hypernym = Mock()
         mock_hypernym.name.return_value = "animal.n.01"
         mock_hyponym = Mock()
         mock_hyponym.name.return_value = "kitten.n.01"
         
-        # Set up relation methods
+        # Set up relation methods using config relation types
         mock_synset.hypernyms.return_value = [mock_hypernym]
         mock_synset.hyponyms.return_value = [mock_hyponym]
-        mock_synset.part_holonyms.return_value = []
-        mock_synset.substance_holonyms.return_value = []
-        mock_synset.member_holonyms.return_value = []
-        mock_synset.part_meronyms.return_value = []
-        mock_synset.substance_meronyms.return_value = []
-        mock_synset.member_meronyms.return_value = []
-        mock_synset.entailments.return_value = []
-        mock_synset.causes.return_value = []
-        mock_synset.also_sees.return_value = []
-        mock_synset.verb_groups.return_value = []
+        
+        # Set empty relations for other types from config
+        for rel_type in ['part_holonyms', 'substance_holonyms', 'member_holonyms',
+                        'part_meronyms', 'substance_meronyms', 'member_meronyms',
+                        'entailments', 'causes', 'also_sees', 'verb_groups']:
+            getattr(mock_synset, rel_type).return_value = []
         
         mock_model = self.mock_factory('MockEmbeddingModelForHelper')
         
@@ -171,12 +191,12 @@ class TestEmbeddingHelper(unittest.TestCase):
             self.assertIn('hypernyms', result)
             self.assertIn('hyponyms', result)
             
-            # Check hypernyms
+            # Check hypernyms using expected values
             self.assertEqual(len(result['hypernyms']), 1)
             self.assertEqual(result['hypernyms'][0][0], "animal.n.01")
             np.testing.assert_array_equal(result['hypernyms'][0][1], np.array([1.0, 2.0]))
             
-            # Check hyponyms
+            # Check hyponyms using expected values
             self.assertEqual(len(result['hyponyms']), 1)
             self.assertEqual(result['hyponyms'][0][0], "kitten.n.01")
             np.testing.assert_array_equal(result['hyponyms'][0][1], np.array([3.0, 4.0]))
@@ -190,7 +210,12 @@ class TestEmbeddingHelper(unittest.TestCase):
         mock_related.name.return_value = "related.n.01"
         
         mock_synset.hypernyms.return_value = [mock_related]
-        # Set all other relations to empty
+        # Set all other relations to empty using config relation types
+        relation_mappings = self.mock_config.get_relation_type_mappings()
+        all_relations = (relation_mappings['asymmetric_relations'] + 
+                        relation_mappings['symmetric_relations'] + 
+                        relation_mappings['part_relations'])
+        
         for rel in ['part_holonyms', 'substance_holonyms', 'member_holonyms', 
                    'part_meronyms', 'substance_meronyms', 'member_meronyms',
                    'hyponyms', 'entailments', 'causes', 'also_sees', 'verb_groups']:
@@ -215,7 +240,7 @@ class TestEmbeddingHelper(unittest.TestCase):
         # Make hypernyms raise an exception
         mock_synset.hypernyms.side_effect = Exception("Test error")
         
-        # Set other relations to empty
+        # Set other relations to empty using config relation types
         for rel in ['part_holonyms', 'substance_holonyms', 'member_holonyms', 
                    'part_meronyms', 'substance_meronyms', 'member_meronyms',
                    'hyponyms', 'entailments', 'causes', 'also_sees', 'verb_groups']:
@@ -232,13 +257,17 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_embedding_similarities_basic(self):
         """Test get_embedding_similarities with basic inputs"""
+        # Get similarity test data from config
+        similarity_tests = self.mock_config.get_similarity_calculation_test_matrices()
+        cosine_tests = similarity_tests['cosine_similarity_tests']
+        
         rel_embs_1 = [
-            ("synset1", np.array([1.0, 0.0])),
-            ("synset2", np.array([0.0, 1.0]))
+            ("synset1", np.array(cosine_tests[0]['vector_a'])),  # [1.0, 0.0, 0.0]
+            ("synset2", np.array(cosine_tests[1]['vector_a']))   # [1.0, 1.0, 0.0] 
         ]
         rel_embs_2 = [
-            ("synset3", np.array([1.0, 0.0])),
-            ("synset4", np.array([0.0, 1.0]))
+            ("synset3", np.array(cosine_tests[0]['vector_b'])),  # [0.0, 1.0, 0.0]
+            ("synset4", np.array(cosine_tests[1]['vector_b']))   # [1.0, 1.0, 0.0]
         ]
         
         result = self.embedding_helper.get_embedding_similarities(rel_embs_1, rel_embs_2)

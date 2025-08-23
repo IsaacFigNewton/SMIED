@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.GlossParser import GlossParser
 from tests.mocks.gloss_parser_mocks import GlossParserMockFactory
+from tests.config.gloss_parser_config import GlossParserMockConfig
 
 
 class TestGlossParser(unittest.TestCase):
@@ -15,8 +16,9 @@ class TestGlossParser(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = GlossParserMockFactory()
+        self.mock_config = GlossParserMockConfig()
         
         # Create NLP function using factory
         self.mock_nlp = self.mock_factory('MockNLPForGloss')
@@ -36,6 +38,9 @@ class TestGlossParser(unittest.TestCase):
         # Create spaCy document using factory
         mock_doc = self.mock_factory('MockDocForGloss')
         
+        # Get test gloss from config
+        test_gloss = self.mock_config.get_test_gloss_texts()['simple_gloss']
+        
         # Create tokens using factory
         mock_token1 = self.mock_factory('MockTokenForGloss', "cat")
         mock_token1.dep_ = "nsubj"
@@ -52,8 +57,9 @@ class TestGlossParser(unittest.TestCase):
         
         self.mock_nlp.return_value = mock_doc
         
-        # Mock WordNet synsets using factory
-        mock_synset = self.mock_factory('MockSynset', "cat.n.01")
+        # Mock WordNet synsets using factory and config
+        synset_data = self.mock_config.get_synset_mock_structures()['cat_synset']
+        mock_synset = self.mock_factory('MockSynset', synset_data['name'])
         with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
             mock_synsets.return_value = [mock_synset]
             
@@ -81,8 +87,12 @@ class TestGlossParser(unittest.TestCase):
         mock_doc.text = "test"
         mock_nlp.return_value = mock_doc
         
+        # Get test text from config
+        edge_cases = self.mock_config.get_edge_case_glosses()
+        test_text = edge_cases['single_word']
+        
         with patch('nltk.corpus.wordnet.synsets'):
-            result = self.parser_no_nlp.parse_gloss("test text", nlp_func=mock_nlp)
+            result = self.parser_no_nlp.parse_gloss(test_text, nlp_func=mock_nlp)
             self.assertIsInstance(result, dict)
 
     def test_parse_gloss_exception_handling(self):
@@ -93,6 +103,9 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets(self):
         """Test token to synsets conversion"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()['cat_synset']
+        
         # Create tokens using factory
         mock_token1 = self.mock_factory('MockTokenForGloss', "cat")
         mock_token1.is_punct = False
@@ -122,13 +135,16 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets_fallback(self):
         """Test token to synsets with fallback to original text"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()['cat_synset']
+        
         mock_token = self.mock_factory('MockTokenForGloss', "cat")
         mock_token.is_punct = False
         mock_token.is_stop = False
         mock_token.lemma_ = "unknown_lemma"
         
         with patch('smied.GlossParser.wn.synsets') as mock_synsets:
-            mock_synset = self.mock_factory('MockSynset', "cat.n.01")
+            mock_synset = self.mock_factory('MockSynset', synset_data['name'])
             # First call (with lemma) raises exception, second call (with text) returns synsets
             mock_synsets.side_effect = [Exception("Not found"), [mock_synset]]
             
@@ -154,11 +170,15 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_subjects_from_gloss(self):
         """Test subject extraction from gloss"""
+        # Get dependency patterns from config
+        patterns = self.mock_config.get_dependency_patterns()
+        subject_patterns = patterns['subject_patterns']
+        
         mock_token1 = Mock()
-        mock_token1.dep_ = "nsubj"
+        mock_token1.dep_ = subject_patterns[0]  # "nsubj"
         
         mock_token2 = Mock()
-        mock_token2.dep_ = "nsubjpass"
+        mock_token2.dep_ = subject_patterns[1]  # "nsubjpass"
         
         mock_token3 = Mock()
         mock_token3.dep_ = "obj"
@@ -176,14 +196,18 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_objects_from_gloss(self):
         """Test object extraction from gloss"""
+        # Get object patterns from config
+        patterns = self.mock_config.get_dependency_patterns()
+        object_patterns = patterns['object_patterns']
+        
         mock_iobj = Mock()
-        mock_iobj.dep_ = "iobj"
+        mock_iobj.dep_ = object_patterns[1]  # "iobj"
         
         mock_dobj = Mock()
-        mock_dobj.dep_ = "dobj"
+        mock_dobj.dep_ = object_patterns[0]  # "dobj"
         
         mock_pobj = Mock()
-        mock_pobj.dep_ = "pobj"
+        mock_pobj.dep_ = object_patterns[2]  # "pobj"
         
         mock_doc = Mock()
         # Make __iter__ return a new iterator each time it's called
@@ -200,11 +224,15 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_objects_no_indirect_objects(self):
         """Test object extraction when no indirect objects present"""
+        # Get object patterns from config
+        patterns = self.mock_config.get_dependency_patterns()
+        object_patterns = patterns['object_patterns']
+        
         mock_dobj = Mock()
-        mock_dobj.dep_ = "dobj"
+        mock_dobj.dep_ = object_patterns[0]  # "dobj"
         
         mock_pobj = Mock()
-        mock_pobj.dep_ = "pobj"
+        mock_pobj.dep_ = object_patterns[2]  # "pobj"
         
         mock_doc = Mock()
         # Make __iter__ return a new iterator each time it's called
@@ -244,12 +272,16 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_verbs_from_gloss(self):
         """Test verb extraction from gloss"""
+        # Get POS tag mappings from config
+        pos_mappings = self.mock_config.get_pos_tag_mappings()
+        verb_tags = pos_mappings['verbs']
+        
         mock_verb = Mock()
         mock_verb.pos_ = "VERB"
         
         mock_participle = Mock()
         mock_participle.pos_ = "VERB"
-        mock_participle.tag_ = "VBN"
+        mock_participle.tag_ = verb_tags[3]  # "VBN"
         mock_participle.dep_ = "acl"
         
         mock_noun = Mock()
@@ -268,12 +300,16 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_verbs_exclude_passive(self):
         """Test verb extraction excluding passive forms"""
+        # Get POS tag mappings from config
+        pos_mappings = self.mock_config.get_pos_tag_mappings()
+        verb_tags = pos_mappings['verbs']
+        
         mock_verb = Mock()
         mock_verb.pos_ = "VERB"
         
         mock_participle = Mock()
         mock_participle.pos_ = "VERB"
-        mock_participle.tag_ = "VBN"
+        mock_participle.tag_ = verb_tags[3]  # "VBN"
         mock_participle.dep_ = "acl"
         
         mock_doc = Mock()
@@ -366,22 +402,31 @@ class TestGlossParser(unittest.TestCase):
 
     def test_path_syn_to_syn_same_synset(self):
         """Test pathfinding between identical synsets"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()['cat_synset']
+        synset_name = synset_data['name']
+        
         mock_synset = Mock()
-        mock_synset.name.return_value = "cat.n.01"
+        mock_synset.name.return_value = synset_name
         
         path = self.parser.path_syn_to_syn(mock_synset, mock_synset)
         
-        self.assertEqual(path, ["cat.n.01"])
+        self.assertEqual(path, [synset_name])
 
     def test_path_syn_to_syn_different_pos(self):
         """Test pathfinding between synsets of different POS"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()
+        cat_data = synset_data['cat_synset']
+        run_data = synset_data['run_synset']
+        
         mock_synset1 = Mock()
-        mock_synset1.name.return_value = "cat.n.01"
-        mock_synset1.pos.return_value = 'n'
+        mock_synset1.name.return_value = cat_data['name']
+        mock_synset1.pos.return_value = cat_data['pos']
         
         mock_synset2 = Mock()
-        mock_synset2.name.return_value = "run.v.01"
-        mock_synset2.pos.return_value = 'v'
+        mock_synset2.name.return_value = run_data['name']
+        mock_synset2.pos.return_value = run_data['pos']
         
         path = self.parser.path_syn_to_syn(mock_synset1, mock_synset2)
         
@@ -389,24 +434,34 @@ class TestGlossParser(unittest.TestCase):
 
     def test_path_syn_to_syn_string_inputs(self):
         """Test pathfinding with string inputs instead of synset objects"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()
+        cat_name = synset_data['cat_synset']['name']
+        dog_name = synset_data['dog_synset']['name']
+        
         # Test same synset case - should return path with just that synset
-        path = self.parser.path_syn_to_syn("cat.n.01", "cat.n.01")
-        self.assertEqual(path, ["cat.n.01"])
+        path = self.parser.path_syn_to_syn(cat_name, cat_name)
+        self.assertEqual(path, [cat_name])
         
         # Test different synsets - should return None because strings can't find neighbors
-        path = self.parser.path_syn_to_syn("cat.n.01", "dog.n.01")
+        path = self.parser.path_syn_to_syn(cat_name, dog_name)
         self.assertIsNone(path)
 
     @patch('smied.GlossParser.GlossParser.get_all_neighbors')
     def test_path_syn_to_syn_with_path(self, mock_get_neighbors):
         """Test pathfinding that finds a path through neighbors"""
+        # Get synset data from config
+        synset_data = self.mock_config.get_synset_mock_structures()
+        cat_data = synset_data['cat_synset']
+        dog_data = synset_data['dog_synset']
+        
         mock_start = Mock()
-        mock_start.name.return_value = "cat.n.01"
-        mock_start.pos.return_value = 'n'
+        mock_start.name.return_value = cat_data['name']
+        mock_start.pos.return_value = cat_data['pos']
         
         mock_end = Mock()
-        mock_end.name.return_value = "dog.n.01"
-        mock_end.pos.return_value = 'n'
+        mock_end.name.return_value = dog_data['name']
+        mock_end.pos.return_value = dog_data['pos']
         
         mock_intermediate = Mock()
         mock_intermediate.name.return_value = "animal.n.01"
@@ -414,11 +469,11 @@ class TestGlossParser(unittest.TestCase):
         # Set up neighbor relationships based on input synset
         def get_neighbors_side_effect(synset, wn_module=None):
             synset_name = synset.name() if hasattr(synset, 'name') else str(synset)
-            if synset_name == "cat.n.01":
+            if synset_name == cat_data['name']:
                 return [mock_intermediate]
             elif synset_name == "animal.n.01":
                 return [mock_end]  # animal connects to dog
-            elif synset_name == "dog.n.01":
+            elif synset_name == dog_data['name']:
                 return []
             else:
                 return []
@@ -437,20 +492,27 @@ class TestGlossParserIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up with mock NLP for integration testing"""
+        self.mock_factory = GlossParserMockFactory()
+        self.mock_config = GlossParserMockConfig()
         self.mock_nlp = Mock()
         self.parser = GlossParser(nlp_func=self.mock_nlp)
 
     def test_full_parsing_workflow(self):
         """Test complete parsing workflow"""
+        # Get POS and dependency patterns from config
+        pos_mappings = self.mock_config.get_pos_tag_mappings()
+        patterns = self.mock_config.get_dependency_patterns()
+        synset_data = self.mock_config.get_synset_mock_structures()
+        
         # Create a realistic mock document
         mock_token_the = Mock()
-        mock_token_the.dep_ = "det"
-        mock_token_the.pos_ = "DET"
+        mock_token_the.dep_ = patterns['determiner_patterns'][0]  # "det"
+        mock_token_the.pos_ = pos_mappings['determiners'][0]  # "DT"
         mock_token_the.is_punct = False
         mock_token_the.is_stop = True
         
         mock_token_cat = Mock()
-        mock_token_cat.dep_ = "nsubj"
+        mock_token_cat.dep_ = patterns['subject_patterns'][0]  # "nsubj"
         mock_token_cat.pos_ = "NOUN"
         mock_token_cat.is_punct = False
         mock_token_cat.is_stop = False
@@ -474,10 +536,10 @@ class TestGlossParserIntegration(unittest.TestCase):
         
         self.mock_nlp.return_value = mock_doc
         
-        # Mock WordNet responses
+        # Mock WordNet responses using config data
         with patch('smied.GlossParser.wn.synsets') as mock_synsets:
-            mock_cat_synset = Mock()
-            mock_run_synset = Mock()
+            mock_cat_synset = self.mock_factory('MockSynset', synset_data['cat_synset']['name'])
+            mock_run_synset = self.mock_factory('MockSynset', synset_data['run_synset']['name'])
             mock_synsets.side_effect = [[mock_cat_synset], [mock_run_synset]]
             
             result = self.parser.parse_gloss("The cat runs")

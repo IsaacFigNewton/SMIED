@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.BeamBuilder import BeamBuilder
 from tests.mocks.beam_builder_mocks import BeamBuilderMockFactory
+from tests.config.beam_builder_config import BeamBuilderMockConfig
 
 
 class TestBeamBuilder(unittest.TestCase):
@@ -16,8 +17,9 @@ class TestBeamBuilder(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = BeamBuilderMockFactory()
+        self.mock_config = BeamBuilderMockConfig()
         
         # Create embedding helper using factory
         self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
@@ -38,67 +40,36 @@ class TestBeamBuilder(unittest.TestCase):
 
     def test_asymmetric_pairs_map_content(self):
         """Test asymmetric pairs mapping contains expected relations"""
-        expected_pairs = {
-            "part_holonyms": "part_meronyms",
-            "substance_holonyms": "substance_meronyms", 
-            "member_holonyms": "member_meronyms",
-            "part_meronyms": "part_holonyms",
-            "substance_meronyms": "substance_holonyms",
-            "member_meronyms": "member_holonyms",
-            "hypernyms": "hyponyms",
-            "hyponyms": "hypernyms"
-        }
+        expected_pairs = self.mock_config.get_expected_asymmetric_pairs()
         
         for key, value in expected_pairs.items():
             self.assertEqual(self.beam_builder.asymmetric_pairs_map[key], value)
 
     def test_symmetric_pairs_map_content(self):
         """Test symmetric pairs mapping contains expected relations"""
-        expected_symmetric = [
-            "part_holonyms", "substance_holonyms", "member_holonyms",
-            "part_meronyms", "substance_meronyms", "member_meronyms",
-            "hypernyms", "hyponyms", "entailments", "causes", 
-            "also_sees", "verb_groups"
-        ]
+        expected_symmetric = self.mock_config.get_expected_symmetric_relations()
         
         for relation in expected_symmetric:
             self.assertEqual(self.beam_builder.symmetric_pairs_map[relation], relation)
 
     def test_get_new_beams_basic(self):
         """Test basic functionality of get_new_beams"""
-        # Mock graph using factory - create a more realistic mock
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_node("animal.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")
-        mock_graph.add_edge("dog.n.01", "animal.n.01")
+        # Get test data from mock config
+        mock_graph = self.mock_config.get_basic_test_graph()
+        embeddings = self.mock_config.get_basic_test_embeddings()
+        pairs = self.mock_config.get_basic_test_pairs()
         
         # Mock synsets using factory
         mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
         mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
-        # Mock embedding helper responses
-        mock_src_embeddings = {
-            "hypernyms": [("animal.n.01", 0.9)]
-        }
-        mock_tgt_embeddings = {
-            "hypernyms": [("animal.n.01", 0.8)]
-        }
-        
+        # Set up embedding helper responses using config data
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
-        ]
-        
-        mock_asymm_pairs = [
-            (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.85)
-        ]
-        mock_symm_pairs = [
-            (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.75)
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
-            mock_asymm_pairs, mock_symm_pairs
+            pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
         # Mock WordNet synset creation
@@ -126,8 +97,11 @@ class TestBeamBuilder(unittest.TestCase):
         mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
         mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
-        # Empty embeddings
-        self.mock_embedding_helper.embed_lexical_relations.side_effect = [{}, {}]
+        # Get empty embeddings from config
+        embeddings = self.mock_config.get_empty_embeddings()
+        self.mock_embedding_helper.embed_lexical_relations.side_effect = [
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
+        ]
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.return_value = []
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
@@ -152,14 +126,10 @@ class TestBeamBuilder(unittest.TestCase):
         mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
         mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
-        # Embeddings claim to have neighbors that aren't in the graph
-        mock_src_embeddings = {
-            "hypernyms": [("animal.n.01", 0.9)]  # Not a neighbor in graph
-        }
-        mock_tgt_embeddings = {}
-        
+        # Get validation error embeddings from config
+        embeddings = self.mock_config.get_validation_error_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
@@ -176,37 +146,20 @@ class TestBeamBuilder(unittest.TestCase):
 
     def test_get_new_beams_beam_width_limiting(self):
         """Test get_new_beams respects beam_width parameter"""
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_node("animal.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")
-        mock_graph.add_edge("dog.n.01", "animal.n.01")
+        mock_graph = self.mock_config.get_basic_test_graph()
         
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         
-        mock_src_embeddings = {"hypernyms": [("animal.n.01", 0.9)]}
-        mock_tgt_embeddings = {"hypernyms": [("animal.n.01", 0.8)]}
-        
+        embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
-        # Return many pairs (more than beam_width)
-        many_asymm_pairs = [
-            (("cat.n.01", "rel1"), ("dog.n.01", "rel1"), 0.9),
-            (("cat.n.01", "rel2"), ("dog.n.01", "rel2"), 0.8),
-            (("cat.n.01", "rel3"), ("dog.n.01", "rel3"), 0.7),
-            (("cat.n.01", "rel4"), ("dog.n.01", "rel4"), 0.6),
-        ]
-        many_symm_pairs = [
-            (("cat.n.01", "relA"), ("dog.n.01", "relA"), 0.85),
-            (("cat.n.01", "relB"), ("dog.n.01", "relB"), 0.75),
-        ]
-        
+        # Get test pairs for beam width testing
+        pairs = self.mock_config.get_beam_width_test_pairs()
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
-            many_asymm_pairs, many_symm_pairs
+            pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
@@ -227,25 +180,17 @@ class TestBeamBuilder(unittest.TestCase):
 
     def test_get_new_beams_result_structure(self):
         """Test get_new_beams returns properly structured results"""
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_node("animal.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")
-        mock_graph.add_edge("dog.n.01", "animal.n.01")
+        mock_graph = self.mock_config.get_basic_test_graph()
         
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         
-        mock_src_embeddings = {"hypernyms": [("animal.n.01", 0.9)]}
-        mock_tgt_embeddings = {"hypernyms": [("animal.n.01", 0.8)]}
-        
+        embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
         mock_pair = (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.85)
-        
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
             [mock_pair], []  # asymm, symm
         ]
@@ -276,21 +221,15 @@ class TestBeamBuilder(unittest.TestCase):
 
     def test_get_new_beams_calls_embedding_helper_correctly(self):
         """Test get_new_beams calls embedding helper methods with correct parameters"""
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")
-        mock_graph.add_edge("dog.n.01", "animal.n.01")
+        mock_graph = self.mock_config.get_basic_test_graph()
         
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         mock_model = Mock()
         
-        mock_src_embeddings = {"hypernyms": [("animal.n.01", 0.9)]}
-        mock_tgt_embeddings = {"hypernyms": [("animal.n.01", 0.8)]}
-        
+        embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.return_value = []
         
@@ -324,8 +263,9 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = BeamBuilderMockFactory()
+        self.mock_config = BeamBuilderMockConfig()
         
         # Create mocks using factory
         self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
@@ -343,7 +283,10 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         
-        self.mock_embedding_helper.embed_lexical_relations.side_effect = [{}, {}]
+        embeddings = self.mock_config.get_empty_embeddings()
+        self.mock_embedding_helper.embed_lexical_relations.side_effect = [
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
+        ]
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.return_value = []
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
@@ -359,30 +302,18 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
 
     def test_get_new_beams_identical_scores(self):
         """Test get_new_beams when multiple pairs have identical scores"""
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_node("animal.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")
-        mock_graph.add_edge("dog.n.01", "animal.n.01")
+        mock_graph = self.mock_config.get_basic_test_graph()
         
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         
-        mock_src_embeddings = {"hypernyms": [("animal.n.01", 0.9)]}
-        mock_tgt_embeddings = {"hypernyms": [("animal.n.01", 0.8)]}
-        
+        embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
-        # Multiple pairs with same score
-        identical_score_pairs = [
-            (("cat.n.01", "rel1"), ("dog.n.01", "rel1"), 0.8),
-            (("cat.n.01", "rel2"), ("dog.n.01", "rel2"), 0.8),
-            (("cat.n.01", "rel3"), ("dog.n.01", "rel3"), 0.8),
-        ]
-        
+        # Get pairs with identical scores from config
+        identical_score_pairs = self.mock_config.get_identical_scores_pairs()
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
             identical_score_pairs, []
         ]
@@ -403,21 +334,15 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
 
     def test_get_new_beams_partial_neighbor_validation_error(self):
         """Test get_new_beams when only some embeddings fail validation"""
-        mock_graph = nx.DiGraph()
-        mock_graph.add_node("cat.n.01")
-        mock_graph.add_node("dog.n.01")
-        mock_graph.add_node("animal.n.01")
-        mock_graph.add_edge("cat.n.01", "animal.n.01")  # Only cat has animal as neighbor
+        mock_graph = self.mock_config.get_partial_neighbor_validation_graph()
         
         mock_cat_synset = Mock()
         mock_dog_synset = Mock()
         
-        # Both synsets claim animal as neighbor, but only cat has it in graph
-        mock_src_embeddings = {"hypernyms": [("animal.n.01", 0.9)]}  # Valid
-        mock_tgt_embeddings = {"hypernyms": [("animal.n.01", 0.8)]}  # Invalid - dog doesn't have animal as neighbor
-        
+        # Get embeddings that will cause partial validation error
+        embeddings = self.mock_config.get_partial_neighbor_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            mock_src_embeddings, mock_tgt_embeddings
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
         ]
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
@@ -440,8 +365,9 @@ class TestBeamBuilderIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up for integration testing"""
-        # Initialize mock factory for integration tests
+        # Initialize mock factory and config for integration tests
         self.mock_factory = BeamBuilderMockFactory()
+        self.mock_config = BeamBuilderMockConfig()
         self.integration_mock = self.mock_factory('MockBeamBuilderIntegration')
         
         # Create embedding helper using factory
@@ -450,45 +376,17 @@ class TestBeamBuilderIntegration(unittest.TestCase):
 
     def test_realistic_wordnet_scenario(self):
         """Test BeamBuilder with a realistic WordNet-like graph structure"""
-        # Create a more realistic graph structure
-        graph = nx.DiGraph()
-        
-        # Add nodes for a simple taxonomy
-        nodes = ["cat.n.01", "dog.n.01", "animal.n.01", "mammal.n.01", "pet.n.01"]
-        for node in nodes:
-            graph.add_node(node)
-        
-        # Add hierarchical relationships
-        graph.add_edge("cat.n.01", "mammal.n.01")    # cat -> mammal (hypernym)
-        graph.add_edge("dog.n.01", "mammal.n.01")    # dog -> mammal (hypernym)
-        graph.add_edge("mammal.n.01", "animal.n.01")  # mammal -> animal (hypernym)
-        graph.add_edge("cat.n.01", "pet.n.01")       # cat -> pet (also)
-        graph.add_edge("dog.n.01", "pet.n.01")       # dog -> pet (also)
-        
-        # Mock realistic embeddings
-        cat_embeddings = {
-            "hypernyms": [("mammal.n.01", 0.9)],
-            "also_sees": [("pet.n.01", 0.7)]
-        }
-        dog_embeddings = {
-            "hypernyms": [("mammal.n.01", 0.85)], 
-            "also_sees": [("pet.n.01", 0.75)]
-        }
+        # Get realistic graph and data from config
+        graph = self.mock_config.get_realistic_wordnet_graph()
+        embeddings = self.mock_config.get_realistic_embeddings()
+        pairs = self.mock_config.get_realistic_aligned_pairs()
         
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            cat_embeddings, dog_embeddings
-        ]
-        
-        # Mock realistic pair alignments
-        asymm_pairs = [
-            (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.87)
-        ]
-        symm_pairs = [
-            (("cat.n.01", "also_sees"), ("dog.n.01", "also_sees"), 0.72)
+            embeddings['cat_embeddings'], embeddings['dog_embeddings']
         ]
         
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
-            asymm_pairs, symm_pairs
+            pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
         # Mock synsets
@@ -512,52 +410,17 @@ class TestBeamBuilderIntegration(unittest.TestCase):
 
     def test_complex_graph_with_many_relations(self):
         """Test BeamBuilder with a complex graph having many relation types"""
-        # Create a complex graph
-        graph = nx.DiGraph()
-        
-        # Central synsets
-        nodes = ["cat.n.01", "dog.n.01", "mammal.n.01", "animal.n.01", "vertebrate.n.01"]
-        for node in nodes:
-            graph.add_node(node)
-        
-        # Add various types of edges to simulate different WordNet relations
-        edges = [
-            ("cat.n.01", "mammal.n.01"),      # hypernym
-            ("dog.n.01", "mammal.n.01"),      # hypernym
-            ("mammal.n.01", "vertebrate.n.01"), # hypernym
-            ("vertebrate.n.01", "animal.n.01"), # hypernym
-        ]
-        
-        for src, tgt in edges:
-            graph.add_edge(src, tgt)
-        
-        # Mock complex embeddings with multiple relation types
-        cat_embeddings = {
-            "hypernyms": [("mammal.n.01", 0.95)],
-            "part_holonyms": [],  # No part relations for cat
-            "similar_tos": []     # No similar relations
-        }
-        
-        dog_embeddings = {
-            "hypernyms": [("mammal.n.01", 0.92)],
-            "part_holonyms": [],  # No part relations for dog
-            "similar_tos": []     # No similar relations
-        }
+        # Get complex test data from config
+        graph = self.mock_config.get_complex_graph()
+        embeddings = self.mock_config.get_complex_embeddings()
+        pairs = self.mock_config.get_complex_aligned_pairs()
         
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
-            cat_embeddings, dog_embeddings
-        ]
-        
-        # Mock alignment with various relation types
-        strong_asymm_pairs = [
-            (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.93)
-        ]
-        strong_symm_pairs = [
-            (("cat.n.01", "hypernyms"), ("dog.n.01", "hypernyms"), 0.88)
+            embeddings['cat_embeddings'], embeddings['dog_embeddings']
         ]
         
         self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.side_effect = [
-            strong_asymm_pairs, strong_symm_pairs
+            pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
         mock_cat_synset = Mock()

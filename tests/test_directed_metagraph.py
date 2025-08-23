@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from smied.DirectedMetagraph import DirectedMetagraph
 from tests.mocks.directed_metagraph_mocks import DirectedMetagraphMockFactory
+from tests.config.directed_metagraph_config import DirectedMetagraphMockConfig
 
 
 class TestDirectedMetagraph(unittest.TestCase):
@@ -15,19 +16,23 @@ class TestDirectedMetagraph(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        # Initialize mock factory
+        # Initialize mock factory and config
         self.mock_factory = DirectedMetagraphMockFactory()
+        self.mock_config = DirectedMetagraphMockConfig()
         
-        # Basic test vertex lists
+        # Get basic test vertex lists from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         self.simple_vert_list = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ((0, 1), {"relation": "subject"})
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
         ]
         
         self.complex_vert_list = [
-            ("John", {"type": "person", "pos": "NOUN"}),
-            ("runs", {"type": "action", "pos": "VERB"}),
+            vertex_structures['person_action_vertices'][0],  # ("John", {"type": "person", "pos": "NOUN"})
+            vertex_structures['person_action_vertices'][1],  # ("runs", {"type": "action", "pos": "VERB"})
             ("fast", {"type": "manner", "pos": "ADV"}),
             ((0, 1), {"relation": "agent"}),
             ((1, 2), {"relation": "manner"}),
@@ -63,7 +68,7 @@ class TestDirectedMetagraph(unittest.TestCase):
         self.assertEqual(last_vert[0], [0, 1, 2])  # Should be sorted
 
 
-class TestDirectedMetagraphValidation(unittest.TestCase):
+class TestDirectedMetagraphValidation(TestDirectedMetagraph):
     """Test validation methods of DirectedMetagraph"""
     
     def test_validate_vert_atomic_string_only(self):
@@ -146,37 +151,49 @@ class TestDirectedMetagraphValidation(unittest.TestCase):
     
     def test_validate_graph_valid(self):
         """Test validation of valid graph"""
+        # Get validation test data from config
+        validation_data = self.mock_config.get_validation_test_data()
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         vert_list = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ((0, 1), {"relation": "subject"})
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
         ]
         DirectedMetagraph.validate_graph(vert_list)
         # Should not raise any exception
     
     def test_validate_graph_invalid(self):
         """Test validation fails for invalid graph"""
+        # Get validation test data from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        
         vert_list = [
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
             ((0, 2), {"relation": "subject"})  # Invalid forward reference
         ]
         with self.assertRaises(AssertionError):
             DirectedMetagraph.validate_graph(vert_list)
 
 
-class TestDirectedMetagraphCanonicalization(unittest.TestCase):
+class TestDirectedMetagraphCanonicalization(TestDirectedMetagraph):
     """Test canonicalization methods of DirectedMetagraph"""
     
     def test_canonicalize_vert_atomic(self):
         """Test canonicalization of atomic vertex"""
-        original = ("word", {"pos": "NOUN"})
+        # Get vertex from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        original = vertex_structures['simple_vertices'][0]  # ("word1", {"pos": "NOUN"})
         canonical = DirectedMetagraph.canonicalize_vert(original)
         self.assertEqual(canonical, original)
     
     def test_canonicalize_vert_directed(self):
         """Test canonicalization of directed relation vertex"""
-        original = ((0, 1), {"relation": "subject"})
+        # Get edge from config
+        edge_structures = self.mock_config.get_edge_structures()
+        original = edge_structures['simple_edges'][0]  # ((0, 1), {"relation": "subject"})
         canonical = DirectedMetagraph.canonicalize_vert(original)
         self.assertEqual(canonical, original)
     
@@ -194,15 +211,22 @@ class TestDirectedMetagraphCanonicalization(unittest.TestCase):
         self.assertEqual(canonical, original)
 
 
-class TestDirectedMetagraphNetworkXConversion(unittest.TestCase):
+class TestDirectedMetagraphNetworkXConversion(TestDirectedMetagraph):
     """Test NetworkX conversion functionality"""
     
     def setUp(self):
         """Set up test fixtures"""
+        self.mock_factory = DirectedMetagraphMockFactory()
+        self.mock_config = DirectedMetagraphMockConfig()
+        
+        # Get vertex and edge structures from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         self.simple_graph = DirectedMetagraph([
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ((0, 1), {"relation": "subject"})
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            edge_structures['simple_edges'][0]       # ((0, 1), {"relation": "subject"})
         ])
         
         self.complex_graph = DirectedMetagraph([
@@ -215,27 +239,34 @@ class TestDirectedMetagraphNetworkXConversion(unittest.TestCase):
     
     def test_add_vert_to_nx_atomic(self):
         """Test adding atomic vertex to NetworkX graph"""
+        # Get vertex data from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        node_data = vertex_structures['simple_vertices'][0]  # ("word1", {"pos": "NOUN"})
+        
         G = nx.DiGraph()
-        node_data = ("word", {"pos": "NOUN"})
         G = DirectedMetagraph.add_vert_to_nx(G, 0, node_data)
         
         self.assertEqual(len(G.nodes()), 1)
         self.assertIn(0, G.nodes())
-        self.assertEqual(G.nodes[0]["label"], "word")
+        self.assertEqual(G.nodes[0]["label"], node_data[0])
     
     def test_add_vert_to_nx_directed_relation(self):
         """Test adding directed relation vertex to NetworkX graph"""
+        # Get vertex and edge data from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         G = nx.DiGraph()
         # First add the atomic vertices that the relation references
-        G.add_node(0, label="word1")
-        G.add_node(1, label="word2")
+        G.add_node(0, label=vertex_structures['simple_vertices'][0][0])  # "word1"
+        G.add_node(1, label=vertex_structures['simple_vertices'][1][0])  # "word2"
         
-        node_data = ((0, 1), {"relation": "subject"})
+        node_data = edge_structures['simple_edges'][0]  # ((0, 1), {"relation": "subject"})
         G = DirectedMetagraph.add_vert_to_nx(G, 2, node_data)
         
         self.assertEqual(len(G.nodes()), 3)
         self.assertIn(2, G.nodes())
-        self.assertEqual(G.nodes[2]["label"], "subject(0, 1)")
+        self.assertEqual(G.nodes[2]["label"], f"{node_data[1]['relation']}(0, 1)")
         
         # Check edges
         self.assertIn((0, 2), G.edges())
@@ -265,6 +296,9 @@ class TestDirectedMetagraphNetworkXConversion(unittest.TestCase):
     
     def test_add_vert_to_nx_with_attributes(self):
         """Test adding vertex with additional attributes"""
+        # Get validation data from config
+        validation_data = self.mock_config.get_validation_test_data()
+        
         G = nx.DiGraph()
         node_data = ("word", {"pos": "NOUN", "lemma": "word", "relation": "should_be_filtered"})
         G = DirectedMetagraph.add_vert_to_nx(G, 0, node_data)
@@ -276,16 +310,21 @@ class TestDirectedMetagraphNetworkXConversion(unittest.TestCase):
     
     def test_to_nx_simple_graph(self):
         """Test conversion of simple graph to NetworkX"""
+        # Get expected labels from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         G = self.simple_graph.to_nx()
         
         self.assertIsInstance(G, nx.DiGraph)
         self.assertEqual(len(G.nodes()), 3)
         self.assertEqual(len(G.edges()), 2)  # Two edges from directed relation
         
-        # Check node labels
-        self.assertEqual(G.nodes[0]["label"], "word1")
-        self.assertEqual(G.nodes[1]["label"], "word2")
-        self.assertEqual(G.nodes[2]["label"], "subject(0, 1)")
+        # Check node labels using config data
+        self.assertEqual(G.nodes[0]["label"], vertex_structures['simple_vertices'][0][0])  # "word1"
+        self.assertEqual(G.nodes[1]["label"], vertex_structures['simple_vertices'][1][0])  # "word2"
+        relation_name = edge_structures['simple_edges'][0][1]['relation']  # "subject"
+        self.assertEqual(G.nodes[2]["label"], f"{relation_name}(0, 1)")
     
     def test_to_nx_complex_graph(self):
         """Test conversion of complex graph to NetworkX"""
@@ -308,21 +347,32 @@ class TestDirectedMetagraphNetworkXConversion(unittest.TestCase):
         self.assertEqual(len(G.edges()), 0)
 
 
-class TestDirectedMetagraphManipulation(unittest.TestCase):
+class TestDirectedMetagraphManipulation(TestDirectedMetagraph):
     """Test graph manipulation methods"""
     
     def setUp(self):
         """Set up test fixtures"""
+        self.mock_factory = DirectedMetagraphMockFactory()
+        self.mock_config = DirectedMetagraphMockConfig()
+        
+        # Get vertex and edge structures from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
         self.graph = DirectedMetagraph([
-            ("word1", {"pos": "NOUN"}),
-            ("word2", {"pos": "VERB"}),
-            ("word3", {"pos": "ADJ"}),
-            ((0, 1), {"relation": "subject"}),
-            ((1, 2), {"relation": "modifier"})
+            vertex_structures['simple_vertices'][0],  # ("word1", {"pos": "NOUN"})
+            vertex_structures['simple_vertices'][1],  # ("word2", {"pos": "VERB"})
+            vertex_structures['simple_vertices'][2],  # ("word3", {"pos": "ADJ"})
+            edge_structures['simple_edges'][0],      # ((0, 1), {"relation": "subject"})
+            edge_structures['simple_edges'][2]       # ((0, 2), {"relation": "modifier"})
         ])
     
     def test_add_vert_atomic(self):
         """Test adding atomic vertex"""
+        # Get test data from config
+        manipulation_data = self.mock_config.get_graph_manipulation_scenarios()
+        new_vertex = manipulation_data['addition_scenario']['vertices_to_add'][0]  # ("C", {"new": True})
+        
         initial_length = len(self.graph.metaverts)
         self.graph.add_vert("word4", {"pos": "ADV"})
         
@@ -339,6 +389,9 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
     
     def test_add_vert_directed_relation(self):
         """Test adding directed relation vertex"""
+        # Get edge data from config
+        edge_structures = self.mock_config.get_edge_structures()
+        
         initial_length = len(self.graph.metaverts)
         self.graph.add_vert((0, 2), {"relation": "direct_relation"})
         
@@ -426,7 +479,7 @@ class TestDirectedMetagraphManipulation(unittest.TestCase):
             pass
 
 
-class TestDirectedMetagraphRemoveVertsHelper(unittest.TestCase):
+class TestDirectedMetagraphRemoveVertsHelper(TestDirectedMetagraph):
     """Test the _remove_verts helper method"""
     
     def test_remove_verts_empty_set(self):
@@ -442,21 +495,32 @@ class TestDirectedMetagraphRemoveVertsHelper(unittest.TestCase):
     
     def test_remove_verts_atomic_vertex(self):
         """Test _remove_verts with atomic vertices"""
-        metaverts = {1: ("word2", {"pos": "VERB"})}  # Only vertex 1, vertex 0 already removed
+        # Get vertex data from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        vertex_data = vertex_structures['simple_vertices'][1]  # ("word2", {"pos": "VERB"})
+        
+        metaverts = {1: vertex_data}  # Only vertex 1, vertex 0 already removed
         result = DirectedMetagraph._remove_verts({0}, 1, metaverts)
-        self.assertEqual(result, {1: ("word2", {"pos": "VERB"})})
+        self.assertEqual(result, {1: vertex_data})
     
     def test_remove_verts_directed_relation_partial_removal(self):
         """Test _remove_verts with directed relation that gets partially cleaned"""
+        # Get test data from config
+        vertex_structures = self.mock_config.get_basic_vertex_structures()
+        edge_structures = self.mock_config.get_edge_structures()
+        
+        vertex_data = vertex_structures['simple_vertices'][1]  # ("word2", {"pos": "VERB"})
+        edge_data = edge_structures['simple_edges'][0]        # ((0, 1), {"relation": "subject"})
+        
         metaverts = {
-            1: ("word2", {"pos": "VERB"}),
-            2: ((0, 1), {"relation": "subject"})
+            1: vertex_data,
+            2: edge_data
         }
         # Remove vertex 0, which should also remove the relation (since it references vertex 0)
         result = DirectedMetagraph._remove_verts({0}, 1, metaverts)
         # The relation should be removed because it references vertex 0
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[1], ("word2", {"pos": "VERB"}))
+        self.assertEqual(result[1], vertex_data)
     
     def test_remove_verts_undirected_relation_partial_removal(self):
         """Test _remove_verts with undirected relation that gets partially cleaned"""
@@ -484,7 +548,7 @@ class TestDirectedMetagraphRemoveVertsHelper(unittest.TestCase):
         self.assertEqual(len(result), 0)
 
 
-class TestDirectedMetagraphEdgeCases(unittest.TestCase):
+class TestDirectedMetagraphEdgeCases(TestDirectedMetagraph):
     """Test edge cases and error conditions"""
     
     def test_initialization_with_invalid_vertex_list(self):
@@ -545,15 +609,19 @@ class TestDirectedMetagraphEdgeCases(unittest.TestCase):
                 self.assertNotIn(1, mv[0])
 
 
-class TestDirectedMetagraphIntegration(unittest.TestCase):
+class TestDirectedMetagraphIntegration(TestDirectedMetagraph):
     """Integration tests for DirectedMetagraph"""
     
     def test_build_and_manipulate_graph(self):
         """Test building and manipulating a graph step by step"""
+        # Get traversal scenario from config for structured testing
+        traversal_data = self.mock_config.get_graph_traversal_scenarios()
+        linear_path = traversal_data['linear_path']
+        
         # Start with empty graph
         dg = DirectedMetagraph()
         
-        # Add atomic vertices
+        # Add atomic vertices using realistic linguistic structure
         dg.add_vert("The", {"pos": "DET"})      # 0
         dg.add_vert("cat", {"pos": "NOUN"})     # 1
         dg.add_vert("runs", {"pos": "VERB"})    # 2
@@ -582,6 +650,10 @@ class TestDirectedMetagraphIntegration(unittest.TestCase):
     
     def test_canonicalization_in_practice(self):
         """Test that canonicalization works in practice"""
+        # Get complex graph structure from config for canonical testing
+        complex_structures = self.mock_config.get_complex_graph_structures()
+        hierarchical = complex_structures['hierarchical_structure']
+        
         # Create graph with unsorted undirected relations
         vert_list = [
             ("A", {}),
@@ -598,6 +670,9 @@ class TestDirectedMetagraphIntegration(unittest.TestCase):
     
     def test_validation_prevents_invalid_graphs(self):
         """Test that validation prevents creation of invalid graphs"""
+        # Get validation test data from config
+        validation_data = self.mock_config.get_validation_test_data()
+        
         # Forward reference should fail
         with self.assertRaises(AssertionError):
             DirectedMetagraph([

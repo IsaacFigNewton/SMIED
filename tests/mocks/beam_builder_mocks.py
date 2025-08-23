@@ -6,6 +6,7 @@ from unittest.mock import Mock
 from typing import List, Dict, Any, Optional
 
 
+
 class BeamBuilderMockFactory:
     """Factory class for creating BeamBuilder mock instances."""
     
