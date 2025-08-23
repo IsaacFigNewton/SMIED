@@ -3,7 +3,7 @@ Unit tests for the SMIED class.
 """
 
 import unittest
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import patch, call
 import sys
 import os
 from typing import Dict, Any
@@ -37,6 +37,8 @@ class TestSMIED(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        # Initialize mock factory
+        self.mock_factory = SMIEDMockFactory()
         # Create SMIED instance with mocked components
         with patch('smied.SMIED.nltk'), \
              patch('smied.SMIED.wn'), \
@@ -67,7 +69,7 @@ class TestSMIED(unittest.TestCase):
              patch('spacy.load') as mock_spacy_load, \
              patch('smied.SMIED.SemanticDecomposer') as mock_decomposer:
             
-            mock_spacy_load.return_value = Mock()
+            mock_spacy_load.return_value = self.mock_factory('MockSpacy')
             
             # Initialization happens during construction
             smied = SMIED(nlp_model="en_core_web_sm", auto_download=True, build_graph_on_init=False)
@@ -91,7 +93,7 @@ class TestSMIED(unittest.TestCase):
              patch('spacy.load') as mock_spacy_load, \
              patch('smied.SMIED.SemanticDecomposer') as mock_decomposer:
             
-            mock_spacy_load.return_value = Mock()
+            mock_spacy_load.return_value = self.mock_factory('MockSpacy')
             
             smied = SMIED(auto_download=False)
             initial_decomposer_call_count = mock_decomposer.call_count
@@ -108,7 +110,7 @@ class TestSMIED(unittest.TestCase):
     def test_setup_nlp_success(self):
         """Test successful NLP setup."""
         with patch('spacy.load') as mock_spacy_load:
-            mock_nlp = Mock()
+            mock_nlp = self.mock_factory('MockSpacy')
             mock_spacy_load.return_value = mock_nlp
             
             smied = SMIED(nlp_model="test_model", auto_download=False)
@@ -139,8 +141,8 @@ class TestSMIED(unittest.TestCase):
     def test_build_synset_graph(self):
         """Test synset graph building."""
         with patch('smied.SMIED.SemanticDecomposer') as mock_decomposer_class:
-            mock_decomposer = Mock()
-            mock_graph = Mock()
+            mock_decomposer = self.mock_factory('MockSemanticDecomposer')
+            mock_graph = self.mock_factory('MockGraph')
             mock_graph.number_of_nodes.return_value = 100
             mock_graph.number_of_edges.return_value = 200
             mock_decomposer.build_synset_graph.return_value = mock_graph
@@ -160,7 +162,7 @@ class TestSMIED(unittest.TestCase):
         with patch('smied.SMIED.SemanticDecomposer'):
             smied = SMIED(nlp_model=None, auto_download=False)
             
-            mock_graph = Mock()
+            mock_graph = self.mock_factory('MockGraph')
             smied.synset_graph = mock_graph
             
             result = smied.build_synset_graph(verbose=False)
@@ -170,7 +172,7 @@ class TestSMIED(unittest.TestCase):
     def test_get_synsets_with_pos(self):
         """Test getting synsets with POS specified."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synsets = [Mock(), Mock()]
+            mock_synsets = [self.mock_factory('MockSynset'), self.mock_factory('MockSynset')]
             mock_wn.synsets.return_value = mock_synsets
             mock_wn.NOUN = 'n'
             
@@ -183,7 +185,7 @@ class TestSMIED(unittest.TestCase):
     def test_get_synsets_without_pos(self):
         """Test getting synsets without POS specified."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synsets = [Mock(), Mock()]
+            mock_synsets = [self.mock_factory('MockSynset'), self.mock_factory('MockSynset')]
             mock_wn.synsets.return_value = mock_synsets
             
             smied = SMIED()
@@ -199,16 +201,16 @@ class TestSMIED(unittest.TestCase):
              patch('builtins.print'):
             
             # Set up mocks
-            mock_decomposer = Mock()
+            mock_decomposer = self.mock_factory('MockSemanticDecomposer')
             mock_decomposer_class.return_value = mock_decomposer
             
-            mock_graph = Mock()
+            mock_graph = self.mock_factory('MockGraph')
             mock_graph.number_of_nodes.return_value = 100
             mock_graph.number_of_edges.return_value = 200
             mock_decomposer.build_synset_graph.return_value = mock_graph
             
-            mock_path = [Mock(), Mock()]
-            mock_predicate = Mock()
+            mock_path = [self.mock_factory('MockSynset'), self.mock_factory('MockSynset')]
+            mock_predicate = self.mock_factory('MockSynset')
             mock_decomposer.find_connected_shortest_paths.return_value = (
                 mock_path, mock_path, mock_predicate
             )
@@ -230,10 +232,10 @@ class TestSMIED(unittest.TestCase):
              patch('builtins.print') as mock_print:
             
             # Set up mocks
-            mock_decomposer = Mock()
+            mock_decomposer = self.mock_factory('MockSemanticDecomposer')
             mock_decomposer_class.return_value = mock_decomposer
             
-            mock_graph = Mock()
+            mock_graph = self.mock_factory('MockGraph')
             mock_graph.number_of_nodes.return_value = 100
             mock_graph.number_of_edges.return_value = 200
             mock_decomposer.build_synset_graph.return_value = mock_graph
@@ -261,7 +263,7 @@ class TestSMIED(unittest.TestCase):
     def test_analyze_triple_exception(self):
         """Test triple analysis with exception."""
         with patch('smied.SMIED.SemanticDecomposer') as mock_decomposer_class:
-            mock_decomposer = Mock()
+            mock_decomposer = self.mock_factory('MockSemanticDecomposer')
             mock_decomposer_class.return_value = mock_decomposer
             mock_decomposer.build_synset_graph.side_effect = Exception("Test error")
             
@@ -275,10 +277,11 @@ class TestSMIED(unittest.TestCase):
         with patch('smied.SMIED.SemanticDecomposer') as mock_decomposer_class, \
              patch('builtins.print') as mock_print:
             
+            from unittest.mock import Mock
             mock_decomposer_class.show_connected_paths = Mock()
             
             # Create mock paths and predicate
-            mock_synset = Mock()
+            mock_synset = self.mock_factory('MockSynset')
             mock_synset.name.return_value = "test.n.01"
             mock_synset.definition.return_value = "test definition"
             
@@ -316,8 +319,8 @@ class TestSMIED(unittest.TestCase):
     def test_calculate_similarity_path(self):
         """Test calculating path similarity between words."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synset1 = Mock()
-            mock_synset2 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_synset1.path_similarity.return_value = 0.5
             
             mock_wn.synsets.side_effect = [[mock_synset1], [mock_synset2]]
@@ -331,8 +334,8 @@ class TestSMIED(unittest.TestCase):
     def test_calculate_similarity_wu_palmer(self):
         """Test calculating Wu-Palmer similarity."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synset1 = Mock()
-            mock_synset2 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_synset1.wup_similarity.return_value = 0.8
             
             mock_wn.synsets.side_effect = [[mock_synset1], [mock_synset2]]
@@ -346,8 +349,8 @@ class TestSMIED(unittest.TestCase):
     def test_calculate_similarity_lch(self):
         """Test calculating LCH similarity."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synset1 = Mock()
-            mock_synset2 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_synset1.lch_similarity.return_value = 2.5
             
             mock_wn.synsets.side_effect = [[mock_synset1], [mock_synset2]]
@@ -361,7 +364,7 @@ class TestSMIED(unittest.TestCase):
     def test_calculate_similarity_no_synsets(self):
         """Test similarity calculation when synsets not found."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_wn.synsets.side_effect = [[], [Mock()]]
+            mock_wn.synsets.side_effect = [[], [self.mock_factory('MockSynset')]]
             
             smied = SMIED()
             result = smied.calculate_similarity("xyz", "dog")
@@ -371,8 +374,8 @@ class TestSMIED(unittest.TestCase):
     def test_calculate_similarity_invalid_method(self):
         """Test similarity calculation with invalid method."""
         with patch('smied.SMIED.wn') as mock_wn:
-            mock_synset1 = Mock()
-            mock_synset2 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_wn.synsets.side_effect = [[mock_synset1], [mock_synset2]]
             
             smied = SMIED()
@@ -384,21 +387,21 @@ class TestSMIED(unittest.TestCase):
         """Test getting comprehensive word information."""
         with patch('smied.SMIED.wn') as mock_wn:
             # Create mock synset
-            mock_synset = Mock()
+            mock_synset = self.mock_factory('MockSynset')
             mock_synset.name.return_value = "cat.n.01"
             mock_synset.definition.return_value = "feline mammal"
             mock_synset.pos.return_value = "n"
             mock_synset.examples.return_value = ["The cat sat on the mat"]
             
-            mock_lemma = Mock()
+            mock_lemma = self.mock_factory('MockSynset')
             mock_lemma.name.return_value = "cat"
             mock_synset.lemmas.return_value = [mock_lemma]
             
-            mock_hypernym = Mock()
+            mock_hypernym = self.mock_factory('MockSynset')
             mock_hypernym.name.return_value = "feline.n.01"
             mock_synset.hypernyms.return_value = [mock_hypernym]
             
-            mock_hyponym = Mock()
+            mock_hyponym = self.mock_factory('MockSynset')
             mock_hyponym.name.return_value = "kitten.n.01"
             mock_synset.hyponyms.return_value = [mock_hyponym]
             
@@ -426,7 +429,7 @@ class TestSMIED(unittest.TestCase):
              patch('builtins.print') as mock_print:
             
             # Create mock synsets
-            mock_synset = Mock()
+            mock_synset = self.mock_factory('MockSynset')
             mock_synset.name.return_value = "test.n.01"
             mock_synset.definition.return_value = "test definition"
             mock_synset.hypernyms.return_value = []
@@ -448,11 +451,11 @@ class TestSMIED(unittest.TestCase):
         """Test showing hypernym path."""
         with patch('builtins.print') as mock_print:
             # Create mock synset chain
-            mock_synset1 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
             mock_synset1.name.return_value = "cat.n.01"
             mock_synset1.definition.return_value = "feline mammal"
             
-            mock_synset2 = Mock()
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_synset2.name.return_value = "feline.n.01"
             mock_synset2.definition.return_value = "cat family"
             mock_synset2.hypernyms.return_value = []
@@ -470,10 +473,10 @@ class TestSMIED(unittest.TestCase):
         """Test showing verb relations."""
         with patch('builtins.print') as mock_print:
             # Create mock synset with relations
-            mock_synset = Mock()
+            mock_synset = self.mock_factory('MockSynset')
             mock_synset.name.return_value = "jump.v.01"
             
-            mock_entailment = Mock()
+            mock_entailment = self.mock_factory('MockSynset')
             mock_entailment.name.return_value = "move.v.01"
             mock_entailment.definition.return_value = "change position"
             mock_synset.entailments.return_value = [mock_entailment]
@@ -494,12 +497,12 @@ class TestSMIED(unittest.TestCase):
              patch('builtins.print') as mock_print:
             
             # Create mock synsets
-            mock_synset1 = Mock()
+            mock_synset1 = self.mock_factory('MockSynset')
             mock_synset1.name.return_value = "cat.n.01"
             mock_synset1.path_similarity.return_value = 0.5
             mock_synset1.hypernyms.return_value = []
             
-            mock_synset2 = Mock()
+            mock_synset2 = self.mock_factory('MockSynset')
             mock_synset2.name.return_value = "dog.n.01"
             
             mock_wn.synsets.side_effect = [
@@ -520,37 +523,22 @@ class TestSMIED(unittest.TestCase):
 class TestSMIEDIntegration(unittest.TestCase):
     """Integration tests for SMIED class."""
     
+    def setUp(self):
+        """Set up integration test fixtures."""
+        from tests.mocks.smied_mocks import SMIEDMockFactory
+        self.mock_factory = SMIEDMockFactory()
+        self.integration_mock = self.mock_factory('MockSMIEDIntegration')
+    
     def test_full_pipeline_mock(self):
         """Test full pipeline with mocked components."""
-        with patch('smied.SMIED.nltk') as mock_nltk, \
-             patch('spacy.load') as mock_spacy_load, \
-             patch('smied.SMIED.wn') as mock_wn, \
-             patch('smied.SMIED.SemanticDecomposer') as mock_decomposer_class, \
+        # Create full pipeline mocks using integration mock
+        test_mocks = self.integration_mock.create_full_pipeline_mocks()
+        
+        with patch('smied.SMIED.nltk', test_mocks['mock_nltk']), \
+             patch('spacy.load', return_value=test_mocks['mock_nlp']), \
+             patch('smied.SMIED.wn', test_mocks['mock_wn']), \
+             patch('smied.SMIED.SemanticDecomposer', return_value=test_mocks['mock_decomposer']), \
              patch('builtins.print'):
-            
-            # Set up mocks
-            mock_nlp = Mock()
-            mock_spacy_load.return_value = mock_nlp
-            
-            mock_decomposer = Mock()
-            mock_decomposer_class.return_value = mock_decomposer
-            
-            mock_graph = Mock()
-            mock_graph.number_of_nodes.return_value = 1000
-            mock_graph.number_of_edges.return_value = 5000
-            mock_decomposer.build_synset_graph.return_value = mock_graph
-            
-            mock_synset = Mock()
-            mock_synset.name.return_value = "test.n.01"
-            mock_synset.definition.return_value = "test definition"
-            
-            mock_decomposer.find_connected_shortest_paths.return_value = (
-                [mock_synset], [mock_synset], mock_synset
-            )
-            
-            mock_wn.synsets.return_value = [mock_synset]
-            mock_wn.NOUN = 'n'
-            mock_wn.VERB = 'v'
             
             # Create and use SMIED
             smied = SMIED(nlp_model="en_core_web_sm", auto_download=True, build_graph_on_init=False)
@@ -563,11 +551,10 @@ class TestSMIEDIntegration(unittest.TestCase):
             self.assertIsNotNone(object_path)
             self.assertIsNotNone(predicate)
             
-            # Verify calls
-            mock_nltk.download.assert_any_call('wordnet', quiet=True)
-            mock_spacy_load.assert_called_once_with("en_core_web_sm")
-            mock_decomposer.build_synset_graph.assert_called_once()
-            mock_decomposer.find_connected_shortest_paths.assert_called_once()
+            # Verify calls using test_mocks
+            test_mocks['mock_nltk'].download.assert_any_call('wordnet', quiet=True)
+            test_mocks['mock_decomposer'].build_synset_graph.assert_called_once()
+            test_mocks['mock_decomposer'].find_connected_shortest_paths.assert_called_once()
     
     def test_multiple_analyses(self):
         """Test multiple analyses with same instance."""
@@ -575,10 +562,10 @@ class TestSMIEDIntegration(unittest.TestCase):
              patch('smied.SMIED.wn') as mock_wn, \
              patch('builtins.print'):
             
-            mock_decomposer = Mock()
+            mock_decomposer = self.mock_factory('MockSemanticDecomposer')
             mock_decomposer_class.return_value = mock_decomposer
             
-            mock_graph = Mock()
+            mock_graph = self.mock_factory('MockGraph')
             mock_graph.number_of_nodes.return_value = 100
             mock_graph.number_of_edges.return_value = 200
             mock_decomposer.build_synset_graph.return_value = mock_graph

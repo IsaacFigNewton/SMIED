@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, Mock
 import numpy as np
 import sys
 import os
@@ -35,11 +35,9 @@ class TestEmbeddingHelper(unittest.TestCase):
         test_vectors = self.mock_config.get_embedding_test_vectors()
         
         # Create synset using config data
-        mock_synset = Mock()
-        mock_lemma1 = Mock()
-        mock_lemma1.name.return_value = lemma_names['simple_lemmas'][0]  # "cat"
-        mock_lemma2 = Mock()
-        mock_lemma2.name.return_value = lemma_names['simple_lemmas'][1]  # "feline"
+        mock_synset = self.mock_factory('MockSynset', 'cat.n.01')
+        mock_lemma1 = self.mock_factory('MockLemma', lemma_names['simple_lemmas'][0])  # "cat"
+        mock_lemma2 = self.mock_factory('MockLemma', lemma_names['simple_lemmas'][1])  # "feline"
         mock_synset.lemmas.return_value = [mock_lemma1, mock_lemma2]
         
         # Create embedding model using config vectors
@@ -60,9 +58,8 @@ class TestEmbeddingHelper(unittest.TestCase):
         lemma_names = self.mock_config.get_test_lemma_names()
         test_vectors = self.mock_config.get_embedding_test_vectors()
         
-        mock_synset = Mock()
-        mock_lemma = Mock()
-        mock_lemma.name.return_value = lemma_names['compound_lemmas'][0]  # "ice_cream"
+        mock_synset = self.mock_factory('MockSynset', 'ice_cream.n.01')
+        mock_lemma = self.mock_factory('MockLemma', lemma_names['compound_lemmas'][0])  # "ice_cream"
         mock_synset.lemmas.return_value = [mock_lemma]
         
         # Use space-separated version from config
@@ -82,9 +79,8 @@ class TestEmbeddingHelper(unittest.TestCase):
         lemma_names = self.mock_config.get_test_lemma_names()
         test_vectors = self.mock_config.get_embedding_test_vectors()
         
-        mock_synset = Mock()
-        mock_lemma = Mock()
-        mock_lemma.name.return_value = lemma_names['compound_lemmas'][0]  # "ice_cream"
+        mock_synset = self.mock_factory('MockSynset', 'ice_cream.n.01')
+        mock_lemma = self.mock_factory('MockLemma', lemma_names['compound_lemmas'][0])  # "ice_cream"
         mock_synset.lemmas.return_value = [mock_lemma]
         
         # Use underscore version from config
@@ -104,9 +100,8 @@ class TestEmbeddingHelper(unittest.TestCase):
         lemma_names = self.mock_config.get_test_lemma_names()
         test_vectors = self.mock_config.get_embedding_test_vectors()
         
-        mock_synset = Mock()
-        mock_lemma = Mock()
-        mock_lemma.name.return_value = lemma_names['compound_lemmas'][1]  # "hot_dog"
+        mock_synset = self.mock_factory('MockSynset', 'hot_dog.n.01')
+        mock_lemma = self.mock_factory('MockLemma', lemma_names['compound_lemmas'][1])  # "hot_dog"
         mock_synset.lemmas.return_value = [mock_lemma]
         
         # Use multi-word vectors from config
@@ -125,9 +120,8 @@ class TestEmbeddingHelper(unittest.TestCase):
         edge_cases = self.mock_config.get_edge_case_test_data()
         invalid_synsets = edge_cases['invalid_synsets']
         
-        mock_synset = Mock()
-        mock_lemma = Mock()
-        mock_lemma.name.return_value = invalid_synsets['nonexistent_synset']  # "fake.n.01"
+        mock_synset = self.mock_factory('MockSynset', 'fake.n.01')
+        mock_lemma = self.mock_factory('MockLemma', invalid_synsets['nonexistent_synset'])  # "fake.n.01"
         mock_synset.lemmas.return_value = [mock_lemma]
         
         mock_model = {}  # Empty model
@@ -139,8 +133,7 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_get_synset_embedding_centroid_exception_handling(self):
         """Test get_synset_embedding_centroid handles exceptions gracefully"""
-        mock_synset = Mock()
-        mock_synset.name.return_value = "test_synset"
+        mock_synset = self.mock_factory('MockSynset', 'test_synset')
         mock_synset.lemmas.side_effect = Exception("Test exception")
         
         mock_model = {}
@@ -158,14 +151,11 @@ class TestEmbeddingHelper(unittest.TestCase):
         synset_names = self.mock_config.get_mock_synset_names()
         relation_types = self.mock_config.get_relation_type_mappings()
         
-        mock_synset = Mock()
-        mock_synset.name.return_value = synset_names['animal_synsets']['cat']  # "cat.n.01"
+        mock_synset = self.mock_factory('MockSynset', synset_names['animal_synsets']['cat'])  # "cat.n.01"
         
         # Mock related synsets using config data
-        mock_hypernym = Mock()
-        mock_hypernym.name.return_value = synset_names['animal_synsets']['animal']  # "animal.n.01"
-        mock_hyponym = Mock()
-        mock_hyponym.name.return_value = synset_names['animal_synsets']['kitten']  # "kitten.n.01"
+        mock_hypernym = self.mock_factory('MockSynset', synset_names['animal_synsets']['animal'])  # "animal.n.01"
+        mock_hyponym = self.mock_factory('MockSynset', synset_names['animal_synsets']['kitten'])  # "kitten.n.01"
         
         # Set up relation methods using config relation types
         mock_synset.hypernyms.return_value = [mock_hypernym]
@@ -203,11 +193,9 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_embed_lexical_relations_empty_centroids_filtered(self):
         """Test embed_lexical_relations filters out empty centroids"""
-        mock_synset = Mock()
-        mock_synset.name.return_value = "test.n.01"
+        mock_synset = self.mock_factory('MockSynset', 'test.n.01')
         
-        mock_related = Mock()
-        mock_related.name.return_value = "related.n.01"
+        mock_related = self.mock_factory('MockSynset', 'related.n.01')
         
         mock_synset.hypernyms.return_value = [mock_related]
         # Set all other relations to empty using config relation types
@@ -234,8 +222,7 @@ class TestEmbeddingHelper(unittest.TestCase):
 
     def test_embed_lexical_relations_exception_handling(self):
         """Test embed_lexical_relations handles exceptions in relation methods"""
-        mock_synset = Mock()
-        mock_synset.name.return_value = "test.n.01"
+        mock_synset = self.mock_factory('MockSynset', 'test.n.01')
         
         # Make hypernyms raise an exception
         mock_synset.hypernyms.side_effect = Exception("Test error")

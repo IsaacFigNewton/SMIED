@@ -98,23 +98,62 @@ class MockSMIEDIntegration(Mock):
         # Mock components for integration testing
         self.mock_nltk = Mock()
         self.mock_spacy = Mock()
-        self.mock_wn = Mock()
-        self.mock_semantic_decomposer = Mock()
+    
+    def create_full_pipeline_mocks(self):
+        """Create complete set of mocks for full pipeline testing."""
+        # Create NLP mock
+        mock_nlp = Mock()
         
-        # Set up NLTK mock
-        self.mock_nltk.download = Mock()
+        # Create decomposer mock
+        mock_decomposer = Mock()
         
-        # Set up spacy mock
-        self.mock_spacy.load = Mock()
+        # Create graph mock with realistic data
+        mock_graph = Mock()
+        mock_graph.number_of_nodes.return_value = 1000
+        mock_graph.number_of_edges.return_value = 5000
+        mock_decomposer.build_synset_graph.return_value = mock_graph
         
-        # Set up WordNet mock
-        self.mock_wn.synsets = Mock(return_value=[])
-        self.mock_wn.NOUN = 'n'
-        self.mock_wn.VERB = 'v'
+        # Create synset mocks
+        mock_synset = Mock()
+        mock_synset.name.return_value = "test.n.01"
+        mock_synset.definition.return_value = "test definition"
         
-        # Set up SemanticDecomposer mock
-        self.mock_semantic_decomposer.build_synset_graph = Mock()
-        self.mock_semantic_decomposer.find_connected_shortest_paths = Mock()
+        # Setup decomposer result
+        mock_decomposer.find_connected_shortest_paths.return_value = (
+            [mock_synset], [mock_synset], mock_synset
+        )
+        
+        # Create WordNet mock
+        mock_wn = Mock()
+        mock_wn.synsets.return_value = [mock_synset]
+        mock_wn.NOUN = 'n'
+        mock_wn.VERB = 'v'
+        
+        # Setup NLTK mock
+        mock_nltk = Mock()
+        mock_nltk.download = Mock()
+        
+        return {
+            'mock_nlp': mock_nlp,
+            'mock_decomposer': mock_decomposer,
+            'mock_graph': mock_graph,
+            'mock_synset': mock_synset,
+            'mock_wn': mock_wn,
+            'mock_nltk': mock_nltk
+        }
+    
+    def setup_integration_patches(self, test_mocks):
+        """Return context managers for patching in integration tests."""
+        from unittest.mock import patch
+        
+        patches = {
+            'nltk': patch('smied.SMIED.nltk', return_value=test_mocks['mock_nltk']),
+            'spacy': patch('spacy.load', return_value=test_mocks['mock_nlp']),
+            'wordnet': patch('smied.SMIED.wn', return_value=test_mocks['mock_wn']),
+            'decomposer': patch('smied.SMIED.SemanticDecomposer', return_value=test_mocks['mock_decomposer']),
+            'print': patch('builtins.print')
+        }
+        return patches
 
 
 class MockNLTK(Mock):

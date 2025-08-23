@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import sys
 import os
 
@@ -51,7 +51,8 @@ class TestGlossParser(unittest.TestCase):
         mock_token2.pos_ = "VERB"
         mock_token2.lemma_ = "run"
         
-        mock_doc.__iter__ = Mock(return_value=iter([mock_token1, mock_token2]))
+        from unittest.mock import Mock
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_token1, mock_token2]))
         mock_doc.noun_chunks = []
         mock_doc.text = "The cat runs"
         
@@ -82,7 +83,8 @@ class TestGlossParser(unittest.TestCase):
         """Test parse_gloss with provided NLP function"""
         mock_nlp = self.mock_factory('MockNLPForGloss')
         mock_doc = self.mock_factory('MockDocForGloss')
-        mock_doc.__iter__ = Mock(return_value=iter([]))
+        from unittest.mock import Mock
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter([]))
         mock_doc.noun_chunks = []
         mock_doc.text = "test"
         mock_nlp.return_value = mock_doc
@@ -174,17 +176,18 @@ class TestGlossParser(unittest.TestCase):
         patterns = self.mock_config.get_dependency_patterns()
         subject_patterns = patterns['subject_patterns']
         
-        mock_token1 = Mock()
+        mock_token1 = self.mock_factory('MockTokenForGloss', "subject1")
         mock_token1.dep_ = subject_patterns[0]  # "nsubj"
         
-        mock_token2 = Mock()
+        mock_token2 = self.mock_factory('MockTokenForGloss', "subject2")
         mock_token2.dep_ = subject_patterns[1]  # "nsubjpass"
         
-        mock_token3 = Mock()
+        mock_token3 = self.mock_factory('MockTokenForGloss', "object")
         mock_token3.dep_ = "obj"
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_token1, mock_token2, mock_token3]))
         
         subjects, passive_subjects = self.parser.extract_subjects_from_gloss(mock_doc)
@@ -200,17 +203,18 @@ class TestGlossParser(unittest.TestCase):
         patterns = self.mock_config.get_dependency_patterns()
         object_patterns = patterns['object_patterns']
         
-        mock_iobj = Mock()
+        mock_iobj = self.mock_factory('MockTokenForGloss', "indirect_object")
         mock_iobj.dep_ = object_patterns[1]  # "iobj"
         
-        mock_dobj = Mock()
+        mock_dobj = self.mock_factory('MockTokenForGloss', "direct_object")
         mock_dobj.dep_ = object_patterns[0]  # "dobj"
         
-        mock_pobj = Mock()
+        mock_pobj = self.mock_factory('MockTokenForGloss', "preposition_object")
         mock_pobj.dep_ = object_patterns[2]  # "pobj"
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_iobj, mock_dobj, mock_pobj]))
         mock_doc.noun_chunks = []
         
@@ -228,14 +232,15 @@ class TestGlossParser(unittest.TestCase):
         patterns = self.mock_config.get_dependency_patterns()
         object_patterns = patterns['object_patterns']
         
-        mock_dobj = Mock()
+        mock_dobj = self.mock_factory('MockTokenForGloss', "direct_object")
         mock_dobj.dep_ = object_patterns[0]  # "dobj"
         
-        mock_pobj = Mock()
+        mock_pobj = self.mock_factory('MockTokenForGloss', "preposition_object")
         mock_pobj.dep_ = object_patterns[2]  # "pobj"
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_dobj, mock_pobj]))
         mock_doc.noun_chunks = []
         
@@ -248,20 +253,22 @@ class TestGlossParser(unittest.TestCase):
 
     def test_extract_objects_noun_chunks_fallback(self):
         """Test object extraction using noun chunks as fallback"""
-        mock_root_verb = Mock()
+        mock_root_verb = self.mock_factory('MockTokenForGloss', "root_verb")
         mock_root_verb.dep_ = "ROOT"
         mock_root_verb.pos_ = "VERB"
         
-        mock_token = Mock()
+        mock_token = self.mock_factory('MockTokenForGloss', "token")
         mock_token.head = mock_root_verb
         
-        mock_chunk = Mock()
+        mock_chunk = self.mock_factory('MockDocForGloss')
         mock_chunk.root = mock_token
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_chunk.__iter__ = Mock(side_effect=lambda: iter([mock_token]))
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_root_verb]))
         mock_doc.noun_chunks = [mock_chunk]
         
@@ -276,19 +283,20 @@ class TestGlossParser(unittest.TestCase):
         pos_mappings = self.mock_config.get_pos_tag_mappings()
         verb_tags = pos_mappings['verbs']
         
-        mock_verb = Mock()
+        mock_verb = self.mock_factory('MockTokenForGloss', "verb")
         mock_verb.pos_ = "VERB"
         
-        mock_participle = Mock()
+        mock_participle = self.mock_factory('MockTokenForGloss', "participle")
         mock_participle.pos_ = "VERB"
         mock_participle.tag_ = verb_tags[3]  # "VBN"
         mock_participle.dep_ = "acl"
         
-        mock_noun = Mock()
+        mock_noun = self.mock_factory('MockTokenForGloss', "noun")
         mock_noun.pos_ = "NOUN"
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_verb, mock_participle, mock_noun]))
         
         verbs = self.parser.extract_verbs_from_gloss(mock_doc, include_passive=True)
@@ -304,16 +312,17 @@ class TestGlossParser(unittest.TestCase):
         pos_mappings = self.mock_config.get_pos_tag_mappings()
         verb_tags = pos_mappings['verbs']
         
-        mock_verb = Mock()
+        mock_verb = self.mock_factory('MockTokenForGloss', "verb")
         mock_verb.pos_ = "VERB"
         
-        mock_participle = Mock()
+        mock_participle = self.mock_factory('MockTokenForGloss', "participle")
         mock_participle.pos_ = "VERB"
         mock_participle.tag_ = verb_tags[3]  # "VBN"
         mock_participle.dep_ = "acl"
         
-        mock_doc = Mock()
-        # Make __iter__ return a new iterator each time it's called  
+        mock_doc = self.mock_factory('MockDocForGloss')
+        # Make __iter__ return a new iterator each time it's called
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(side_effect=lambda: iter([mock_verb, mock_participle]))
         
         verbs = self.parser.extract_verbs_from_gloss(mock_doc, include_passive=False)
@@ -324,19 +333,20 @@ class TestGlossParser(unittest.TestCase):
 
     def test_find_instrumental_verbs(self):
         """Test finding instrumental verbs"""
-        mock_used = Mock()
+        mock_used = self.mock_factory('MockTokenForGloss', "used")
         mock_used.text = "used"
         
-        mock_for_token = Mock()
+        mock_for_token = self.mock_factory('MockTokenForGloss', "for")
         mock_for_token.pos_ = "ADP"
         
-        mock_verb = Mock()
+        mock_verb = self.mock_factory('MockTokenForGloss', "verb")
         mock_verb.pos_ = "VERB"
         
         tokens = [mock_used, mock_for_token, mock_verb]
         
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         mock_doc.text = "This is used for running"
+        from unittest.mock import Mock
         mock_doc.__iter__ = Mock(return_value=iter(tokens))
         mock_doc.__getitem__ = Mock(side_effect=lambda x: tokens[x])
         mock_doc.__len__ = Mock(return_value=3)
@@ -348,7 +358,7 @@ class TestGlossParser(unittest.TestCase):
 
     def test_find_instrumental_verbs_no_used(self):
         """Test finding instrumental verbs when 'used' not present"""
-        mock_doc = Mock()
+        mock_doc = self.mock_factory('MockDocForGloss')
         mock_doc.text = "This is for running"
         
         instrumental_verbs = self.parser.find_instrumental_verbs(mock_doc)
@@ -357,9 +367,9 @@ class TestGlossParser(unittest.TestCase):
 
     def test_get_all_neighbors(self):
         """Test getting all neighbors of a synset"""
-        mock_synset = Mock()
-        mock_neighbor1 = Mock()
-        mock_neighbor2 = Mock()
+        mock_synset = self.mock_factory('MockSynset', 'test.synset.01')
+        mock_neighbor1 = self.mock_factory('MockSynset', 'neighbor1.synset.01')
+        mock_neighbor2 = self.mock_factory('MockSynset', 'neighbor2.synset.01')
         
         mock_synset.hypernyms.return_value = [mock_neighbor1]
         mock_synset.hyponyms.return_value = [mock_neighbor2]
@@ -380,8 +390,8 @@ class TestGlossParser(unittest.TestCase):
 
     def test_get_all_neighbors_exception_handling(self):
         """Test get_all_neighbors with method exceptions"""
-        mock_synset = Mock()
-        mock_neighbor = Mock()
+        mock_synset = self.mock_factory('MockSynset', 'test.synset.01')
+        mock_neighbor = self.mock_factory('MockSynset', 'neighbor.synset.01')
         
         mock_synset.hypernyms.side_effect = Exception("Error")
         mock_synset.hyponyms.return_value = [mock_neighbor]
@@ -406,8 +416,7 @@ class TestGlossParser(unittest.TestCase):
         synset_data = self.mock_config.get_synset_mock_structures()['cat_synset']
         synset_name = synset_data['name']
         
-        mock_synset = Mock()
-        mock_synset.name.return_value = synset_name
+        mock_synset = self.mock_factory('MockSynset', synset_name)
         
         path = self.parser.path_syn_to_syn(mock_synset, mock_synset)
         
@@ -420,12 +429,10 @@ class TestGlossParser(unittest.TestCase):
         cat_data = synset_data['cat_synset']
         run_data = synset_data['run_synset']
         
-        mock_synset1 = Mock()
-        mock_synset1.name.return_value = cat_data['name']
+        mock_synset1 = self.mock_factory('MockSynset', cat_data['name'])
         mock_synset1.pos.return_value = cat_data['pos']
         
-        mock_synset2 = Mock()
-        mock_synset2.name.return_value = run_data['name']
+        mock_synset2 = self.mock_factory('MockSynset', run_data['name'])
         mock_synset2.pos.return_value = run_data['pos']
         
         path = self.parser.path_syn_to_syn(mock_synset1, mock_synset2)
@@ -455,16 +462,13 @@ class TestGlossParser(unittest.TestCase):
         cat_data = synset_data['cat_synset']
         dog_data = synset_data['dog_synset']
         
-        mock_start = Mock()
-        mock_start.name.return_value = cat_data['name']
+        mock_start = self.mock_factory('MockSynset', cat_data['name'])
         mock_start.pos.return_value = cat_data['pos']
         
-        mock_end = Mock()
-        mock_end.name.return_value = dog_data['name']
+        mock_end = self.mock_factory('MockSynset', dog_data['name'])
         mock_end.pos.return_value = dog_data['pos']
         
-        mock_intermediate = Mock()
-        mock_intermediate.name.return_value = "animal.n.01"
+        mock_intermediate = self.mock_factory('MockSynset', 'animal.n.01')
         
         # Set up neighbor relationships based on input synset
         def get_neighbors_side_effect(synset, wn_module=None):
@@ -494,55 +498,29 @@ class TestGlossParserIntegration(unittest.TestCase):
         """Set up with mock NLP for integration testing"""
         self.mock_factory = GlossParserMockFactory()
         self.mock_config = GlossParserMockConfig()
-        self.mock_nlp = Mock()
+        self.integration_mock = self.mock_factory('MockGlossParserIntegration')
+        
+        # Use integration mock NLP
+        self.mock_nlp = self.integration_mock.create_integration_nlp_mock()
         self.parser = GlossParser(nlp_func=self.mock_nlp)
 
     def test_full_parsing_workflow(self):
         """Test complete parsing workflow"""
-        # Get POS and dependency patterns from config
-        pos_mappings = self.mock_config.get_pos_tag_mappings()
-        patterns = self.mock_config.get_dependency_patterns()
-        synset_data = self.mock_config.get_synset_mock_structures()
+        # Setup integration parsing scenario using mock factory
+        scenario = self.integration_mock.setup_integration_parsing_scenario('simple_sentence')
         
-        # Create a realistic mock document
-        mock_token_the = Mock()
-        mock_token_the.dep_ = patterns['determiner_patterns'][0]  # "det"
-        mock_token_the.pos_ = pos_mappings['determiners'][0]  # "DT"
-        mock_token_the.is_punct = False
-        mock_token_the.is_stop = True
+        # Configure parser with scenario NLP
+        self.parser = GlossParser(nlp_func=scenario['nlp'])
         
-        mock_token_cat = Mock()
-        mock_token_cat.dep_ = patterns['subject_patterns'][0]  # "nsubj"
-        mock_token_cat.pos_ = "NOUN"
-        mock_token_cat.is_punct = False
-        mock_token_cat.is_stop = False
-        mock_token_cat.lemma_ = "cat"
-        mock_token_cat.text = "cat"
-        
-        mock_token_runs = Mock()
-        mock_token_runs.dep_ = "ROOT"
-        mock_token_runs.pos_ = "VERB"
-        mock_token_runs.is_punct = False
-        mock_token_runs.is_stop = False
-        mock_token_runs.lemma_ = "run"
-        mock_token_runs.text = "runs"
-        
-        tokens = [mock_token_the, mock_token_cat, mock_token_runs]
-        
-        mock_doc = Mock()
-        mock_doc.__iter__ = Mock(side_effect=lambda: iter(tokens))
-        mock_doc.noun_chunks = []
-        mock_doc.text = "The cat runs"
-        
-        self.mock_nlp.return_value = mock_doc
-        
-        # Mock WordNet responses using config data
+        # Mock WordNet responses using scenario synsets
         with patch('smied.GlossParser.wn.synsets') as mock_synsets:
-            mock_cat_synset = self.mock_factory('MockSynset', synset_data['cat_synset']['name'])
-            mock_run_synset = self.mock_factory('MockSynset', synset_data['run_synset']['name'])
-            mock_synsets.side_effect = [[mock_cat_synset], [mock_run_synset]]
+            # Setup synset returns for each lemma
+            synset_returns = []
+            for synset in scenario['synsets']:
+                synset_returns.append([synset])
+            mock_synsets.side_effect = synset_returns
             
-            result = self.parser.parse_gloss("The cat runs")
+            result = self.parser.parse_gloss(scenario['text'])
             
             self.assertIsNotNone(result)
             self.assertIn('subjects', result)

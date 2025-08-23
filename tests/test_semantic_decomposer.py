@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import networkx as nx
 import sys
 import os
@@ -172,14 +172,16 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_find_predicate_to_object_paths(self):
         """Test _find_predicate_to_object_paths method"""
-        mock_pred_synset = Mock()
-        mock_obj_synset = Mock()
+        # Create a mock WordNet module that can create synsets
+        mock_wn = self.mock_factory('MockWordNetForDecomposer')
+        mock_pred_synset = mock_wn._create_mock_synset('run.v.01')
+        mock_obj_synset = mock_wn._create_mock_synset('park.n.01')
         mock_graph = nx.DiGraph()
         
         # Mock gloss parser
         mock_parsed_gloss = {
-            'objects': [Mock()],
-            'predicates': [Mock()]
+            'objects': [self.mock_factory('MockTokenForDecomposer', 'object')],
+            'predicates': [self.mock_factory('MockTokenForDecomposer', 'predicate')]
         }
         self.decomposer.gloss_parser.parse_gloss.return_value = mock_parsed_gloss
         
@@ -187,7 +189,7 @@ class TestSemanticDecomposer(unittest.TestCase):
              patch.object(self.decomposer, '_find_path_between_synsets') as mock_path, \
              patch.object(self.decomposer, '_explore_hypernym_paths') as mock_hypernyms:
             
-            mock_matches.return_value = [Mock()]
+            mock_matches.return_value = [self.mock_factory('MockPatternMatcher')]
             mock_path.return_value = [mock_pred_synset, mock_obj_synset]
             mock_hypernyms.return_value = []
             
@@ -204,13 +206,14 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_get_best_synset_matches(self):
         """Test _get_best_synset_matches method"""
-        mock_candidate1 = Mock()
+        mock_wn = self.mock_factory('MockWordNetForDecomposer')
+        mock_candidate1 = mock_wn._create_mock_synset('candidate1.n.01')
         mock_candidate1.path_similarity.return_value = 0.8
         
-        mock_candidate2 = Mock()
+        mock_candidate2 = mock_wn._create_mock_synset('candidate2.n.01')
         mock_candidate2.path_similarity.return_value = 0.6
         
-        mock_target = Mock()
+        mock_target = mock_wn._create_mock_synset('target.n.01')
         
         result = self.decomposer._get_best_synset_matches(
             [[mock_candidate1, mock_candidate2]], [mock_target], top_k=2
@@ -225,10 +228,11 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_get_best_synset_matches_no_path_similarity(self):
         """Test _get_best_synset_matches when path_similarity fails"""
-        mock_candidate = Mock()
+        mock_wn = self.mock_factory('MockWordNetForDecomposer')
+        mock_candidate = mock_wn._create_mock_synset('candidate.n.01')
         mock_candidate.path_similarity.side_effect = Exception("No path similarity")
         
-        mock_target = Mock()
+        mock_target = mock_wn._create_mock_synset('target.n.01')
         
         result = self.decomposer._get_best_synset_matches(
             [[mock_candidate]], [mock_target]
@@ -253,7 +257,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         mock_graph.add_node(simple_path['target'])  # "animal.n.01"
         
         with patch('smied.SemanticDecomposer.PairwiseBidirectionalAStar') as mock_pathfinder:
-            mock_instance = Mock()
+            mock_instance = self.mock_factory('MockPairwiseBidirectionalAStar')
             mock_instance.find_paths.return_value = [([synset_names['animal_synsets'][0], simple_path['target']], 1.0)]
             mock_pathfinder.return_value = mock_instance
             
@@ -270,10 +274,10 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_find_path_between_synsets_not_in_graph(self):
         """Test _find_path_between_synsets when synsets not in graph"""
-        mock_src = Mock()
+        mock_src = self.mock_factory('MockWordNetForDecomposer')
         mock_src.name.return_value = "missing.n.01"
         
-        mock_tgt = Mock()
+        mock_tgt = self.mock_factory('MockWordNetForDecomposer')
         mock_tgt.name.return_value = "animal.n.01"
         
         mock_graph = nx.DiGraph()
@@ -287,16 +291,16 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_explore_hypernym_paths(self):
         """Test _explore_hypernym_paths method"""
-        mock_src = Mock()
-        mock_src.hypernyms.return_value = [Mock()]
+        mock_src = self.mock_factory('MockWordNetForDecomposer')
+        mock_src.hypernyms.return_value = [self.mock_factory('MockWordNetForDecomposer')]
         
-        mock_tgt = Mock()
-        mock_tgt.hypernyms.return_value = [Mock()]
+        mock_tgt = self.mock_factory('MockWordNetForDecomposer')
+        mock_tgt.hypernyms.return_value = [self.mock_factory('MockWordNetForDecomposer')]
         
         mock_graph = nx.DiGraph()
         
         with patch.object(self.decomposer, '_find_path_between_synsets') as mock_path:
-            mock_path.return_value = [Mock(), Mock()]
+            mock_path.return_value = [self.mock_factory('MockWordNetForDecomposer'), self.mock_factory('MockWordNetForDecomposer')]
             
             result = self.decomposer._explore_hypernym_paths(
                 [mock_src], [mock_tgt], mock_graph, None, 3, 10, False, 3, 1
@@ -319,7 +323,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         # Get synset names from config
         synset_names = self.mock_config.get_wordnet_synset_names()
         
-        mock_synset1 = Mock()
+        mock_synset1 = self.mock_factory('MockWordNetForDecomposer')
         mock_synset1.name.return_value = synset_names['animal_synsets'][0]  # "cat.n.01"
         mock_synset1.hypernyms.return_value = []
         mock_synset1.hyponyms.return_value = []
@@ -339,7 +343,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         graph_structures = self.mock_config.get_expected_graph_structures()
         simple_taxonomy = graph_structures['simple_taxonomy']
         
-        mock_synset2 = Mock()
+        mock_synset2 = self.mock_factory('MockWordNetForDecomposer')
         mock_synset2.name.return_value = simple_taxonomy['nodes'][4]  # "animal.n.01"
         mock_synset2.hypernyms.return_value = []
         mock_synset2.hyponyms.return_value = [mock_synset1]  # cat is hyponym of animal
@@ -371,6 +375,7 @@ class TestSemanticDecomposer(unittest.TestCase):
     def test_build_synset_graph_holonym_meronym_methods(self):
         """Test that build_synset_graph uses correct holonym/meronym methods"""
         # This test ensures the bug with holonyms() and meronyms() is fixed
+        from unittest.mock import Mock
         mock_synset = Mock(spec=[
             'name', 'hypernyms', 'hyponyms',
             'member_holonyms', 'part_holonyms', 'substance_holonyms',
@@ -420,7 +425,7 @@ class TestSemanticDecomposer(unittest.TestCase):
         synset_names = self.mock_config.get_wordnet_synset_names()
         gloss_data = self.mock_config.get_mock_gloss_parsing_results()
         
-        mock_synset = Mock()
+        mock_synset = self.mock_factory('MockWordNetForDecomposer')
         mock_synset.name.return_value = synset_names['animal_synsets'][0]  # "cat.n.01"
         mock_synset.definition.return_value = gloss_data['cat.n.01']['gloss']
         
@@ -455,13 +460,13 @@ class TestSemanticDecomposer(unittest.TestCase):
 
     def test_show_connected_paths(self):
         """Test show_connected_paths static method"""
-        mock_predicate = Mock()
+        mock_predicate = self.mock_factory('MockTokenForDecomposer', 'predicate')
         mock_predicate.name.return_value = "run.v.01"
         
-        mock_subj = Mock()
+        mock_subj = self.mock_factory('MockTokenForDecomposer', 'subject')
         mock_subj.name.return_value = "cat.n.01"
         
-        mock_obj = Mock()
+        mock_obj = self.mock_factory('MockTokenForDecomposer', 'object')
         mock_obj.name.return_value = "park.n.01"
         
         subject_path = [mock_subj, mock_predicate]
@@ -543,60 +548,27 @@ class TestSemanticDecomposerIntegration(unittest.TestCase):
 
     def test_complex_pathfinding_scenario(self):
         """Test a complex pathfinding scenario with multiple strategies"""
-        # Mock synsets with proper relationships
-        mock_cat = Mock()
-        mock_cat.name.return_value = "cat.n.01"
-        mock_cat.definition.return_value = "a small carnivorous mammal"
+        # Setup pathfinding scenario using integration mock
+        scenario = self.integration_mock.create_pathfinding_scenario('simple_triple')
         
-        mock_run = Mock()
-        mock_run.name.return_value = "run.v.01"
-        mock_run.definition.return_value = "move fast by using legs"
+        # Setup WordNet mock responses using integration mock
+        self.integration_mock.setup_wordnet_mock_responses(self.mock_wn, scenario)
         
-        mock_park = Mock()
-        mock_park.name.return_value = "park.n.01"
-        mock_park.definition.return_value = "a large public garden"
-        
-        # Set up WordNet mock responses
-        self.mock_wn.synsets.side_effect = [
-            [mock_cat],     # cat synsets
-            [mock_run],     # run synsets
-            [mock_park]     # park synsets
-        ]
-        self.mock_wn.NOUN = 'n'
-        self.mock_wn.VERB = 'v'
-        self.mock_wn.synset.side_effect = lambda name: {
-            "cat.n.01": mock_cat,
-            "run.v.01": mock_run,
-            "park.n.01": mock_park
-        }.get(name)
-        
-        # Create graph with connections
-        graph = nx.DiGraph()
-        graph.add_node("cat.n.01")
-        graph.add_node("run.v.01")
-        graph.add_node("park.n.01")
-        graph.add_edge("cat.n.01", "run.v.01")
-        graph.add_edge("run.v.01", "park.n.01")
-        
-        # Mock gloss parsing to return some results
-        mock_gloss_result = {
-            'subjects': [Mock()],
-            'objects': [Mock()],
-            'predicates': [Mock()]
-        }
+        # Mock gloss parsing result using integration mock
+        mock_gloss_result = self.integration_mock.create_mock_gloss_result('basic')
         self.decomposer.gloss_parser.parse_gloss.return_value = mock_gloss_result
         
-        # Mock path finding
+        # Mock path finding using scenario data
         with patch('smied.SemanticDecomposer.PairwiseBidirectionalAStar') as mock_pathfinder:
-            mock_instance = Mock()
-            mock_instance.find_paths.return_value = [(["cat.n.01", "run.v.01"], 1.0)]
+            mock_instance = self.mock_factory('MockPairwiseBidirectionalAStar')
+            mock_instance.find_paths.return_value = scenario['expected_paths']
             mock_pathfinder.return_value = mock_instance
             
             with patch.object(self.decomposer, '_get_best_synset_matches') as mock_matches:
-                mock_matches.return_value = [mock_cat]  # Return matching synsets
+                mock_matches.return_value = [scenario['synsets'][0]]  # Return matching synsets
                 
                 result = self.decomposer.find_connected_shortest_paths(
-                    "cat", "run", "park", g=graph
+                    "cat", "run", "park", g=scenario['graph']
                 )
                 
                 self.assertIsNotNone(result)

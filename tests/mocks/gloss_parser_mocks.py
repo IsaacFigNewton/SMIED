@@ -91,6 +91,105 @@ class MockGlossParserIntegration(Mock):
         # Integration components
         self.real_nlp = MockRealNLPForGloss()
         self.complex_glosses = MockComplexGlosses()
+    
+    def create_integration_tokens(self, token_configs):
+        """Create structured tokens for integration testing.
+        
+        Args:
+            token_configs: List of dicts with token config like:
+                [{'text': 'cat', 'pos_': 'NOUN', 'dep_': 'nsubj', 'lemma_': 'cat'}]
+        """
+        tokens = []
+        for config in token_configs:
+            token = MockTokenForGloss(config.get('text', 'test'))
+            token.pos_ = config.get('pos_', 'NOUN')
+            token.dep_ = config.get('dep_', 'ROOT')
+            token.lemma_ = config.get('lemma_', config.get('text', 'test').lower())
+            token.is_punct = config.get('is_punct', False)
+            token.is_stop = config.get('is_stop', False)
+            tokens.append(token)
+        return tokens
+    
+    def create_integration_document(self, text, tokens):
+        """Create a structured document for integration testing.
+        
+        Args:
+            text: The document text
+            tokens: List of token mocks
+        """
+        mock_doc = MockDocForGloss()
+        mock_doc.text = text
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter(tokens))
+        mock_doc.noun_chunks = []
+        return mock_doc
+    
+    def create_integration_nlp_mock(self):
+        """Create NLP mock for integration testing."""
+        return MockNLPForGloss()
+    
+    def setup_integration_parsing_scenario(self, scenario_name='simple_sentence'):
+        """Setup complete integration parsing scenario.
+        
+        Returns dict with configured nlp, doc, tokens, and synsets.
+        """
+        scenarios = {
+            'simple_sentence': {
+                'text': 'The cat runs',
+                'token_configs': [
+                    {'text': 'The', 'pos_': 'DT', 'dep_': 'det', 'is_stop': True},
+                    {'text': 'cat', 'pos_': 'NOUN', 'dep_': 'nsubj', 'lemma_': 'cat'},
+                    {'text': 'runs', 'pos_': 'VERB', 'dep_': 'ROOT', 'lemma_': 'run'}
+                ],
+                'synsets': [
+                    {'name': 'cat.n.01', 'for_lemma': 'cat'},
+                    {'name': 'run.v.01', 'for_lemma': 'run'}
+                ]
+            },
+            'complex_sentence': {
+                'text': 'The quick brown fox jumps over the lazy dog',
+                'token_configs': [
+                    {'text': 'The', 'pos_': 'DT', 'dep_': 'det', 'is_stop': True},
+                    {'text': 'quick', 'pos_': 'ADJ', 'dep_': 'amod'},
+                    {'text': 'brown', 'pos_': 'ADJ', 'dep_': 'amod'},
+                    {'text': 'fox', 'pos_': 'NOUN', 'dep_': 'nsubj'},
+                    {'text': 'jumps', 'pos_': 'VERB', 'dep_': 'ROOT', 'lemma_': 'jump'},
+                    {'text': 'over', 'pos_': 'ADP', 'dep_': 'prep'},
+                    {'text': 'the', 'pos_': 'DT', 'dep_': 'det', 'is_stop': True},
+                    {'text': 'lazy', 'pos_': 'ADJ', 'dep_': 'amod'},
+                    {'text': 'dog', 'pos_': 'NOUN', 'dep_': 'pobj'}
+                ],
+                'synsets': [
+                    {'name': 'fox.n.01', 'for_lemma': 'fox'},
+                    {'name': 'jump.v.01', 'for_lemma': 'jump'},
+                    {'name': 'dog.n.01', 'for_lemma': 'dog'}
+                ]
+            }
+        }
+        
+        if scenario_name not in scenarios:
+            scenario_name = 'simple_sentence'
+        
+        scenario = scenarios[scenario_name]
+        
+        # Create components
+        tokens = self.create_integration_tokens(scenario['token_configs'])
+        doc = self.create_integration_document(scenario['text'], tokens)
+        nlp = self.create_integration_nlp_mock()
+        nlp.return_value = doc
+        
+        # Create synset mocks
+        synsets = []
+        for synset_config in scenario['synsets']:
+            synset = MockSynsetForGloss(synset_config['name'])
+            synsets.append(synset)
+        
+        return {
+            'nlp': nlp,
+            'doc': doc,
+            'tokens': tokens,
+            'synsets': synsets,
+            'text': scenario['text']
+        }
 
 
 class MockNLPForGloss(Mock):

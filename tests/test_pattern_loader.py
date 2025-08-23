@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open
 import json
 import sys
 import os
@@ -230,7 +230,7 @@ class TestPatternLoader(unittest.TestCase):
     def test_get_default_patterns_success(self, mock_files, mock_patterns):
         """Test _get_default_patterns loads patterns successfully"""
         # Mock the resource file system
-        mock_resource = Mock()
+        mock_resource = self.mock_factory('MockFileSystemForLoader')
         mock_resource.open.return_value.__enter__.return_value.read.return_value = json.dumps({
             "test_pattern": {"description": "test", "pattern": []}
         })

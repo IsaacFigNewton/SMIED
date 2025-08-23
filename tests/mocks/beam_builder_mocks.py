@@ -89,6 +89,63 @@ class MockBeamBuilderIntegration(Mock):
         self.mock_wordnet = MockWordNetModule()
         self.mock_embedding_helper = MockEmbeddingHelper()
         self.mock_nlp = Mock()
+    
+    def create_integration_synset_mocks(self):
+        """Create synset mocks for integration testing."""
+        mock_cat_synset = MockSynsetForBeam("cat.n.01", "feline mammal")
+        mock_dog_synset = MockSynsetForBeam("dog.n.01", "canine mammal")
+        return mock_cat_synset, mock_dog_synset
+    
+    def create_realistic_embedding_model_mock(self):
+        """Create realistic embedding model mock for integration tests."""
+        mock_model = MockEmbeddingModel()
+        mock_model.get_vector.return_value = [0.2, 0.4, 0.6, 0.8, 1.0]
+        mock_model.similarity.return_value = 0.75
+        return mock_model
+    
+    def create_complex_synset_mocks(self):
+        """Create complex synset mocks with more detailed relationships."""
+        mock_cat_synset = MockSynsetForBeam("cat.n.01", "feline mammal")
+        mock_dog_synset = MockSynsetForBeam("dog.n.01", "canine mammal")
+        
+        # Add more realistic relationships
+        mock_animal_synset = MockSynsetForBeam("animal.n.01", "living organism")
+        mock_mammal_synset = MockSynsetForBeam("mammal.n.01", "warm-blooded vertebrate")
+        
+        # Set up hypernyms
+        mock_cat_synset.hypernyms.return_value = [mock_mammal_synset]
+        mock_dog_synset.hypernyms.return_value = [mock_mammal_synset]
+        mock_mammal_synset.hypernyms.return_value = [mock_animal_synset]
+        
+        # Set up hyponyms
+        mock_mammal_synset.hyponyms.return_value = [mock_cat_synset, mock_dog_synset]
+        mock_animal_synset.hyponyms.return_value = [mock_mammal_synset]
+        
+        # Set up similar relationships
+        mock_cat_synset.similar_tos.return_value = [mock_dog_synset]
+        mock_dog_synset.similar_tos.return_value = [mock_cat_synset]
+        
+        return {
+            'cat': mock_cat_synset,
+            'dog': mock_dog_synset,
+            'animal': mock_animal_synset,
+            'mammal': mock_mammal_synset
+        }
+    
+    def setup_patch_side_effects(self, synset_mocks):
+        """Setup side effects for nltk.corpus.wordnet.synset patches."""
+        def synset_side_effect(name):
+            if name == "cat.n.01":
+                return synset_mocks['cat']
+            elif name == "dog.n.01":
+                return synset_mocks['dog']
+            elif name == "animal.n.01":
+                return synset_mocks['animal']
+            elif name == "mammal.n.01":
+                return synset_mocks['mammal']
+            else:
+                return MockSynsetForBeam(name, f"definition for {name}")
+        return synset_side_effect
 
 
 class MockEmbeddingHelper(Mock):

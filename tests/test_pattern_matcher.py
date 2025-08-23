@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import sys
 import os
 
@@ -60,7 +60,7 @@ class TestPatternMatcher(unittest.TestCase):
     def test_initialization_without_pattern_loader(self):
         """Test PatternMatcher initialization without pattern loader"""
         with patch('smied.PatternMatcher.PatternLoader') as mock_pl_class:
-            mock_pl_instance = Mock()
+            mock_pl_instance = self.mock_factory('MockPatternLoaderForPattern')
             mock_pl_class.return_value = mock_pl_instance
             
             matcher = PatternMatcher(semantic_graph=self.mock_semantic_graph)
@@ -356,7 +356,7 @@ class TestPatternMatcher(unittest.TestCase):
         self.pattern_matcher.use_metavertex_matching = False
         
         # Mock NetworkX graph
-        mock_nx_graph = Mock()
+        mock_nx_graph = self.mock_factory('MockNetworkXForPattern')
         mock_nx_graph.nodes.return_value = ["node1", "node2"]
         mock_nx_graph.nodes.__getitem__ = lambda self, node: {"label": node, "pos": "NOUN"}
         mock_nx_graph.neighbors.return_value = []
@@ -380,7 +380,7 @@ class TestPatternMatcher(unittest.TestCase):
         # Even length query should raise error
         query = [{"pos": "NOUN"}, {"pos": "VERB"}]  # Even length
         
-        self.mock_semantic_graph.to_nx.return_value = Mock()
+        self.mock_semantic_graph.to_nx.return_value = self.mock_factory('MockNetworkXForPattern')
         
         with self.assertRaises(ValueError) as context:
             self.pattern_matcher.match_chain(query)
@@ -596,10 +596,11 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures"""
-        self.mock_semantic_graph = Mock()
+        self.mock_factory = PatternMatcherMockFactory()
+        self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {}
         
-        self.mock_pattern_loader = Mock()
+        self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')
         self.mock_pattern_loader.patterns = {}
         
         self.pattern_matcher = PatternMatcher(
@@ -706,8 +707,9 @@ class TestPatternMatcherIntegration(unittest.TestCase):
     
     def setUp(self):
         """Set up realistic test scenario"""
+        self.mock_factory = PatternMatcherMockFactory()
         # Create realistic metavertex structure representing "The cat runs fast"
-        self.mock_semantic_graph = Mock()
+        self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
         self.mock_semantic_graph.metaverts = {
             0: ("The", {"pos": "DET", "text": "The"}),
             1: ("cat", {"pos": "NOUN", "text": "cat"}),
@@ -719,7 +721,7 @@ class TestPatternMatcherIntegration(unittest.TestCase):
         }
         
         # Create realistic patterns
-        self.mock_pattern_loader = Mock()
+        self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')
         self.mock_pattern_loader.patterns = {
             "syntactic": {
                 "noun_phrase": {

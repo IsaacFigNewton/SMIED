@@ -95,6 +95,144 @@ class MockSemanticDecomposerIntegration(Mock):
         self.real_wordnet = MockRealWordNet()
         self.real_graph = MockRealNetworkXGraph()
         self.pathfinder = MockPairwiseBidirectionalAStar()
+    
+    def create_integration_synset_mocks(self, synset_configs):
+        """Create synset mocks for integration testing.
+        
+        Args:
+            synset_configs: List of dicts like:
+                [{'name': 'cat.n.01', 'definition': 'feline mammal'}]
+        """
+        synsets = []
+        for config in synset_configs:
+            mock_synset = Mock()
+            mock_synset.name.return_value = config.get('name', 'test.n.01')
+            mock_synset.definition.return_value = config.get('definition', 'test definition')
+            mock_synset.pos.return_value = config.get('pos', 'n')
+            synsets.append(mock_synset)
+        return synsets
+    
+    def create_integration_graph(self, node_configs, edge_configs):
+        """Create NetworkX graph for integration testing.
+        
+        Args:
+            node_configs: List of node names
+            edge_configs: List of (source, target) tuples
+        """
+        graph = nx.DiGraph()
+        for node in node_configs:
+            graph.add_node(node)
+        for source, target in edge_configs:
+            graph.add_edge(source, target)
+        return graph
+    
+    def create_pathfinding_scenario(self, scenario_name='simple_triple'):
+        """Create complete pathfinding scenario with synsets and graph.
+        
+        Returns dict with synsets, graph, and configuration.
+        """
+        scenarios = {
+            'simple_triple': {
+                'synsets': [
+                    {'name': 'cat.n.01', 'definition': 'a small carnivorous mammal'},
+                    {'name': 'run.v.01', 'definition': 'move fast by using legs'},
+                    {'name': 'park.n.01', 'definition': 'a large public garden'}
+                ],
+                'nodes': ['cat.n.01', 'run.v.01', 'park.n.01'],
+                'edges': [('cat.n.01', 'run.v.01'), ('run.v.01', 'park.n.01')],
+                'expected_paths': [(["cat.n.01", "run.v.01"], 1.0)]
+            },
+            'complex_network': {
+                'synsets': [
+                    {'name': 'cat.n.01', 'definition': 'feline mammal'},
+                    {'name': 'animal.n.01', 'definition': 'living organism'},
+                    {'name': 'run.v.01', 'definition': 'move fast'},
+                    {'name': 'park.n.01', 'definition': 'public garden'},
+                    {'name': 'mammal.n.01', 'definition': 'warm-blooded vertebrate'}
+                ],
+                'nodes': ['cat.n.01', 'animal.n.01', 'run.v.01', 'park.n.01', 'mammal.n.01'],
+                'edges': [
+                    ('cat.n.01', 'mammal.n.01'),
+                    ('mammal.n.01', 'animal.n.01'),
+                    ('animal.n.01', 'run.v.01'),
+                    ('run.v.01', 'park.n.01')
+                ],
+                'expected_paths': [
+                    (["cat.n.01", "mammal.n.01", "animal.n.01", "run.v.01"], 2.0),
+                    (["run.v.01", "park.n.01"], 1.0)
+                ]
+            }
+        }
+        
+        if scenario_name not in scenarios:
+            scenario_name = 'simple_triple'
+        
+        scenario = scenarios[scenario_name]
+        
+        synsets = self.create_integration_synset_mocks(scenario['synsets'])
+        graph = self.create_integration_graph(scenario['nodes'], scenario['edges'])
+        
+        # Create synset name lookup
+        synset_lookup = {}
+        for i, synset in enumerate(synsets):
+            synset_lookup[scenario['synsets'][i]['name']] = synset
+        
+        return {
+            'synsets': synsets,
+            'graph': graph,
+            'synset_lookup': synset_lookup,
+            'expected_paths': scenario['expected_paths'],
+            'scenario_config': scenario
+        }
+    
+    def setup_wordnet_mock_responses(self, wordnet_mock, scenario):
+        """Setup WordNet mock responses for a scenario."""
+        synsets = scenario['synsets']
+        synset_lookup = scenario['synset_lookup']
+        
+        # Setup synsets() calls
+        wordnet_mock.synsets.side_effect = [
+            [synset] for synset in synsets[:3]  # First 3 synsets for subject, predicate, object
+        ]
+        
+        # Setup synset() calls
+        wordnet_mock.synset.side_effect = lambda name: synset_lookup.get(name)
+        
+        # Setup constants
+        wordnet_mock.NOUN = 'n'
+        wordnet_mock.VERB = 'v'
+        
+        return wordnet_mock
+    
+    def create_mock_gloss_result(self, result_type='basic'):
+        """Create mock gloss parsing result."""
+        if result_type == 'basic':
+            return {
+                'subjects': [Mock()],
+                'objects': [Mock()],
+                'predicates': [Mock()],
+                'raw_subjects': ['cat'],
+                'raw_objects': ['park'],
+                'raw_predicates': ['run']
+            }
+        elif result_type == 'empty':
+            return {
+                'subjects': [],
+                'objects': [],
+                'predicates': [],
+                'raw_subjects': [],
+                'raw_objects': [],
+                'raw_predicates': []
+            }
+        else:
+            return {
+                'subjects': [Mock(), Mock()],
+                'objects': [Mock(), Mock()],
+                'predicates': [Mock()],
+                'raw_subjects': ['cat', 'animal'],
+                'raw_objects': ['park', 'place'],
+                'raw_predicates': ['run']
+            }
 
 
 class MockWordNetForDecomposer(Mock):

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 import networkx as nx
 import sys
 import os
@@ -148,8 +148,8 @@ class TestBeamBuilder(unittest.TestCase):
         """Test get_new_beams respects beam_width parameter"""
         mock_graph = self.mock_config.get_basic_test_graph()
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
@@ -165,7 +165,7 @@ class TestBeamBuilder(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             beam_width = 3
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model, beam_width=beam_width
@@ -182,8 +182,8 @@ class TestBeamBuilder(unittest.TestCase):
         """Test get_new_beams returns properly structured results"""
         mock_graph = self.mock_config.get_basic_test_graph()
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
@@ -198,7 +198,7 @@ class TestBeamBuilder(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model
             )
@@ -223,9 +223,9 @@ class TestBeamBuilder(unittest.TestCase):
         """Test get_new_beams calls embedding helper methods with correct parameters"""
         mock_graph = self.mock_config.get_basic_test_graph()
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
-        mock_model = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
+        mock_model = self.mock_factory('MockEmbeddingModel')
         
         embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
@@ -280,8 +280,8 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         mock_graph.add_node("cat.n.01")
         mock_graph.add_node("dog.n.01")
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         embeddings = self.mock_config.get_empty_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
@@ -292,7 +292,7 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model, beam_width=0
             )
@@ -304,8 +304,8 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         """Test get_new_beams when multiple pairs have identical scores"""
         mock_graph = self.mock_config.get_basic_test_graph()
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         embeddings = self.mock_config.get_basic_test_embeddings()
         self.mock_embedding_helper.embed_lexical_relations.side_effect = [
@@ -321,7 +321,7 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             result = self.beam_builder.get_new_beams(
                 mock_graph, "cat.n.01", "dog.n.01", mock_model, beam_width=2
             )
@@ -336,8 +336,8 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         """Test get_new_beams when only some embeddings fail validation"""
         mock_graph = self.mock_config.get_partial_neighbor_validation_graph()
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
         
         # Get embeddings that will cause partial validation error
         embeddings = self.mock_config.get_partial_neighbor_embeddings()
@@ -348,7 +348,7 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            mock_model = self.mock_factory('MockEmbeddingModel')
             with self.assertRaises(ValueError) as context:
                 self.beam_builder.get_new_beams(
                     mock_graph, "cat.n.01", "dog.n.01", mock_model
@@ -389,14 +389,14 @@ class TestBeamBuilderIntegration(unittest.TestCase):
             pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
-        # Mock synsets
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        # Use synset mocks from integration mock
+        mock_cat_synset, mock_dog_synset = self.integration_mock.create_integration_synset_mocks()
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
             mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
             
-            mock_model = Mock()
+            # Use embedding model mock from integration mock
+            mock_model = self.integration_mock.create_realistic_embedding_model_mock()
             result = self.beam_builder.get_new_beams(
                 graph, "cat.n.01", "dog.n.01", mock_model, beam_width=5
             )
@@ -423,13 +423,17 @@ class TestBeamBuilderIntegration(unittest.TestCase):
             pairs['asymm_pairs'], pairs['symm_pairs']
         ]
         
-        mock_cat_synset = Mock()
-        mock_dog_synset = Mock()
+        # Use complex synset mocks from integration mock
+        synset_mocks = self.integration_mock.create_complex_synset_mocks()
+        mock_cat_synset = synset_mocks['cat']
+        mock_dog_synset = synset_mocks['dog']
         
         with patch('nltk.corpus.wordnet.synset') as mock_synset:
-            mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
+            # Use setup_patch_side_effects from integration mock
+            mock_synset.side_effect = self.integration_mock.setup_patch_side_effects(synset_mocks)
             
-            mock_model = Mock()
+            # Use embedding model mock from integration mock
+            mock_model = self.integration_mock.create_realistic_embedding_model_mock()
             result = self.beam_builder.get_new_beams(
                 graph, "cat.n.01", "dog.n.01", mock_model, beam_width=3
             )
