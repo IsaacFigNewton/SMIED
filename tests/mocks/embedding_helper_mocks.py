@@ -6,6 +6,17 @@ from unittest.mock import Mock
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 
+# Import mock classes from other modules
+from .smied_mocks import MockSynset
+
+
+class MockLemma(Mock):
+    """Mock lemma for EmbeddingHelper tests."""
+    
+    def __init__(self, lemma_name="test", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.name = Mock(return_value=lemma_name)
+
 
 class EmbeddingHelperMockFactory:
     """Factory class for creating EmbeddingHelper mock instances."""
@@ -24,6 +35,8 @@ class EmbeddingHelperMockFactory:
             'MockClusterResult': MockClusterResult,
             'MockSimilarityMatrix': MockSimilarityMatrix,
             'MockDimensionReducer': MockDimensionReducer,
+            'MockSynset': MockSynset,
+            'MockLemma': MockLemma,
         }
     
     def __call__(self, mock_name: str, *args, **kwargs) -> Mock:
