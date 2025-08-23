@@ -22,6 +22,9 @@ class GlossParserMockFactory:
             'MockRealNLPForGloss': MockRealNLPForGloss,
             'MockComplexDoc': MockComplexDoc,
             'MockComplexGlosses': MockComplexGlosses,
+            # Common cross-factory mock types
+            'MockSynset': MockSynsetForGloss,
+            'MockLemma': MockLemmaForGloss,
         }
     
     def __call__(self, mock_name: str, *args, **kwargs) -> Mock:
@@ -203,3 +206,55 @@ class MockComplexGlosses(Mock):
         self.simple_gloss = "a small furry animal"
         self.complex_gloss = "a carnivorous mammal with retractile claws that hunts small prey"
         self.technical_gloss = "a member of the family Felidae characterized by specific morphological features"
+
+
+class MockSynsetForGloss(Mock):
+    """Mock synset for GlossParser tests."""
+    
+    def __init__(self, synset_name="test.n.01", definition="test definition", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._name = synset_name
+        self.definition_ = definition
+        
+        # Mock common synset methods - avoid circular references by using simple mocks
+        self.name = Mock(return_value=synset_name)
+        self.definition = Mock(return_value=definition)
+        
+        # Create simple lemma mock to avoid circular reference
+        simple_lemma = Mock()
+        simple_lemma.name = Mock(return_value="test")
+        simple_lemma.key = Mock(return_value=f"test.n.01.{synset_name}")
+        simple_lemma.count = Mock(return_value=1)
+        self.lemmas = Mock(return_value=[simple_lemma])
+        
+        self.pos = Mock(return_value=synset_name.split('.')[1][0] if '.' in synset_name else 'n')
+        
+        # Mock synset relationships
+        self.hypernyms = Mock(return_value=[])
+        self.hyponyms = Mock(return_value=[])
+        self.holonyms = Mock(return_value=[])
+        self.meronyms = Mock(return_value=[])
+
+
+class MockLemmaForGloss(Mock):
+    """Mock lemma for GlossParser tests."""
+    
+    def __init__(self, lemma_name="test", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._lemma_name = lemma_name
+        
+        # Mock lemma methods and properties - avoid circular reference
+        self.name = Mock(return_value=lemma_name)
+        
+        # Create simple synset mock to avoid circular reference
+        simple_synset = Mock()
+        simple_synset.name = Mock(return_value=f"{lemma_name}.n.01")
+        simple_synset.definition = Mock(return_value="test definition")
+        self.synset = Mock(return_value=simple_synset)
+        
+        self.antonyms = Mock(return_value=[])
+        self.derivationally_related_forms = Mock(return_value=[])
+        
+        # Common properties
+        self.key = Mock(return_value=f"{lemma_name}.n.01.test")
+        self.count = Mock(return_value=1)

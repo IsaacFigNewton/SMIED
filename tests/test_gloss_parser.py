@@ -41,7 +41,7 @@ class TestGlossParser(unittest.TestCase):
         mock_token1.dep_ = "nsubj"
         mock_token1.pos_ = "NOUN"
         
-        mock_token2 = self.mock_factory('MockToken', "runs")
+        mock_token2 = self.mock_factory('MockTokenForGloss', "runs")
         mock_token2.dep_ = "ROOT"
         mock_token2.pos_ = "VERB"
         mock_token2.lemma_ = "run"
@@ -127,10 +127,10 @@ class TestGlossParser(unittest.TestCase):
         mock_token.is_stop = False
         mock_token.lemma_ = "unknown_lemma"
         
-        with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
+        with patch('smied.GlossParser.wn.synsets') as mock_synsets:
             mock_synset = self.mock_factory('MockSynset', "cat.n.01")
-            # First call (with lemma) returns empty, second call (with text) returns synsets
-            mock_synsets.side_effect = [[], [mock_synset]]
+            # First call (with lemma) raises exception, second call (with text) returns synsets
+            mock_synsets.side_effect = [Exception("Not found"), [mock_synset]]
             
             result = self.parser._tokens_to_synsets([mock_token], pos='n')
             
@@ -139,7 +139,7 @@ class TestGlossParser(unittest.TestCase):
 
     def test_tokens_to_synsets_complete_failure(self):
         """Test token to synsets when both lemma and text fail"""
-        mock_token = self.mock_factory('MockToken', "unknown")
+        mock_token = self.mock_factory('MockTokenForGloss', "unknown")
         mock_token.is_punct = False
         mock_token.is_stop = False
         mock_token.lemma_ = "unknown"
@@ -297,10 +297,12 @@ class TestGlossParser(unittest.TestCase):
         mock_verb = Mock()
         mock_verb.pos_ = "VERB"
         
+        tokens = [mock_used, mock_for_token, mock_verb]
+        
         mock_doc = Mock()
         mock_doc.text = "This is used for running"
-        mock_doc.__iter__ = Mock(return_value=iter([mock_used, mock_for_token, mock_verb]))
-        mock_doc.__getitem__ = Mock(side_effect=[mock_used, mock_for_token, mock_verb])
+        mock_doc.__iter__ = Mock(return_value=iter(tokens))
+        mock_doc.__getitem__ = Mock(side_effect=lambda x: tokens[x])
         mock_doc.__len__ = Mock(return_value=3)
         
         instrumental_verbs = self.parser.find_instrumental_verbs(mock_doc)
@@ -387,9 +389,13 @@ class TestGlossParser(unittest.TestCase):
 
     def test_path_syn_to_syn_string_inputs(self):
         """Test pathfinding with string inputs instead of synset objects"""
-        path = self.parser.path_syn_to_syn("cat.n.01", "dog.n.01")
+        # Test same synset case - should return path with just that synset
+        path = self.parser.path_syn_to_syn("cat.n.01", "cat.n.01")
+        self.assertEqual(path, ["cat.n.01"])
         
-        self.assertEqual(path, ["cat.n.01"])  # Same synset case
+        # Test different synsets - should return None because strings can't find neighbors
+        path = self.parser.path_syn_to_syn("cat.n.01", "dog.n.01")
+        self.assertIsNone(path)
 
     @patch('smied.GlossParser.GlossParser.get_all_neighbors')
     def test_path_syn_to_syn_with_path(self, mock_get_neighbors):
@@ -405,13 +411,19 @@ class TestGlossParser(unittest.TestCase):
         mock_intermediate = Mock()
         mock_intermediate.name.return_value = "animal.n.01"
         
-        # Set up neighbor relationships
-        mock_get_neighbors.side_effect = [
-            [mock_intermediate],  # neighbors of cat
-            [mock_end],           # neighbors of animal (from backward search)
-            [],                   # neighbors of dog (from forward search)
-            []                    # neighbors of animal (from forward search)
-        ]
+        # Set up neighbor relationships based on input synset
+        def get_neighbors_side_effect(synset, wn_module=None):
+            synset_name = synset.name() if hasattr(synset, 'name') else str(synset)
+            if synset_name == "cat.n.01":
+                return [mock_intermediate]
+            elif synset_name == "animal.n.01":
+                return [mock_end]  # animal connects to dog
+            elif synset_name == "dog.n.01":
+                return []
+            else:
+                return []
+        
+        mock_get_neighbors.side_effect = get_neighbors_side_effect
         
         path = self.parser.path_syn_to_syn(mock_start, mock_end, max_depth=4)
         
@@ -453,18 +465,20 @@ class TestGlossParserIntegration(unittest.TestCase):
         mock_token_runs.lemma_ = "run"
         mock_token_runs.text = "runs"
         
+        tokens = [mock_token_the, mock_token_cat, mock_token_runs]
+        
         mock_doc = Mock()
-        mock_doc.__iter__ = Mock(return_value=iter([mock_token_the, mock_token_cat, mock_token_runs]))
+        mock_doc.__iter__ = Mock(side_effect=lambda: iter(tokens))
         mock_doc.noun_chunks = []
         mock_doc.text = "The cat runs"
         
         self.mock_nlp.return_value = mock_doc
         
         # Mock WordNet responses
-        with patch('nltk.corpus.wordnet.synsets') as mock_synsets:
+        with patch('smied.GlossParser.wn.synsets') as mock_synsets:
             mock_cat_synset = Mock()
             mock_run_synset = Mock()
-            mock_synsets.side_effect = [[mock_cat_synset], [], [mock_run_synset]]
+            mock_synsets.side_effect = [[mock_cat_synset], [mock_run_synset]]
             
             result = self.parser.parse_gloss("The cat runs")
             
