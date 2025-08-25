@@ -41,7 +41,6 @@ class PairwiseBidirectionalAStar:
         src: SynsetName,
         tgt: SynsetName,
         get_new_beams_fn: Optional[GetNewBeamsFn] = None,
-        gloss_seed_nodes: Optional[Iterable[SynsetName]] = None,
         beam_width: int = 10,  # Optimized: increased from 3 to 10
         max_depth: int = 10,   # Optimized: increased from 6 to 10
         relax_beam: bool = True,  # Optimized: changed from False to True
@@ -53,7 +52,6 @@ class PairwiseBidirectionalAStar:
           g: nx.DiGraph — graph of synsets (nodes as synset names).
           src, tgt: synset node ids (strings).
           get_new_beams_fn: function to produce embedding-based beam pairs (optional).
-          gloss_seed_nodes: explicit list of synset names seeded from glosses (optional).
           beam_width: beam width for initial seeding (optimized default: 10).
           max_depth: maximum hops allowed per side (optimized default: 10).
           relax_beam: if True, allow exploring nodes outside the allowed beams (optimized default: True).
@@ -64,7 +62,6 @@ class PairwiseBidirectionalAStar:
         self.src = src
         self.tgt = tgt
         self.get_new_beams_fn = get_new_beams_fn
-        self.gloss_seed_nodes = set(gloss_seed_nodes) if gloss_seed_nodes else set()
         self.beam_width = beam_width
         self.max_depth = max_depth
         self.relax_beam = relax_beam
@@ -93,14 +90,6 @@ class PairwiseBidirectionalAStar:
     # -------------------------
     # WordNet Distance Estimation for Hybrid Heuristic
     # -------------------------
-    def _different_pos(self, synset1_name: SynsetName, synset2_name: SynsetName) -> bool:
-        """Check if two synsets have different parts of speech."""
-        try:
-            syn1 = wn.synset(synset1_name)
-            syn2 = wn.synset(synset2_name)
-            return syn1.pos() != syn2.pos()
-        except Exception:
-            return False
 
     def _estimate_wordnet_hops(self, current: SynsetName, target: SynsetName) -> float:
         """
@@ -126,7 +115,7 @@ class PairwiseBidirectionalAStar:
                 return max(1.0, estimated_distance)
             
             # Fallback for different POS or unrelated synsets
-            if self._different_pos(current, target):
+            if wn.synset(current).pos() != wn.synset(target).pos():
                 return 8.0  # Higher cost for cross-POS connections
             else:
                 return 6.0  # Default distance within same POS
@@ -166,7 +155,7 @@ class PairwiseBidirectionalAStar:
             # Hybrid heuristic combining embedding and WordNet distance
             embedding_sim = self._get_embedding_similarity(current, target)
             wordnet_distance = self._estimate_wordnet_hops(current, target)
-            cross_pos_penalty = 0.2 if self._different_pos(current, target) else 0.0
+            cross_pos_penalty = 0.2 if (wn.synset(current).pos() != wn.synset(target).pos()) else 0.0
             
             # Balanced combination (70% embedding, 30% WordNet)
             h = (1 - embedding_sim) * 0.7 + wordnet_distance * 0.3 + cross_pos_penalty
@@ -203,12 +192,6 @@ class PairwiseBidirectionalAStar:
         self.src_allowed.add(self.src)
         self.tgt_allowed.add(self.tgt)
 
-        # Include explicit gloss seeds in allowed sets (boost their priority)
-        for node in self.gloss_seed_nodes:
-            # you may want to add heuristics only to one side depending on how seeds were created.
-            self.src_allowed.add(node)
-            self.tgt_allowed.add(node)
-
         # Build heuristics using the new hybrid system
         self.h_forward = {}
         self.h_backward = {}
@@ -237,19 +220,6 @@ class PairwiseBidirectionalAStar:
                     self.h_forward[s_node] = min(self.h_forward[s_node], h_val)
                 if t_node in self.h_backward:
                     self.h_backward[t_node] = min(self.h_backward[t_node], h_val)
-
-        # Apply gloss bonus: reduce heuristic for gloss seeds (they look more promising)
-        for node in self.gloss_seed_nodes:
-            # subtract GLOSS_BONUS but keep >= 0
-            if node in self.h_forward:
-                self.h_forward[node] = max(0.0, self.h_forward[node] - self.GLOSS_BONUS)
-            else:
-                self.h_forward[node] = max(0.0, 0.5 - self.GLOSS_BONUS)  # default h=0.5 if not in beams
-
-            if node in self.h_backward:
-                self.h_backward[node] = max(0.0, self.h_backward[node] - self.GLOSS_BONUS)
-            else:
-                self.h_backward[node] = max(0.0, 0.5 - self.GLOSS_BONUS)
 
     # -------------------------
     # Initialization of queues
@@ -280,10 +250,18 @@ class PairwiseBidirectionalAStar:
             return 1.0
 
     def _allowed_forward(self, node: SynsetName) -> bool:
-        return self.relax_beam or node in self.src_allowed or node in self.tgt_allowed or node == self.tgt or node == self.src
+        return self.relax_beam\
+            or node in self.src_allowed\
+                or node in self.tgt_allowed\
+                    or node == self.tgt\
+                        or node == self.src
 
     def _allowed_backward(self, node: SynsetName) -> bool:
-        return self.relax_beam or node in self.tgt_allowed or node in self.src_allowed or node == self.src or node == self.tgt
+        return self.relax_beam\
+            or node in self.tgt_allowed\
+                or node in self.src_allowed\
+                    or node == self.src\
+                        or node == self.tgt
 
     # -------------------------
     # Expand one node from forward/back

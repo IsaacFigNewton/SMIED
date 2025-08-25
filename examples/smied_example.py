@@ -42,7 +42,7 @@ def main():
     result = pipeline.analyze_triple(
         subject="cat",
         predicate="chase",
-        object="hole",
+        object="mouse",
         verbose=True
     )
     

@@ -1075,20 +1075,29 @@ class SemanticDecomposer:
         frame = self.framenet_srl.frame_cache[frame_name]
         
         # Get frame elements that typically correspond to subjects (Agent, Experiencer, etc.)
-        subject_fe_names = {
-            'Agent', 'Experiencer', 'Cognizer', 'Speaker', 'Protagonist', 
-            'Actor', 'Performer', 'Causer', 'Entity', 'Theme'  # Theme can be subject in passive constructions
+        subject_fe_to_synset = {
+            "Agent": "agent.n.01",          # a representative who acts on behalf of others
+            "Experiencer": "experiencer.n.01",  # an entity that experiences
+            "Cognizer": "thinker.n.01",     # someone who exercises the mind
+            "Speaker": "speaker.n.01",      # someone who expresses in language
+            "Protagonist": "protagonist.n.01",  # the principal character in a work of fiction
+            "Actor": "actor.n.01",          # a theatrical performer
+            "Performer": "performer.n.01",  # a person who performs in a show
+            "Causer": "cause.n.01",         # events responsible for a result
+            "Entity": "entity.n.01",        # that which is perceived or known to have its own distinct existence
+            "Theme": "theme.n.03",          # the subject matter of a conversation or discussion
         }
+
         
         # For each subject synset, try to connect through frame elements
         for subj_synset in subject_synsets:
             # Try to find semantic connections via frame roles
-            for fe_name in subject_fe_names:
+            for fe_name, fe_synset in subject_fe_to_synset.items():
                 if fe_name in frame.FE:
                     # Create a conceptual connection through semantic frame role
-                    if g is not None and subj_synset.name() in g and predicate_synset.name() in g:
+                    if g is not None and subj_synset.name() in g and fe_synset in g:
                         path = self._find_path_between_synsets(
-                            subj_synset, predicate_synset, g, get_new_beams_fn,
+                            subj_synset, wn.synset(fe_synset), g, get_new_beams_fn,
                             beam_width, max_depth, relax_beam, max_results_per_pair, len_tolerance
                         )
                         if path:
