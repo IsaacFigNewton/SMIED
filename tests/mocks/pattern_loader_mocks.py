@@ -59,30 +59,20 @@ class MockPatternLoader(Mock):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Initialize loader components
-        self.patterns = []
+        # Initialize loader components - use actual PatternLoader structure
+        self.patterns = {}
         self.file_cache = {}
-        self.validation_rules = MockValidationRules()
         
-        # Set up methods
-        self.load_patterns = Mock(return_value=[])
-        self.load_from_file = Mock(return_value=[])
-        self.load_from_directory = Mock(return_value=[])
-        self.load_from_string = Mock(return_value=[])
-        self.save_patterns = Mock()
-        self.save_to_file = Mock()
-        
-        # Pattern management
+        # Set up core methods to match actual PatternLoader interface
+        self.load_patterns_from_file = Mock()
+        self.save_patterns_to_file = Mock()
+        self.json_to_pattern = Mock()
+        self.pattern_to_json = Mock(return_value={})
         self.add_pattern = Mock()
-        self.remove_pattern = Mock()
-        self.get_pattern = Mock(return_value=None)
-        self.get_all_patterns = Mock(return_value=[])
-        self.clear_patterns = Mock()
+        self._get_default_patterns = Mock(return_value={})
         
-        # Validation and parsing
-        self.validate_pattern = Mock(return_value=True)
-        self.parse_pattern = Mock(return_value=MockPatternForLoader())
-        self.serialize_pattern = Mock(return_value="")
+        # String representation
+        self.__str__ = Mock(return_value='{}')
 
 
 class MockPatternLoaderEdgeCases(AbstractEdgeCaseMock):
@@ -138,29 +128,26 @@ class MockPatternLoaderIntegration(Mock):
 
 
 class MockPatternForLoader(Mock):
-    """Mock pattern object for PatternLoader."""
+    """Mock pattern structure for PatternLoader testing."""
     
-    def __init__(self, name="test_pattern", *args, **kwargs):
+    def __init__(self, pattern_data=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = name
-        self.version = "1.0"
-        self.description = "Test pattern"
-        self.author = "test_author"
-        self.created_date = "2023-01-01"
-        self.modified_date = "2023-01-01"
+        # Match the actual pattern structure used by PatternLoader
+        if pattern_data is None:
+            pattern_data = {
+                "description": "Test pattern",
+                "pattern": [
+                    {"pos": {"NOUN"}, "text": "test"},
+                    {"relation": {"subject"}}
+                ]
+            }
         
-        # Pattern structure
-        self.vertices = []
-        self.edges = []
-        self.constraints = []
-        self.parameters = {}
-        self.metadata = {}
+        self.description = pattern_data.get("description", "")
+        self.pattern = pattern_data.get("pattern", [])
         
-        # Pattern methods
-        self.to_dict = Mock(return_value={})
-        self.from_dict = Mock()
+        # Methods for pattern manipulation
+        self.to_dict = Mock(return_value=pattern_data)
         self.validate = Mock(return_value=True)
-        self.clone = Mock(return_value=Mock())
 
 
 class MockValidationRules(Mock):
@@ -168,16 +155,15 @@ class MockValidationRules(Mock):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Validation rules
-        self.required_fields = ["name", "vertices", "edges"]
-        self.optional_fields = ["description", "constraints", "metadata"]
+        # Validation rules that match PatternLoader's actual structure
+        self.required_fields = ["description", "pattern"]
+        self.optional_fields = ["metadata", "category"]
+        self.convertible_keys = ["pos", "root_type", "labels", "relation_type", "relation", "text", "dep", "ent_type"]
         
         # Validation methods
-        self.validate_structure = Mock(return_value=True)
-        self.validate_vertices = Mock(return_value=True)
-        self.validate_edges = Mock(return_value=True)
-        self.validate_constraints = Mock(return_value=True)
-        self.validate_metadata = Mock(return_value=True)
+        self.validate_pattern_structure = Mock(return_value=True)
+        self.validate_pattern_keys = Mock(return_value=True)
+        self.validate_json_format = Mock(return_value=True)
 
 
 class MockFileSystemForLoader(Mock):

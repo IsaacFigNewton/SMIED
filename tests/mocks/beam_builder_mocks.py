@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from tests.mocks.base.nlp_doc_mock import AbstractNLPDocMock
 from tests.mocks.base.nlp_token_mock import AbstractNLPTokenMock
 from tests.mocks.base.nlp_function_mock import AbstractNLPFunctionMock
+from tests.mocks.base.entity_mock import AbstractEntityMock, EntityType
 
 
 
@@ -177,31 +178,118 @@ class MockWordNetModule(Mock):
         self.mock_dog_synset = MockSynsetForBeam("dog.n.01", "canine mammal")
 
 
-class MockSynsetForBeam(Mock):
+class MockSynsetForBeam(AbstractEntityMock):
     """Mock synset specifically for BeamBuilder tests."""
     
     def __init__(self, name="test.n.01", definition="test definition", *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        # Initialize as a SYNSET entity type
+        super().__init__(
+            entity_id=name, 
+            entity_type=EntityType.SYNSET,
+            *args, **kwargs
+        )
         self._name = name
         self._definition = definition
         
-        # Mock synset methods
+        # Set entity-specific attributes
         self.name = Mock(return_value=name)
         self.definition = Mock(return_value=definition)
+        self.label = name  # Use synset name as label
+        self.description = definition
+        
+        # Mock synset methods
         self.pos = Mock(return_value="n")
         self.examples = Mock(return_value=["example"])
         self.lemmas = Mock(return_value=[Mock(name=Mock(return_value="test"))])
         
-        # Relations
+        # Relations - using the entity relationship framework
         self.hypernyms = Mock(return_value=[])
         self.hyponyms = Mock(return_value=[])
         self.similar_tos = Mock(return_value=[])
         self.also_sees = Mock(return_value=[])
         
+        # Set up relationship types for synsets
+        self._setup_synset_relationships()
+        
         # Similarity methods
         self.path_similarity = Mock(return_value=0.5)
         self.wup_similarity = Mock(return_value=0.8)
         self.lch_similarity = Mock(return_value=2.5)
+    
+    def _setup_synset_relationships(self):
+        """Set up synset-specific relationship types."""
+        # Initialize relationship dictionaries for WordNet relation types
+        synset_relation_types = [
+            'hypernyms', 'hyponyms', 'part_holonyms', 'part_meronyms',
+            'member_holonyms', 'member_meronyms', 'substance_holonyms',
+            'substance_meronyms', 'similar_tos', 'also_sees', 'verb_groups',
+            'entailments', 'causes'
+        ]
+        
+        for relation_type in synset_relation_types:
+            self.incoming_relations[relation_type] = set()
+            self.outgoing_relations[relation_type] = set()
+    
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute that identifies this synset."""
+        return self._name
+    
+    def validate_entity(self) -> bool:
+        """Validate that the synset is consistent and valid."""
+        # Check basic attributes
+        if not self._name:
+            self.validation_errors.append("Synset name cannot be empty")
+            return False
+        
+        # Check synset name format (should be like "word.pos.num")
+        parts = self._name.split('.')
+        if len(parts) != 3:
+            self.validation_errors.append(f"Invalid synset name format: {self._name}")
+            return False
+        
+        # Check POS tag consistency
+        pos_from_name = parts[1]
+        if hasattr(self.pos, 'return_value') and self.pos.return_value:
+            if pos_from_name != self.pos.return_value:
+                self.validation_errors.append(
+                    f"POS mismatch: name has {pos_from_name}, pos() returns {self.pos.return_value}"
+                )
+                return False
+        
+        return True
+    
+    def get_entity_signature(self) -> str:
+        """Get a unique signature for this synset."""
+        return f"{self.entity_type.value}:{self.id}:{self._name}:{self._definition[:50]}"
+    
+    def add_synset_relation(self, relation_type: str, target_synset: 'MockSynsetForBeam', bidirectional: bool = False):
+        """
+        Add a relation to another synset.
+        
+        Args:
+            relation_type: Type of relation (e.g., 'hypernyms', 'hyponyms')
+            target_synset: Target synset for the relation
+            bidirectional: Whether to add the reverse relation automatically
+        """
+        # Add to outgoing relations
+        if relation_type not in self.outgoing_relations:
+            self.outgoing_relations[relation_type] = set()
+        self.outgoing_relations[relation_type].add(target_synset)
+        
+        # Add to target's incoming relations
+        if relation_type not in target_synset.incoming_relations:
+            target_synset.incoming_relations[relation_type] = set()
+        target_synset.incoming_relations[relation_type].add(self)
+        
+        # Set up method mocks to return related synsets
+        if hasattr(self, relation_type):
+            current_relations = getattr(self, relation_type).return_value or []
+            updated_relations = list(current_relations) + [target_synset]
+            getattr(self, relation_type).return_value = updated_relations
+        
+        # Handle bidirectional relationships
+        if bidirectional:
+            target_synset.add_synset_relation(relation_type, self, bidirectional=False)
 
 
 class MockEmbeddingModel(Mock):

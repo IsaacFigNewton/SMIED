@@ -31,7 +31,7 @@ def main():
         embedding_model=w2v_model,  # Can add embedding model for better similarity
         auto_download=True,  # Automatically download required NLTK data,
         build_graph_on_init=True,  # Build semantic graph on initialization
-        verbosity=2  # Enable verbose output
+        verbosity=1  # Enable verbose output
     )
     
     # Example 1: Analyze a triple
@@ -42,7 +42,7 @@ def main():
     result = pipeline.analyze_triple(
         subject="cat",
         predicate="chase",
-        object="mouse",
+        object="hole",
         verbose=True
     )
     

@@ -4,7 +4,11 @@ Configuration class containing mock constants and test data for PairwiseBidirect
 
 
 class PairwiseBidirectionalAStarMockConfig:
-    """Configuration class containing mock constants and test data for PairwiseBidirectionalAStar tests."""
+    """Configuration class containing mock constants and test data for PairwiseBidirectionalAStar tests.
+    
+    This class follows the SMIED Testing Framework Design Specifications by providing
+    centralized test data management with static methods for different test scenarios.
+    """
     
     @staticmethod
     def get_basic_graph_structures():
@@ -383,5 +387,252 @@ class PairwiseBidirectionalAStarMockConfig:
                 'expansion_factor': 1.5,
                 'max_width': 15,
                 'description': 'Dynamically adjusting beam'
+            }
+        }
+    
+    @staticmethod
+    def get_heuristic_type_configurations():
+        """Get heuristic type configurations from implementation."""
+        return {
+            'uniform': {
+                'description': 'Uniform heuristic (constant value)',
+                'expected_value': 1.0,
+                'use_case': 'baseline_testing'
+            },
+            'wordnet': {
+                'description': 'WordNet path-based heuristic',
+                'dependencies': ['nltk', 'wordnet'],
+                'expected_range': (1.0, 10.0),
+                'use_case': 'taxonomic_similarity'
+            },
+            'embedding': {
+                'description': 'Embedding-based similarity heuristic',
+                'dependencies': ['embedding_helper'],
+                'expected_range': (0.0, 1.0),
+                'use_case': 'semantic_similarity'
+            },
+            'hybrid': {
+                'description': 'Combined WordNet and embedding heuristic',
+                'dependencies': ['embedding_helper', 'nltk', 'wordnet'],
+                'weight_distribution': {'embedding': 0.7, 'wordnet': 0.3},
+                'cross_pos_penalty': 0.2,
+                'use_case': 'comprehensive_similarity'
+            }
+        }
+    
+    @staticmethod
+    def get_optimization_parameters():
+        """Get optimization parameters from implementation updates."""
+        return {
+            'original_defaults': {
+                'beam_width': 3,
+                'max_depth': 6,
+                'relax_beam': False
+            },
+            'optimized_defaults': {
+                'beam_width': 10,
+                'max_depth': 10,
+                'relax_beam': True
+            },
+            'optimization_rationale': {
+                'beam_width_increase': 'Better coverage of search space',
+                'max_depth_increase': 'Handle deeper taxonomic structures',
+                'relax_beam_enabled': 'Allow exploration beyond initial beam'
+            }
+        }
+    
+    @staticmethod
+    def get_wordnet_distance_test_cases():
+        """Get test cases for WordNet distance estimation."""
+        return {
+            'same_synset_pairs': [
+                {
+                    'synset1': 'cat.n.01',
+                    'synset2': 'cat.n.01',
+                    'expected_distance': 0.0,
+                    'description': 'Identical synsets should have zero distance'
+                }
+            ],
+            'related_animal_pairs': [
+                {
+                    'synset1': 'cat.n.01',
+                    'synset2': 'dog.n.01',
+                    'expected_min_distance': 2.0,
+                    'expected_max_distance': 8.0,
+                    'description': 'Related animals through mammal hierarchy'
+                }
+            ],
+            'cross_pos_pairs': [
+                {
+                    'synset1': 'cat.n.01',
+                    'synset2': 'run.v.01',
+                    'expected_distance': 8.0,
+                    'description': 'Cross-POS should have higher penalty'
+                }
+            ],
+            'unrelated_pairs': [
+                {
+                    'synset1': 'computer.n.01',
+                    'synset2': 'tree.n.01',
+                    'expected_distance': 6.0,
+                    'description': 'Unrelated synsets default distance'
+                }
+            ]
+        }
+    
+    @staticmethod
+    def get_gloss_bonus_constant_tests():
+        """Get test data specifically for GLOSS_BONUS constant."""
+        return {
+            'gloss_bonus_value': 0.15,
+            'expected_type': float,
+            'expected_range': (0.0, 1.0),
+            'description': 'Bonus applied to heuristic for gloss seed nodes'
+        }
+    
+    @staticmethod
+    def get_initialization_test_data():
+        """Get test data for initialization scenarios."""
+        return {
+            'basic_initialization': {
+                'src': 'start',
+                'tgt': 'end',
+                'expected_defaults': {
+                    'beam_width': 10,
+                    'max_depth': 10,
+                    'relax_beam': True,
+                    'heuristic_type': 'hybrid'
+                }
+            },
+            'custom_initialization': {
+                'src': 'cat.n.01',
+                'tgt': 'dog.n.01',
+                'custom_params': {
+                    'beam_width': 5,
+                    'max_depth': 8,
+                    'relax_beam': False,
+                    'heuristic_type': 'embedding'
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_search_state_validation_data():
+        """Get data for validating search state initialization and management."""
+        return {
+            'initial_state_checks': {
+                'priority_queue_sizes': {
+                    'forward': 1,
+                    'backward': 1
+                },
+                'g_score_initialization': {
+                    'source_g_forward': 0.0,
+                    'target_g_backward': 0.0
+                },
+                'depth_initialization': {
+                    'source_depth_forward': 0,
+                    'target_depth_backward': 0
+                },
+                'parent_initialization': {
+                    'source_parent_forward': None,
+                    'target_parent_backward': None
+                },
+                'closed_set_initialization': {
+                    'forward_size': 0,
+                    'backward_size': 0
+                }
+            },
+            'queue_entry_structure': {
+                'tuple_length': 3,
+                'components': ['f_score', 'counter', 'node'],
+                'f_score_type': 'float',
+                'counter_type': 'int',
+                'node_type': 'str'
+            }
+        }
+    
+    @staticmethod
+    def get_path_reconstruction_scenarios():
+        """Get scenarios for testing path reconstruction."""
+        return {
+            'simple_linear_path': {
+                'meeting_node': 'middle',
+                'forward_parents': {
+                    'start': None,
+                    'middle': 'start'
+                },
+                'backward_parents': {
+                    'end': None,
+                    'middle': 'end'
+                },
+                'expected_path': ['start', 'middle', 'end']
+            },
+            'complex_branching_path': {
+                'meeting_node': 'junction',
+                'forward_parents': {
+                    'start': None,
+                    'branch1': 'start',
+                    'junction': 'branch1'
+                },
+                'backward_parents': {
+                    'end': None,
+                    'branch2': 'end',
+                    'junction': 'branch2'
+                },
+                'expected_path_pattern': ['start', '*', 'junction', '*', 'end']
+            }
+        }
+    
+    @staticmethod
+    def get_integration_test_scenarios():
+        """Get integration test scenarios."""
+        return {
+            'wordnet_integration': {
+                'description': 'Integration with WordNet taxonomy',
+                'test_pairs': [
+                    ('cat.n.01', 'mammal.n.01'),
+                    ('dog.n.01', 'animal.n.01')
+                ],
+                'expected_path_properties': {
+                    'min_length': 2,
+                    'max_length': 8,
+                    'contains_hypernyms': True
+                }
+            },
+            'embedding_integration': {
+                'description': 'Integration with embedding helper',
+                'requires_embedding_helper': True,
+                'test_parameters': {
+                    'heuristic_type': 'embedding',
+                    'similarity_threshold': 0.7
+                }
+            },
+            'gloss_seed_integration': {
+                'description': 'Integration with gloss seed nodes',
+                'seed_nodes': ['seed1', 'seed2'],
+                'expected_bonus_application': True,
+                'expected_allowed_sets_inclusion': True
+            }
+        }
+    
+    @staticmethod
+    def get_validation_test_data():
+        """Get validation test data for parameter validation."""
+        return {
+            'valid_parameters': {
+                'beam_width_range': (1, 100),
+                'max_depth_range': (1, 50),
+                'heuristic_types': ['uniform', 'wordnet', 'embedding', 'hybrid']
+            },
+            'invalid_parameters': {
+                'negative_beam_width': -1,
+                'zero_max_depth': 0,
+                'invalid_heuristic_type': 'unknown_type'
+            },
+            'boundary_conditions': {
+                'min_beam_width': 1,
+                'max_reasonable_depth': 20,
+                'empty_graph': True,
+                'single_node_graph': True
             }
         }

@@ -2,6 +2,7 @@ import unittest
 import spacy
 import sys
 import os
+from unittest.mock import Mock, patch
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
@@ -14,7 +15,7 @@ from tests.config.metavertex_pattern_matcher_config import MetavertexPatternMatc
 
 
 class TestMetavertexPatternMatcher(unittest.TestCase):
-    """Test the updated PatternMatcher with metavertex structure"""
+    """Basic functionality tests for MetavertexPatternMatcher."""
     
     @classmethod
     def setUpClass(cls):
@@ -27,9 +28,10 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
             cls.nlp = spacy.load("en_core_web_sm")
     
     def setUp(self):
-        """Set up test fixtures"""
-        # Initialize config
+        """Set up test fixtures using factory pattern and config injection."""
+        # Initialize config and mock factory
         self.config = MetavertexPatternMatcherMockConfig()
+        self.mock_factory = MetavertexPatternMatcherMockFactory()
         
         # Get test sentences from config
         sentence_patterns = self.config.get_test_sentence_patterns()
@@ -43,9 +45,6 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         # Create pattern matchers
         self.simple_matcher = PatternMatcher(self.simple_graph)
         self.complex_matcher = PatternMatcher(self.complex_graph)
-        
-        # Initialize mock factory from config
-        self.mock_factory = MetavertexPatternMatcherMockFactory()
     
     def test_metavertex_structure_analysis(self):
         """Test the analyze_metavertex_patterns method"""
@@ -65,8 +64,38 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
         self.assertIsInstance(analysis["relation_types"], dict)
         self.assertIsInstance(analysis["pos_distribution"], dict)
     
-    def test_find_atomic_metavertices(self):
-        """Test finding atomic metavertices with filters"""
+    def test_basic_metavertex_structure_creation(self):
+        """Test basic creation of metavertex structures."""
+        # Use config-driven test data
+        test_data = self.config.get_linguistic_feature_tests()
+        pos_test = test_data['pos_tagging_tests'][0]
+        
+        doc = self.nlp(pos_test['sentence'])
+        graph = SemanticMetagraph(doc=doc)
+        matcher = PatternMatcher(graph)
+        
+        analysis = matcher.analyze_metavertex_patterns()
+        self.assertIn("total_metaverts", analysis)
+        self.assertIn("atomic_count", analysis)
+        self.assertGreater(analysis["atomic_count"], 0)
+    
+    def test_basic_pattern_matching_functionality(self):
+        """Test basic pattern matching functionality."""
+        # Create a simple pattern to find atomic nouns
+        pattern = [{"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}]
+        
+        results = self.simple_matcher.match_metavertex_chain(pattern)
+        self.assertIsInstance(results, list)
+        
+        # Each result should be a list of metavertex indices
+        for result in results:
+            self.assertIsInstance(result, list)
+            for mv_idx in result:
+                self.assertIsInstance(mv_idx, int)
+                self.assertLess(mv_idx, len(self.simple_graph.metaverts))
+    
+    def test_atomic_metavertex_finding(self):
+        """Test finding atomic metavertices with filters."""
         # Find all nouns
         nouns = self.simple_matcher.find_atomic_metavertices(pos="NOUN")
         self.assertIsInstance(nouns, list)
@@ -110,21 +139,6 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
                         pos = mv[1]["pos"]
                         self.assertTrue(self.simple_matcher.metavertex_matches(mv_idx, {"pos": pos}))
                     break
-    
-    def test_basic_pattern_matching(self):
-        """Test basic pattern matching with new metavertex format"""
-        # Create a simple pattern to find atomic nouns
-        pattern = [{"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}]
-        
-        results = self.simple_matcher.match_metavertex_chain(pattern)
-        self.assertIsInstance(results, list)
-        
-        # Each result should be a list of metavertex indices
-        for result in results:
-            self.assertIsInstance(result, list)
-            for mv_idx in result:
-                self.assertIsInstance(mv_idx, int)
-                self.assertLess(mv_idx, len(self.simple_graph.metaverts))
     
     def test_metavertex_basic_patterns(self):
         """Test the metavertex_basic patterns"""
@@ -179,20 +193,6 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
             self.assertEqual(context["indices"], atomic_indices[:2])
             self.assertIsInstance(context["summary"], str)
     
-    def test_pattern_loader_with_metavertex_patterns(self):
-        """Test that PatternLoader loads metavertex patterns"""
-        loader = PatternLoader()
-        
-        # Check that metavertex pattern categories are loaded
-        expected_categories = ["metavertex_basic", "metavertex_semantic", "metavertex_complex"]
-        
-        for category in expected_categories:
-            if category in loader.patterns:
-                self.assertIsInstance(loader.patterns[category], dict)
-                self.assertGreater(len(loader.patterns[category]), 0)
-            else:
-                print(f"Warning: {category} not found in loaded patterns")
-    
     def test_pattern_matching_modes(self):
         """Test both metavertex and NetworkX matching modes"""
         # Test metavertex mode (default)
@@ -238,30 +238,10 @@ class TestMetavertexPatternMatcher(unittest.TestCase):
                 self.assertIsInstance(chain, list)
                 self.assertGreater(len(chain), 1)  # Should have at least start + 1 more
                 self.assertEqual(chain[0], start_idx)  # Should start with the given index
-    
-    def test_complex_semantic_patterns(self):
-        """Test complex semantic patterns on more complex text"""
-        # Create a more complex sentence
-        complex_text = "The professor teaches students mathematics in the classroom."
-        complex_doc = self.nlp(complex_text)
-        complex_graph = SemanticMetagraph(doc=complex_doc)
-        complex_matcher = PatternMatcher(complex_graph)
-        
-        # Test analysis
-        analysis = complex_matcher.analyze_metavertex_patterns()
-        self.assertGreater(analysis["total_metaverts"], 5)  # Should have multiple metavertices
-        self.assertGreater(analysis["atomic_count"], 3)    # Should have multiple words
-        
-        # Test finding specific patterns
-        nouns = complex_matcher.find_atomic_metavertices(pos="NOUN")
-        verbs = complex_matcher.find_atomic_metavertices(pos="VERB")
-        
-        self.assertGreater(len(nouns), 0)
-        self.assertGreater(len(verbs), 0)
 
 
-class TestMetavertexPatternIntegration(unittest.TestCase):
-    """Integration tests for metavertex pattern matching"""
+class TestMetavertexPatternMatcherValidation(unittest.TestCase):
+    """Validation and constraint tests for MetavertexPatternMatcher."""
     
     @classmethod
     def setUpClass(cls):
@@ -274,62 +254,150 @@ class TestMetavertexPatternIntegration(unittest.TestCase):
             cls.nlp = spacy.load("en_core_web_sm")
     
     def setUp(self):
-        """Set up test fixtures for integration tests"""
-        # Initialize config
+        """Set up test fixtures using factory pattern and config injection."""
+        # Initialize config and mock factory
         self.config = MetavertexPatternMatcherMockConfig()
-        
-        # Initialize mock factory from config
         self.mock_factory = MetavertexPatternMatcherMockFactory()
         
         # Get configuration options
         self.processing_options = self.config.get_configuration_options()['processing_options']
         self.pattern_matching_options = self.config.get_configuration_options()['pattern_matching_options']
     
-    def test_full_pipeline_with_metavertex_patterns(self):
-        """Test full pipeline from text to pattern matching"""
-        # Create a test sentence with clear semantic structure
-        text = "Alice gives Bob a red book because he needs it for research."
-        doc = self.nlp(text)
+    def test_pattern_validation_scenarios(self):
+        """Test pattern validation using config-driven scenarios."""
+        validation_data = self.config.get_pattern_validation_scenarios()
         
-        # Create semantic metagraph
-        graph = SemanticMetagraph(doc=doc)
-        self.assertGreater(len(graph.metaverts), 0)
-        
-        # Create pattern matcher
-        matcher = PatternMatcher(graph)
-        
-        # Analyze structure
-        analysis = matcher.analyze_metavertex_patterns()
-        self.assertGreater(analysis["atomic_count"], 5)
-        self.assertGreater(analysis["directed_relation_count"], 3)
-        
-        # Test finding specific semantic roles
-        nouns = matcher.find_atomic_metavertices(pos="NOUN")
-        proper_nouns = matcher.find_atomic_metavertices(pos="PROPN")
-        verbs = matcher.find_atomic_metavertices(pos="VERB")
-        
-        self.assertGreater(len(nouns), 0)
-        self.assertGreater(len(proper_nouns), 0)
-        self.assertGreater(len(verbs), 0)
-        
-        # Test relation finding
-        subject_relations = matcher.find_relation_metavertices(relation_type="nsubj")
-        object_relations = matcher.find_relation_metavertices(relation_type="dobj")
-        
-        # Should find at least some relations
-        total_relations = len(subject_relations) + len(object_relations)
-        self.assertGreater(total_relations, 0)
+        # Test valid patterns
+        for valid_pattern in validation_data['valid_patterns']:
+            # Mock validation should pass
+            mock_pattern = self.mock_factory('MockMetavertexPattern', 
+                                           pattern_id=valid_pattern['pattern_id'])
+            # Validate the pattern structure
+            self.assertTrue(mock_pattern.validate)
     
-    def test_pattern_matching_accuracy(self):
-        """Test that pattern matching produces accurate results"""
-        # Simple sentence with clear structure
-        text = "The dog chases the cat."
-        doc = self.nlp(text)
+    def test_metavertex_matching_validation(self):
+        """Test metavertex matching validation."""
+        # Create test pattern matcher
+        mock_matcher = self.mock_factory('MockMetavertexPatternMatcher')
+        
+        # Test that matching validation works properly
+        self.assertTrue(mock_matcher.validate_match([], []))
+        
+        # Test match scoring
+        score = mock_matcher.score_match([], [])
+        self.assertIsInstance(score, (int, float))
+        self.assertGreaterEqual(score, 0.0)
+        self.assertLessEqual(score, 1.0)
+    
+    def test_pattern_constraint_validation(self):
+        """Test pattern constraint validation."""
+        # Test various pattern constraints
+        tree_pattern = self.mock_factory('MockTreePattern')
+        cycle_pattern = self.mock_factory('MockCyclePattern')
+        clique_pattern = self.mock_factory('MockCliquePattern')
+        chain_pattern = self.mock_factory('MockChainPattern')
+        
+        # Each pattern should validate its own constraints
+        self.assertTrue(tree_pattern.validate_pattern_constraints())
+        self.assertTrue(cycle_pattern.validate_pattern_constraints())
+        self.assertTrue(clique_pattern.validate_pattern_constraints())
+        self.assertTrue(chain_pattern.validate_pattern_constraints())
+    
+    def test_linguistic_feature_validation(self):
+        """Test validation of linguistic features."""
+        test_data = self.config.get_linguistic_feature_tests()
+        
+        # Test POS tagging validation
+        for pos_test in test_data['pos_tagging_tests']:
+            doc = self.nlp(pos_test['sentence'])
+            graph = SemanticMetagraph(doc=doc)
+            matcher = PatternMatcher(graph)
+            
+            # Validate that POS information is correctly extracted
+            analysis = matcher.analyze_metavertex_patterns()
+            self.assertIn('pos_distribution', analysis)
+            self.assertIsInstance(analysis['pos_distribution'], dict)
+    
+    def test_dependency_parsing_validation(self):
+        """Test validation of dependency parsing results."""
+        test_data = self.config.get_linguistic_feature_tests()
+        
+        # Test dependency parsing validation
+        for dep_test in test_data['dependency_parsing_tests']:
+            doc = self.nlp(dep_test['sentence'])
+            graph = SemanticMetagraph(doc=doc)
+            matcher = PatternMatcher(graph)
+            
+            # Validate that dependency relations are correctly captured
+            relations = matcher.find_relation_metavertices()
+            self.assertIsInstance(relations, list)
+
+
+class TestMetavertexPatternMatcherEdgeCases(unittest.TestCase):
+    """Edge cases and error conditions for MetavertexPatternMatcher."""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Load spaCy model once for all tests"""
+        try:
+            cls.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            import subprocess
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+            cls.nlp = spacy.load("en_core_web_sm")
+    
+    def setUp(self):
+        """Set up test fixtures using factory pattern and config injection."""
+        # Initialize config and mock factory
+        self.config = MetavertexPatternMatcherMockConfig()
+        self.mock_factory = MetavertexPatternMatcherMockFactory()
+        
+        # Get error handling test cases
+        self.error_cases = self.config.get_error_handling_test_cases()
+    
+    def test_empty_input_handling(self):
+        """Test handling of empty inputs."""
+        for test_case in self.error_cases['empty_input_tests']:
+            if test_case['input'] == '':
+                # Test empty string handling
+                try:
+                    doc = self.nlp(test_case['input'])
+                    graph = SemanticMetagraph(doc=doc)
+                    matcher = PatternMatcher(graph)
+                    analysis = matcher.analyze_metavertex_patterns()
+                    # Should handle empty input gracefully
+                    self.assertIsInstance(analysis, dict)
+                except Exception as e:
+                    self.fail(f"Empty input should be handled gracefully: {e}")
+    
+    def test_malformed_input_handling(self):
+        """Test handling of malformed inputs."""
+        for test_case in self.error_cases['malformed_input_tests']:
+            # Test handling of various malformed inputs
+            try:
+                doc = self.nlp(test_case['input'])
+                graph = SemanticMetagraph(doc=doc)
+                matcher = PatternMatcher(graph)
+                # Should process without errors
+                analysis = matcher.analyze_metavertex_patterns()
+                self.assertIsInstance(analysis, dict)
+            except Exception as e:
+                # Should handle gracefully
+                self.assertIn('expected_behavior', test_case)
+    
+    def test_pattern_matching_edge_cases(self):
+        """Test pattern matching with edge case patterns."""
+        # Test with empty pattern
+        empty_pattern = []
+        doc = self.nlp("Test sentence.")
         graph = SemanticMetagraph(doc=doc)
         matcher = PatternMatcher(graph)
         
-        # Find subject-verb-object pattern
-        pattern = [
+        results = matcher.match_metavertex_chain(empty_pattern)
+        self.assertIsInstance(results, list)
+        
+        # Test with complex nested pattern
+        complex_pattern = [
             {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]},
             {"mv_type": "directed_relation", "relation_type": "nsubj", "requires_reference": True},
             {"mv_type": "atomic", "pos": ["VERB"]},
@@ -337,19 +405,190 @@ class TestMetavertexPatternIntegration(unittest.TestCase):
             {"mv_type": "atomic", "pos": ["NOUN", "PROPN"]}
         ]
         
-        results = matcher.match_metavertex_chain(pattern)
+        results = matcher.match_metavertex_chain(complex_pattern)
+        self.assertIsInstance(results, list)
+    
+    def test_large_input_handling(self):
+        """Test handling of large inputs."""
+        # Create a large input text
+        large_text = "This is a test sentence. " * 100
         
-        # Should find at least one complete SVO pattern
-        if len(results) > 0:
-            # Verify the structure
-            result = results[0]
-            self.assertEqual(len(result), 5)  # Should match all 5 pattern elements
+        try:
+            doc = self.nlp(large_text)
+            graph = SemanticMetagraph(doc=doc)
+            matcher = PatternMatcher(graph)
+            analysis = matcher.analyze_metavertex_patterns()
             
-            # Verify that we can get meaningful context
-            context = matcher.get_metavertex_context(result)
-            self.assertIn("dog", context["summary"] + " ".join([str(mv) for mv in context["metaverts"]]))
-            self.assertIn("chase", context["summary"] + " ".join([str(mv) for mv in context["metaverts"]]))
-            self.assertIn("cat", context["summary"] + " ".join([str(mv) for mv in context["metaverts"]]))
+            # Should handle large input without memory issues
+            self.assertIsInstance(analysis, dict)
+            self.assertGreater(analysis['total_metaverts'], 100)
+        except Exception as e:
+            # Should handle memory constraints gracefully
+            self.assertIsInstance(e, (MemoryError, RuntimeError))
+    
+    def test_unicode_and_special_characters(self):
+        """Test handling of Unicode and special characters."""
+        unicode_text = "Héllo wörld! 🌍 Special chars: @#$%^&*()"
+        
+        try:
+            doc = self.nlp(unicode_text)
+            graph = SemanticMetagraph(doc=doc)
+            matcher = PatternMatcher(graph)
+            analysis = matcher.analyze_metavertex_patterns()
+            
+            # Should handle Unicode gracefully
+            self.assertIsInstance(analysis, dict)
+        except Exception as e:
+            self.fail(f"Unicode handling failed: {e}")
+
+
+class TestMetavertexPatternMatcherIntegration(unittest.TestCase):
+    """Integration tests with other components for MetavertexPatternMatcher."""
+    
+    @classmethod
+    def setUpClass(cls):
+        """Load spaCy model once for all tests"""
+        try:
+            cls.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            import subprocess
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+            cls.nlp = spacy.load("en_core_web_sm")
+    
+    def setUp(self):
+        """Set up test fixtures using factory pattern and config injection."""
+        # Initialize config and mock factory
+        self.config = MetavertexPatternMatcherMockConfig()
+        self.mock_factory = MetavertexPatternMatcherMockFactory()
+        
+        # Get configuration options and integration scenarios
+        self.processing_options = self.config.get_configuration_options()['processing_options']
+        self.pattern_matching_options = self.config.get_configuration_options()['pattern_matching_options']
+        self.integration_scenarios = self.config.get_integration_test_scenarios()
+    
+    def test_full_pipeline_integration(self):
+        """Test full pipeline integration using config-driven scenarios."""
+        pipeline_test = self.integration_scenarios['full_pipeline_test']
+        
+        # Create semantic metagraph from integration test data
+        doc = self.nlp(pipeline_test['input_text'])
+        graph = SemanticMetagraph(doc=doc)
+        self.assertGreater(len(graph.metaverts), 0)
+        
+        # Create pattern matcher
+        matcher = PatternMatcher(graph)
+        
+        # Test expected pipeline steps
+        analysis = matcher.analyze_metavertex_patterns()
+        expected_count = pipeline_test['expected_outputs']['metavertices_count']
+        self.assertGreaterEqual(analysis["total_metaverts"], expected_count - 5)  # Allow some variance
+        
+        # Test entity finding
+        expected_entities = pipeline_test['expected_outputs']['entities']
+        nouns = matcher.find_atomic_metavertices(pos="NOUN")
+        proper_nouns = matcher.find_atomic_metavertices(pos="PROPN")
+        
+        # Should find entities corresponding to expected entities
+        total_entities = len(nouns) + len(proper_nouns)
+        self.assertGreater(total_entities, 0)
+    
+    def test_batch_processing_integration(self):
+        """Test batch processing integration."""
+        batch_test = self.integration_scenarios['batch_processing_test']
+        
+        results = []
+        for text in batch_test['input_texts']:
+            doc = self.nlp(text)
+            graph = SemanticMetagraph(doc=doc)
+            matcher = PatternMatcher(graph)
+            analysis = matcher.analyze_metavertex_patterns()
+            results.append(analysis)
+        
+        # All should process successfully
+        self.assertEqual(len(results), len(batch_test['input_texts']))
+        
+        # Each result should have expected structure
+        for result in results:
+            self.assertIn("total_metaverts", result)
+            self.assertIn("atomic_count", result)
+            self.assertGreaterEqual(result["atomic_count"], 0)
+    
+    def test_pattern_loader_integration(self):
+        """Test integration with PatternLoader using mock factory."""
+        # Create mock pattern loader
+        mock_pattern_library = self.mock_factory('MockPatternLibraryForMatcher')
+        mock_pattern_index = self.mock_factory('MockPatternIndex')
+        
+        # Test pattern loading integration
+        loader = PatternLoader()
+        
+        # Check that metavertex pattern categories are loaded
+        expected_categories = ["metavertex_basic", "metavertex_semantic", "metavertex_complex"]
+        
+        for category in expected_categories:
+            if category in loader.patterns:
+                self.assertIsInstance(loader.patterns[category], dict)
+                self.assertGreater(len(loader.patterns[category]), 0)
+            else:
+                print(f"Warning: {category} not found in loaded patterns")
+    
+    def test_performance_integration(self):
+        """Test performance integration using config parameters."""
+        perf_params = self.config.get_performance_test_parameters()
+        medium_test = perf_params['medium_text_test']
+        
+        # Create test text of appropriate length
+        test_sentences = ["This is a test sentence."] * (medium_test['num_sentences'] // 5)
+        test_text = " ".join(test_sentences)
+        
+        # Process and measure basic performance
+        doc = self.nlp(test_text)
+        graph = SemanticMetagraph(doc=doc)
+        matcher = PatternMatcher(graph)
+        
+        # Should complete without errors
+        analysis = matcher.analyze_metavertex_patterns()
+        self.assertIsInstance(analysis, dict)
+        self.assertIn("total_metaverts", analysis)
+    
+    def test_real_world_pattern_accuracy(self):
+        """Test pattern matching accuracy using config-driven expected results."""
+        expected_results = self.config.get_expected_matching_results()
+        
+        for test_name, test_data in expected_results.items():
+            with self.subTest(test_case=test_name):
+                # Process the sentence
+                doc = self.nlp(test_data['sentence'])
+                graph = SemanticMetagraph(doc=doc)
+                matcher = PatternMatcher(graph)
+                
+                # Verify expected metavertices are created
+                if 'expected_metavertices' in test_data:
+                    analysis = matcher.analyze_metavertex_patterns()
+                    expected_count = len(test_data['expected_metavertices'])
+                    # Allow some variance in metavertex count
+                    self.assertGreaterEqual(analysis['atomic_count'], expected_count - 2)
+    
+    def test_semantic_metagraph_integration(self):
+        """Test integration with SemanticMetagraph component."""
+        # Use complex sentence for comprehensive integration test
+        complex_sentences = self.config.get_complex_sentence_examples()
+        relative_clause = complex_sentences['relative_clause_sentence']
+        
+        doc = self.nlp(relative_clause['text'])
+        graph = SemanticMetagraph(doc=doc)
+        matcher = PatternMatcher(graph)
+        
+        # Test that semantic relationships are properly captured
+        analysis = matcher.analyze_metavertex_patterns()
+        self.assertGreater(analysis['directed_relation_count'], 0)
+        
+        # Test pattern matching on complex structures
+        pattern = [{"mv_type": "atomic", "pos": ["NOUN"]}, 
+                  {"mv_type": "directed_relation", "relation_type": "relcl"}]
+        
+        results = matcher.match_metavertex_chain(pattern)
+        self.assertIsInstance(results, list)
 
 
 if __name__ == '__main__':

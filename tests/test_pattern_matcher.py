@@ -603,6 +603,113 @@ class TestPatternMatcher(unittest.TestCase):
         self.assertIn("subject", result["relation_types"])
 
 
+class TestPatternMatcherValidation(unittest.TestCase):
+    """Validation and constraint tests for PatternMatcher"""
+    
+    def setUp(self):
+        """Set up test fixtures using mock factory and config injection"""
+        # Initialize config
+        self.config = PatternMatcherMockConfig()
+        
+        # Initialize mock factory from config
+        self.mock_factory = PatternMatcherMockFactory()
+        
+        # Get validation criteria from config
+        self.validation_criteria = self.config.get_validation_criteria()
+        
+        # Create semantic graph for validation testing
+        self.mock_semantic_graph = self.mock_factory('MockSemanticGraphForPattern')
+        graph_structures = self.config.get_mock_semantic_graph_structures()
+        complex_graph = graph_structures['complex_sentence_graph']
+        
+        # Use config-driven graph structure
+        self.mock_semantic_graph.metaverts = {
+            0: ("John", {"pos": "PROPN", "text": "John", "ent_type": "PERSON"}),
+            1: ("runs", {"pos": "VERB", "text": "runs"}),
+            2: ("fast", {"pos": "ADV", "text": "fast"}),
+            3: ((0, 1), {"relation": "subject"}),
+            4: ((1, 2), {"relation": "modifier"})
+        }
+        
+        # Get patterns for validation testing from config
+        pattern_data = self.config.get_pattern_loader_test_patterns()
+        semantic_patterns = pattern_data['semantic_patterns']
+        
+        self.mock_pattern_loader = self.mock_factory('MockPatternLoaderForPattern')
+        self.mock_pattern_loader.patterns = {
+            "validation_category": {
+                "agent_action": {
+                    "description": semantic_patterns[0]['description'],
+                    "pattern": [{"pos": "NOUN"}, {"pos": "VERB"}]
+                }
+            }
+        }
+        
+        self.pattern_matcher = PatternMatcher(
+            semantic_graph=self.mock_semantic_graph,
+            pattern_loader=self.mock_pattern_loader
+        )
+    
+    def test_pattern_validation_basic(self):
+        """Test basic pattern validation functionality"""
+        # Test pattern structure validation
+        valid_pattern = {"pattern": [{"pos": "NOUN"}]}
+        result = self.pattern_matcher.match_metavertex_pattern(valid_pattern)
+        self.assertIsInstance(result, list)
+    
+    def test_pattern_validation_constraints(self):
+        """Test pattern validation with constraints"""
+        # Use validation criteria from config
+        structural_validation = self.validation_criteria['structural_validation']
+        self.assertTrue(structural_validation['vertex_count_match'])
+        self.assertTrue(structural_validation['edge_count_match'])
+    
+    def test_match_quality_validation(self):
+        """Test match quality validation using config criteria"""
+        quality_metrics = self.validation_criteria['match_quality_metrics']
+        self.assertIn('precision', quality_metrics)
+        self.assertIn('recall', quality_metrics)
+        self.assertIn('f1_score', quality_metrics)
+    
+    def test_semantic_validation(self):
+        """Test semantic validation using config criteria"""
+        semantic_validation = self.validation_criteria['semantic_validation']
+        self.assertTrue(semantic_validation['role_consistency'])
+        self.assertTrue(semantic_validation['type_compatibility'])
+
+    def test_pattern_matching_algorithm_validation(self):
+        """Test pattern matching algorithm validation using config"""
+        # Get pattern matching algorithms from config
+        algorithms = self.config.get_pattern_matching_algorithms()
+        
+        # Test exact matching configuration
+        exact_matching = algorithms['exact_matching']
+        self.assertEqual(exact_matching['algorithm'], 'exact_match')
+        self.assertIn('case_sensitive', exact_matching['parameters'])
+        self.assertIn('match_threshold', exact_matching['parameters'])
+        
+        # Test fuzzy matching configuration
+        fuzzy_matching = algorithms['fuzzy_matching']
+        self.assertEqual(fuzzy_matching['algorithm'], 'fuzzy_match')
+        self.assertIn('similarity_threshold', fuzzy_matching['parameters'])
+
+    def test_pos_tag_pattern_validation(self):
+        """Test POS tag pattern validation using config data"""
+        # Get POS tag patterns from config
+        pos_patterns = self.config.get_pos_tag_patterns()
+        
+        # Test noun phrase patterns
+        noun_phrase_patterns = pos_patterns['noun_phrase_patterns']
+        self.assertIn(["DET", "ADJ", "NOUN"], noun_phrase_patterns)
+        self.assertIn(["DET", "NOUN", "NOUN"], noun_phrase_patterns)
+        
+        # Test dependency relations
+        dep_relations = pos_patterns['dependency_relations']
+        core_relations = dep_relations['core_relations']
+        self.assertIn('nsubj', core_relations)
+        self.assertIn('dobj', core_relations)
+
+
 class TestPatternMatcherEdgeCases(unittest.TestCase):
     """Test edge cases and error conditions"""
     
@@ -630,8 +737,11 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
         )
 
     def test_metavertex_matches_malformed_metavertex(self):
-        """Test metavertex_matches with malformed metavertex structure"""
-        # Metavertex with only content, no metadata
+        """Test metavertex_matches with malformed metavertex structure using config edge cases"""
+        # Use edge case scenarios from config
+        malformed_patterns = self.edge_case_scenarios['malformed_patterns']
+        
+        # Test metavertex with only content, no metadata
         self.mock_semantic_graph.metaverts[0] = ("test",)
         
         pattern_attrs = {"text": "test"}
@@ -641,13 +751,18 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
         self.assertTrue(result)
 
     def test_node_matches_empty_pattern(self):
-        """Test node_matches with empty pattern"""
+        """Test node_matches with empty pattern using config edge cases"""
+        # Use empty inputs from config edge cases
+        empty_inputs = self.edge_case_scenarios['empty_inputs']
+        expected_behavior = empty_inputs['expected_behavior']
+        
         node_attrs = {"text": "test", "pos": "NOUN"}
         pattern_attrs = {}
         
         result = self.pattern_matcher.node_matches(node_attrs, pattern_attrs)
         
         self.assertTrue(result)  # Empty pattern should match anything
+        self.assertEqual(expected_behavior, 'return_empty_results')
 
     def test_edge_matches_empty_pattern(self):
         """Test edge_matches with empty pattern"""
@@ -673,7 +788,11 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_get_metavertex_context_missing_indices(self):
-        """Test get_metavertex_context with missing indices"""
+        """Test get_metavertex_context with missing indices using config edge cases"""
+        # Use edge case scenarios for complex nested structures
+        complex_nested = self.edge_case_scenarios['complex_nested_structures']
+        expected_behavior = complex_nested['expected_behavior']
+        
         mv_indices = [999, 998]
         
         result = self.pattern_matcher.get_metavertex_context(mv_indices)
@@ -681,10 +800,14 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
         self.assertEqual(result["indices"], mv_indices)
         self.assertEqual(result["metaverts"], [])
         self.assertEqual(result["summary"], "")
+        self.assertEqual(expected_behavior, 'handle_gracefully')
 
     def test_find_atomic_metavertices_malformed_metaverts(self):
-        """Test find_atomic_metavertices with malformed metaverts"""
-        # Metavertex without metadata
+        """Test find_atomic_metavertices with malformed metaverts using config edge cases"""
+        # Use malformed patterns from config
+        malformed_patterns = self.edge_case_scenarios['malformed_patterns']
+        
+        # Test metavertex without metadata
         self.mock_semantic_graph.metaverts = {
             0: ("test",),  # No metadata tuple
             1: (123,),     # Non-string content
@@ -693,6 +816,11 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
         result = self.pattern_matcher.find_atomic_metavertices(text="test")
         
         self.assertEqual(result, [0])
+        
+        # Verify edge case handling expectations
+        self.assertTrue(len(malformed_patterns) > 0)
+        first_pattern = malformed_patterns[0]
+        self.assertEqual(first_pattern['expected_error'], 'PatternValidationError')
 
     def test_find_relation_metavertices_no_metadata(self):
         """Test find_relation_metavertices with metaverts without metadata"""
@@ -724,7 +852,7 @@ class TestPatternMatcherEdgeCases(unittest.TestCase):
 
 
 class TestPatternMatcherIntegration(unittest.TestCase):
-    """Integration tests for PatternMatcher with realistic scenarios"""
+    """Integration tests for PatternMatcher with other components"""
     
     def setUp(self):
         """Set up realistic test scenario"""

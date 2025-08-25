@@ -27,6 +27,8 @@ class PairwiseBidirectionalAStarMockFactory:
             'MockRealGraphForPathfinding': MockRealGraphForPathfinding,
             'MockPerformanceMetrics': MockPerformanceMetrics,
             'MockMemoryManager': MockMemoryManager,
+            'MockEmbeddingHelper': MockEmbeddingHelper,
+            'MockWordNetInterface': MockWordNetInterface,
         }
     
     def __call__(self, mock_name: str, *args, **kwargs) -> Mock:
@@ -61,35 +63,51 @@ class MockPairwiseBidirectionalAStar(Mock):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Initialize pathfinding components
-        self.graph = MockGraphForPathfinding()
-        self.heuristic = MockHeuristicFunction()
-        self.cost_function = MockCostFunction()
+        # Initialize pathfinding components based on actual class interface
+        self.g = MockGraphForPathfinding()
+        self.src = "start"
+        self.tgt = "end"
+        self.get_new_beams_fn = None
+        self.gloss_seed_nodes = set()
+        self.beam_width = 3
+        self.max_depth = 6
+        self.relax_beam = False
+        self.heuristic_type = "hybrid"
+        self.embedding_helper = None
         
-        # Pathfinding state
-        self.forward_frontier = MockPriorityQueue()
-        self.backward_frontier = MockPriorityQueue()
-        self.forward_visited = set()
-        self.backward_visited = set()
-        self.forward_came_from = {}
-        self.backward_came_from = {}
+        # Internal state based on actual implementation
+        self.src_allowed = set()
+        self.tgt_allowed = set()
+        self.h_forward = {}
+        self.h_backward = {}
         
-        # Set up methods
-        self.find_path = Mock(return_value=[])
+        # Search state
+        self.open_f = []
+        self.open_b = []
+        self.g_f = {}
+        self.g_b = {}
+        self.depth_f = {}
+        self.depth_b = {}
+        self.parent_f = {}
+        self.parent_b = {}
+        self.closed_f = set()
+        self.closed_b = set()
+        
+        # Main method from actual interface
         self.find_paths = Mock(return_value=[])
-        self.find_shortest_path = Mock(return_value=[])
-        self.find_k_shortest_paths = Mock(return_value=[])
         
-        # Algorithm components
-        self.bidirectional_search = Mock(return_value=[])
-        self.forward_search = Mock(return_value=[])
-        self.backward_search = Mock(return_value=[])
-        self.reconstruct_path = Mock(return_value=[])
-        
-        # Optimization methods
-        self.prune_search_space = Mock()
-        self.update_bounds = Mock()
-        self.check_termination = Mock(return_value=False)
+        # Internal methods
+        self._build_allowed_and_heuristics = Mock()
+        self._init_search_state = Mock()
+        self._edge_weight = Mock(return_value=1.0)
+        self._allowed_forward = Mock(return_value=True)
+        self._allowed_backward = Mock(return_value=True)
+        self._expand_forward_once = Mock(return_value=None)
+        self._expand_backward_once = Mock(return_value=None)
+        self._reconstruct_path = Mock(return_value=[])  
+        self._calculate_heuristic = Mock(return_value=0.5)
+        self._wordnet_distance_estimate = Mock(return_value=1.0)
+        self._different_pos = Mock(return_value=False)
 
 
 class MockPairwiseBidirectionalAStarEdgeCases(AbstractEdgeCaseMock):
@@ -295,13 +313,14 @@ class MockHeuristicFunction(AbstractAlgorithmicFunctionMock):
         
         # Heuristic methods
         self.estimate = Mock(return_value=0.0)
+        self.compute_heuristic = Mock(return_value=0.5)
         self.is_admissible = Mock(return_value=True)
         self.is_consistent = Mock(return_value=True)
         
-        # Distance methods
-        self.euclidean_distance = Mock(return_value=1.0)
-        self.manhattan_distance = Mock(return_value=1.0)
-        self.semantic_distance = Mock(return_value=0.5)
+        # Distance methods for different heuristic types
+        self.embedding_similarity = Mock(return_value=0.7)
+        self.wordnet_path_similarity = Mock(return_value=0.8)
+        self.hybrid_similarity = Mock(return_value=0.75)
     
     def compute(self, source_node, target_node, *args, **kwargs) -> float:
         """Compute heuristic estimate between two nodes."""
@@ -499,3 +518,117 @@ class MockMemoryManager(Mock):
         self.check_memory_limit = Mock(return_value=True)
         self.gc_collect = Mock()
         self.get_usage = Mock(return_value=self.current_usage)
+
+
+class MockEmbeddingHelper(Mock):
+    """Mock embedding helper for hybrid heuristic calculations."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Embedding properties
+        self.model_name = "mock_embedding_model"
+        self.embedding_dim = 300
+        self.vocabulary_size = 50000
+        
+        # Embedding methods
+        self.get_embedding = Mock(return_value=[0.1] * self.embedding_dim)
+        self.similarity = Mock(return_value=0.75)
+        self.cosine_similarity = Mock(return_value=0.75)
+        self.euclidean_distance = Mock(return_value=0.5)
+        
+        # WordNet integration
+        self.synset_embedding = Mock(return_value=[0.2] * self.embedding_dim)
+        self.synset_similarity = Mock(return_value=0.8)
+        
+        # Caching methods
+        self.cache_embedding = Mock()
+        self.get_cached_embedding = Mock(return_value=None)
+        self.clear_cache = Mock()
+    
+    def compute_similarity(self, synset1, synset2, *args, **kwargs):
+        """Compute similarity between two synsets using embeddings."""
+        # Mock realistic similarity based on synset names
+        if synset1 == synset2:
+            return 1.0
+        elif "cat" in synset1 and "dog" in synset2:
+            return 0.7  # Related animals
+        elif "run" in synset1 and "walk" in synset2:
+            return 0.8  # Related actions
+        else:
+            return self.similarity.return_value
+
+
+class MockWordNetInterface(Mock):
+    """Mock WordNet interface for testing WordNet-based heuristics."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # WordNet structure simulation
+        self.synsets = {
+            "cat.n.01": {"pos": "n", "definition": "feline mammal"},
+            "dog.n.01": {"pos": "n", "definition": "canine mammal"},
+            "mammal.n.01": {"pos": "n", "definition": "vertebrate animal"},
+            "animal.n.01": {"pos": "n", "definition": "living organism"},
+            "run.v.01": {"pos": "v", "definition": "move fast"},
+            "walk.v.01": {"pos": "v", "definition": "move on foot"}
+        }
+        
+        # WordNet methods
+        self.synset = Mock(side_effect=self._mock_synset)
+        self.path_similarity = Mock(side_effect=self._mock_path_similarity)
+        self.wup_similarity = Mock(side_effect=self._mock_wup_similarity)
+        self.lch_similarity = Mock(side_effect=self._mock_lch_similarity)
+        
+        # Relationship methods
+        self.hypernyms = Mock(return_value=[])
+        self.hyponyms = Mock(return_value=[])
+        self.meronyms = Mock(return_value=[])
+        self.holonyms = Mock(return_value=[])
+    
+    def _mock_synset(self, name):
+        """Return mock synset object."""
+        if name in self.synsets:
+            synset_mock = Mock()
+            synset_mock.name.return_value = name
+            synset_mock.pos.return_value = self.synsets[name]["pos"]
+            synset_mock.definition.return_value = self.synsets[name]["definition"]
+            
+            # Add relationship methods
+            synset_mock.path_similarity = Mock(side_effect=lambda other: self._mock_path_similarity(name, other.name()))
+            synset_mock.wup_similarity = Mock(side_effect=lambda other: self._mock_wup_similarity(name, other.name()))
+            
+            return synset_mock
+        else:
+            return None
+    
+    def _mock_path_similarity(self, synset1, synset2):
+        """Mock path similarity calculation."""
+        if synset1 == synset2:
+            return 1.0
+        
+        # Mock realistic similarities
+        animal_pairs = [("cat.n.01", "dog.n.01"), ("dog.n.01", "cat.n.01")]
+        if (synset1, synset2) in animal_pairs:
+            return 0.8  # Related animals
+        
+        motion_pairs = [("run.v.01", "walk.v.01"), ("walk.v.01", "run.v.01")]
+        if (synset1, synset2) in motion_pairs:
+            return 0.7  # Related actions
+        
+        # Different POS
+        pos1 = self.synsets.get(synset1, {}).get("pos", "")
+        pos2 = self.synsets.get(synset2, {}).get("pos", "")
+        if pos1 != pos2:
+            return 0.1  # Low similarity for different parts of speech
+        
+        return 0.3  # Default similarity
+    
+    def _mock_wup_similarity(self, synset1, synset2):
+        """Mock Wu-Palmer similarity calculation."""
+        path_sim = self._mock_path_similarity(synset1, synset2)
+        return path_sim * 0.9  # WuP typically slightly lower than path
+    
+    def _mock_lch_similarity(self, synset1, synset2):
+        """Mock Leacock-Chodorow similarity calculation."""
+        path_sim = self._mock_path_similarity(synset1, synset2)
+        return path_sim * 1.2  # LCH can be higher than path similarity

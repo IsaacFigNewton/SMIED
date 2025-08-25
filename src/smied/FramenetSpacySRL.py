@@ -94,7 +94,13 @@ class FrameNetSpaCySRL:
         if nlp is not None:
             self.nlp = nlp
         else:
-            self.nlp = spacy.load(spacy_model)
+            try:
+                self.nlp = spacy.load(spacy_model)
+            except OSError:
+                print(f"[WARNING] FrameNetSpaCySRL: spaCy '{spacy_model}' model not found.")
+                print(f"[WARNING] Install with: python -m spacy download {spacy_model}")
+                print("[WARNING] FrameNetSpaCySRL will operate with limited functionality.")
+                self.nlp = None
 
         self.min_confidence = min_confidence
         self.use_wordnet_expansion = use_wordnet_expansion
@@ -161,7 +167,7 @@ class FrameNetSpaCySRL:
         """Make the class callable as a SpaCy pipeline component"""
         return self.process(doc)
 
-    def process_text(self, text: str) -> Doc:
+    def process_text(self, text: str) -> Optional[Doc]:
         """
         Convenience method to process raw text.
 
@@ -169,8 +175,11 @@ class FrameNetSpaCySRL:
             text: Input text string
 
         Returns:
-            Processed SpaCy Doc with frame annotations
+            Processed SpaCy Doc with frame annotations, or None if no NLP model available
         """
+        if self.nlp is None:
+            print("[WARNING] FrameNetSpaCySRL: Cannot process text, no spaCy model available.")
+            return None
         doc = self.nlp(text)
         return self.process(doc)
 
@@ -262,8 +271,8 @@ class FrameNetSpaCySRL:
 
         return doc[start:end]
 
-    def _get_frames_for_predicate(self, pred_span: Span) -> List[str]:
-        """Get possible frames for a predicate using lexical units and WordNet."""
+    def _get_frames_for_predicate(self, pred_span: Span) -> List[Tuple[str, float]]:
+        """Get ALL relevant frames with coherence scores (not just best)."""
         frames = set()
 
         # Primary lookup via lexical units
@@ -280,7 +289,14 @@ class FrameNetSpaCySRL:
             expanded_frames = self._get_frames_via_wordnet(head.lemma_, wn.VERB)
             frames.update(expanded_frames)
 
-        return list(frames)
+        # Return ALL frames with coherence scores (don't select "best")
+        frame_scores = []
+        for frame_name in frames:
+            score = self._score_frame_coherence(frame_name, pred_span)
+            frame_scores.append((frame_name, score))
+        
+        # Return sorted by coherence (best first) but keep all
+        return sorted(frame_scores, key=lambda x: x[1], reverse=True)
 
     def _get_frames_via_wordnet(self, lemma: str, pos) -> Set[str]:
         """Expand frame search using WordNet synonyms"""
@@ -292,36 +308,144 @@ class FrameNetSpaCySRL:
                     frames.update(self.lexical_unit_cache[key])
         return frames
 
+    def _score_frame_coherence(self, frame_name: str, pred_span: Span) -> float:
+        """Score semantic coherence of frame interpretation with predicate."""
+        if frame_name not in self.frame_cache:
+            return 0.0
+            
+        frame = self.frame_cache[frame_name]
+        score = 0.0
+        pred_head = pred_span.root
+        doc = pred_span.doc
+        
+        # Get subject and object words for context
+        subject_word = None
+        object_word = None
+        
+        for child in pred_head.children:
+            if child.dep_ == "nsubj":
+                subject_word = child.lemma_.lower()
+            elif child.dep_ in ["dobj", "obj"]:
+                object_word = child.lemma_.lower()
+        
+        # Check frame element alignment with expected roles
+        core_elements = [fe for fe, data in frame.FE.items() if data.coreType == "Core"]
+        
+        # Agent/Experiencer frames expect animate subjects
+        if subject_word and any(fe in ["Agent", "Experiencer", "Cognizer", "Speaker"] for fe in core_elements):
+            if self._is_animate_word(subject_word):
+                score += 0.3
+        
+        # Theme/Patient frames expect concrete objects  
+        if object_word and any(fe in ["Theme", "Patient", "Goal", "Stimulus"] for fe in core_elements):
+            if self._is_concrete_word(object_word):
+                score += 0.3
+                
+        # Lexical unit match with predicate
+        pred_lemma = pred_head.lemma_.lower()
+        if any(pred_lemma in lu_name.lower() for lu_name in frame.lexUnit):
+            score += 0.4
+        
+        return score
+
+    def _is_animate_word(self, word: str) -> bool:
+        """Check if word typically refers to animate entities."""
+        synsets = wn.synsets(word, pos=wn.NOUN)
+        
+        # Check direct word matches for common animate entities
+        animate_words = {'cat', 'dog', 'person', 'human', 'animal', 'bird', 'fish', 'horse', 'cow'}
+        if word.lower() in animate_words:
+            return True
+            
+        for synset in synsets[:3]:  # Check top 3 senses
+            # Check all hypernym paths (not just direct hypernyms)
+            all_hypernyms = synset.closure(lambda s: s.hypernyms())
+            for hypernym in all_hypernyms:
+                hypernym_name = hypernym.name().lower()
+                # Check for common animate hypernyms
+                if any(animate_term in hypernym_name for animate_term in 
+                       ['person', 'individual', 'animal', 'organism', 
+                        'living_thing', 'being', 'creature', 'human', 'vertebrate']):
+                    return True
+            
+            # Also check direct synset names for animate terms
+            synset_name = synset.name().lower()
+            if any(animate_term in synset_name for animate_term in 
+                   ['person', 'animal', 'human', 'being']):
+                return True
+        
+        return False
+
+    def _is_concrete_word(self, word: str) -> bool:
+        """Check if word typically refers to concrete, tangible entities."""
+        synsets = wn.synsets(word, pos=wn.NOUN)
+        
+        # Check direct word matches for common concrete objects
+        concrete_words = {'book', 'car', 'table', 'chair', 'house', 'computer', 'phone', 'mouse'}
+        if word.lower() in concrete_words:
+            return True
+            
+        for synset in synsets[:3]:  # Check top 3 senses
+            # Check all hypernym paths
+            all_hypernyms = synset.closure(lambda s: s.hypernyms())
+            for hypernym in all_hypernyms:
+                hypernym_name = hypernym.name().lower()
+                # Physical objects, artifacts, substances
+                if any(concrete_term in hypernym_name for concrete_term in 
+                       ['artifact', 'physical_object', 'whole', 'object', 
+                        'instrumentality', 'device', 'structure', 'container',
+                        'conveyance', 'vehicle', 'machine', 'furniture']):
+                    return True
+            
+            # Check direct synset for concrete terms
+            synset_name = synset.name().lower()
+            if any(concrete_term in synset_name for concrete_term in 
+                   ['object', 'thing', 'item', 'artifact']):
+                return True
+                
+        return False
+
     def _select_best_frame(self, pred_span: Span,
-                          frame_names: List[str],
+                          frame_scores: List[Tuple[str, float]],
                           doc: Doc) -> Optional[str]:
         """
         Select the best frame for a predicate based on context.
-        Uses simple heuristics - could be enhanced with ML model.
+        Now works with frame coherence scores from _get_frames_for_predicate().
         """
-        if len(frame_names) == 1:
-            return frame_names[0]
+        if not frame_scores:
+            return None
+            
+        if len(frame_scores) == 1:
+            frame_name, coherence_score = frame_scores[0]
+            # Return if coherence score is above minimum threshold
+            return frame_name if coherence_score >= self.min_confidence else None
 
-        scores = {}
-        for frame_name in frame_names:
+        # Combine coherence scores with syntactic compatibility scores
+        final_scores = {}
+        for frame_name, coherence_score in frame_scores:
             frame = self.frame_cache[frame_name]
-            score = 0.0
+            
+            # Start with coherence score from _score_frame_coherence
+            total_score = coherence_score
+            
+            # Add syntactic compatibility score
+            syntactic_score = self._score_syntactic_compatibility(pred_span, frame, doc)
+            total_score += syntactic_score
 
-            # Score based on lexical unit match
+            # Add lexical unit match bonus
             pred_text = pred_span.text.lower()
             for lu_name in frame.lexUnit:
                 if pred_text in lu_name.lower():
-                    score += 2.0
+                    total_score += 0.2  # Reduced from 2.0 since coherence scoring already handles this
 
-            # Score based on frame element compatibility with syntax
-            score += self._score_syntactic_compatibility(pred_span, frame, doc)
-
-            scores[frame_name] = score
+            final_scores[frame_name] = total_score
 
         # Return highest scoring frame if above threshold
-        best_frame = max(scores, key=scores.get)
-        if scores[best_frame] >= self.min_confidence:
-            return best_frame
+        if final_scores:
+            best_frame = max(final_scores, key=final_scores.get)
+            if final_scores[best_frame] >= self.min_confidence:
+                return best_frame
+        
         return None
 
     def _score_syntactic_compatibility(self, pred_span: Span,

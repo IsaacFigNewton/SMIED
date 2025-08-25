@@ -4,8 +4,9 @@ from .DirectedMetagraph import DirectedMetagraph
 from .SemanticMetagraph import SemanticMetagraph
 from .PatternLoader import PatternLoader
 from .PatternMatcher import PatternMatcher
-from .FramenetSpacySRL import FramenetSpacySRL
+from .FramenetSpacySRL import FrameNetSpaCySRL
 from .SemanticDecomposer import SemanticDecomposer
+from .Diagnostics import SMIEDDiagnostics
 
 # Define what gets imported with "from package import *"
 __all__ = [
@@ -14,6 +15,8 @@ __all__ = [
     "SemanticMetagraph",
     "PatternLoader",
     "PatternMatcher",
-    "FramenetSpacySRL",
+    "FrameNetSpaCySRL",
     "SemanticDecomposer",
+    # Diagnostics
+    "SMIEDDiagnostics",
 ]

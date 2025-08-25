@@ -225,3 +225,56 @@ class BeamBuilderMockConfig:
             'src_embeddings': {"hypernyms": [("animal.n.01", 0.9)]},  # Valid
             'tgt_embeddings': {"hypernyms": [("animal.n.01", 0.8)]}   # Invalid - dog doesn't have animal as neighbor
         }
+    
+    @staticmethod
+    def get_validation_test_data():
+        """Get comprehensive validation test data for various scenarios."""
+        return {
+            'invalid_synset_names': ["nonexistent.n.01", "invalid.v.99", "bad.a.00"],
+            'valid_synset_names': ["cat.n.01", "dog.n.01", "animal.n.01", "mammal.n.01"],
+            'edge_beam_widths': [0, -1, -10, 1000],
+            'invalid_parameters': {
+                'none_graph': None,
+                'empty_graph': {'nodes': [], 'edges': []},
+                'invalid_synset': "not_a_synset",
+                'none_model': None
+            }
+        }
+    
+    @staticmethod
+    def get_asymmetric_relation_test_cases():
+        """Get test cases for asymmetric relation validation."""
+        return {
+            'expected_bidirectional_pairs': {
+                "part_holonyms": "part_meronyms",
+                "substance_holonyms": "substance_meronyms",
+                "member_holonyms": "member_meronyms",
+                "part_meronyms": "part_holonyms",
+                "substance_meronyms": "substance_holonyms",
+                "member_meronyms": "member_holonyms",
+                "hypernyms": "hyponyms",
+                "hyponyms": "hypernyms"
+            },
+            'orphaned_relations': ["isolated_relation", "one_way_relation"],
+            'inconsistent_mappings': {
+                "relation_a": "relation_b",
+                "relation_b": "relation_c",  # Should map back to relation_a
+                "relation_c": "relation_a"
+            }
+        }
+    
+    @staticmethod
+    def get_symmetric_relation_test_cases():
+        """Get test cases for symmetric relation validation."""
+        return {
+            'expected_self_mappings': [
+                "part_holonyms", "substance_holonyms", "member_holonyms",
+                "part_meronyms", "substance_meronyms", "member_meronyms",
+                "hypernyms", "hyponyms", "entailments", "causes",
+                "also_sees", "verb_groups"
+            ],
+            'invalid_self_mappings': {
+                "relation_x": "relation_y",  # Should map to itself
+                "relation_y": "relation_x"   # Should map to itself
+            }
+        }

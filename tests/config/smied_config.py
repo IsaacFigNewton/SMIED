@@ -55,12 +55,12 @@ class SMIEDMockConfig:
             'animal_synsets': {
                 'cat.n.01': {
                     'name': 'cat.n.01',
-                    'definition': 'feline mammal usually having thick soft fur',
+                    'definition': 'feline mammal usually having thick soft fur and no ability to roar: domestic cats; wildcats',
                     'pos': 'n',
                     'examples': ['cats are often kept as pets'],
                     'lemma_names': ['cat', 'true_cat'],
                     'hypernyms': ['feline.n.01'],
-                    'hyponyms': ['house_cat.n.01', 'wildcat.n.01']
+                    'hyponyms': ['wildcat.n.03', 'domestic_cat.n.01']
                 },
                 'dog.n.01': {
                     'name': 'dog.n.01',
@@ -283,6 +283,38 @@ class SMIEDMockConfig:
                     'scenario': 'processing_timeout',
                     'trigger': 'complex_analysis',
                     'expected_behavior': 'return_partial_results'
+                },
+                {
+                    'scenario': 'disk_space_exhaustion',
+                    'trigger': 'large_cache_files',
+                    'expected_behavior': 'clean_cache_and_retry'
+                }
+            ],
+            'concurrent_access_scenarios': [
+                {
+                    'scenario': 'multiple_threads_same_instance',
+                    'expected_behavior': 'thread_safe_access'
+                },
+                {
+                    'scenario': 'concurrent_graph_building',
+                    'expected_behavior': 'prevent_race_conditions'
+                }
+            ],
+            'malformed_input_scenarios': [
+                {
+                    'input': ("", "", ""),
+                    'expected_error': 'ValueError',
+                    'error_message': 'All triple elements must be non-empty'
+                },
+                {
+                    'input': (None, "valid", "valid"),
+                    'expected_error': 'TypeError',
+                    'error_message': 'Triple elements cannot be None'
+                },
+                {
+                    'input': ("valid", 123, "valid"),
+                    'expected_error': 'TypeError',
+                    'error_message': 'Triple elements must be strings'
                 }
             ]
         }
@@ -378,6 +410,102 @@ class SMIEDMockConfig:
                     'description': 'Error output format',
                     'required_keys': ['error_type', 'error_message', 'timestamp'],
                     'optional_keys': ['debug_info', 'suggested_actions']
+                }
+            ]
+        }
+    
+    @staticmethod
+    def get_edge_case_test_scenarios():
+        """Get edge case test scenarios for comprehensive testing."""
+        return {
+            'synset_edge_cases': [
+                {
+                    'edge_case_type': 'empty_synset',
+                    'expected_behavior': 'handle_gracefully',
+                    'should_raise_error': True
+                },
+                {
+                    'edge_case_type': 'malformed_synset',
+                    'expected_behavior': 'validate_and_reject',
+                    'should_raise_error': True
+                },
+                {
+                    'edge_case_type': 'circular_relationships',
+                    'expected_behavior': 'detect_and_handle_cycles',
+                    'should_raise_error': False
+                },
+                {
+                    'edge_case_type': 'missing_relationships',
+                    'expected_behavior': 'accept_isolated_synsets',
+                    'should_raise_error': False
+                }
+            ],
+            'analysis_edge_cases': [
+                {
+                    'scenario': 'very_long_words',
+                    'input': ("supercalifragilisticexpialidocious", "analyze", "antidisestablishmentarianism"),
+                    'expected_behavior': 'handle_long_strings'
+                },
+                {
+                    'scenario': 'unicode_characters',
+                    'input': ("café", "naïve", "résumé"),
+                    'expected_behavior': 'handle_unicode'
+                },
+                {
+                    'scenario': 'special_characters',
+                    'input': ("@user", "#hashtag", "$money"),
+                    'expected_behavior': 'handle_special_chars'
+                }
+            ],
+            'memory_edge_cases': [
+                {
+                    'scenario': 'large_graph_analysis',
+                    'graph_size': 100000,
+                    'expected_behavior': 'use_memory_efficiently'
+                },
+                {
+                    'scenario': 'repeated_analysis_calls',
+                    'call_count': 1000,
+                    'expected_behavior': 'maintain_performance'
+                }
+            ]
+        }
+    
+    @staticmethod  
+    def get_mock_factory_test_cases():
+        """Get test cases for mock factory validation."""
+        return {
+            'valid_mock_types': [
+                'MockISMIEDPipeline',
+                'MockSMIED', 
+                'MockSMIEDIntegration',
+                'MockSMIEDEdgeCases',
+                'MockNLTK',
+                'MockSpacy',
+                'MockWordNet',
+                'MockSynset',
+                'MockSynsetEdgeCases',
+                'MockSemanticDecomposer',
+                'MockGraph'
+            ],
+            'invalid_mock_types': [
+                'NonexistentMock',
+                'InvalidMockType',
+                '',
+                None
+            ],
+            'mock_creation_scenarios': [
+                {
+                    'mock_type': 'MockSynset',
+                    'args': [],
+                    'kwargs': {'name': 'test.n.01', 'definition': 'test'},
+                    'expected_success': True
+                },
+                {
+                    'mock_type': 'MockSMIEDEdgeCases',
+                    'args': [],
+                    'kwargs': {'failure_mode': 'analysis_error'},
+                    'expected_success': True
                 }
             ]
         }

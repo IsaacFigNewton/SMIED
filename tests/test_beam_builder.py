@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import networkx as nx
 import sys
 import os
@@ -13,7 +13,20 @@ from tests.config.beam_builder_config import BeamBuilderMockConfig
 
 
 class TestBeamBuilder(unittest.TestCase):
-    """Test the BeamBuilder class functionality"""
+    """
+    Test suite for core BeamBuilder functionality.
+    
+    This test class focuses on the primary features and expected behavior
+    of the BeamBuilder class, including:
+    - Initialization and configuration
+    - Basic beam generation from synset pairs
+    - Embedding helper integration
+    - Asymmetric and symmetric relation mapping
+    - Result structure and sorting
+    
+    The tests use mock objects through factory pattern and configuration-driven
+    test data to ensure consistent and maintainable testing.
+    """
     
     def setUp(self):
         """Set up test fixtures"""
@@ -53,7 +66,19 @@ class TestBeamBuilder(unittest.TestCase):
             self.assertEqual(self.beam_builder.symmetric_pairs_map[relation], relation)
 
     def test_get_new_beams_basic(self):
-        """Test basic functionality of get_new_beams"""
+        """
+        Test basic functionality of get_new_beams method.
+        
+        This test verifies that get_new_beams correctly:
+        - Creates embeddings for source and target synsets
+        - Retrieves aligned lexical relation pairs for both asymmetric and symmetric relations
+        - Combines and sorts results by relatedness score (descending order)
+        - Returns the expected data structure: list of tuples with relation pairs and scores
+        - Respects the beam_width parameter for result limiting
+        
+        Uses mock synsets, embeddings, and aligned pairs from configuration
+        to ensure predictable and testable behavior.
+        """
         # Get test data from mock config
         mock_graph = self.mock_config.get_basic_test_graph()
         embeddings = self.mock_config.get_basic_test_embeddings()
@@ -258,8 +283,200 @@ class TestBeamBuilder(unittest.TestCase):
             self.assertEqual(second_call_args[0][0], self.beam_builder.symmetric_pairs_map)
 
 
+class TestBeamBuilderValidation(unittest.TestCase):
+    """
+    Test suite for BeamBuilder validation and constraint enforcement.
+    
+    This test class focuses on validating that the BeamBuilder correctly:
+    - Enforces constructor parameter requirements
+    - Validates input parameters and their types
+    - Checks consistency between lexical relations and graph structure
+    - Ensures proper error handling for invalid inputs
+    - Maintains data integrity in asymmetric/symmetric relation mappings
+    
+    These tests are critical for ensuring robust error handling and
+    preventing runtime failures in production usage.
+    """
+    
+    def setUp(self):
+        """Set up test fixtures for validation testing"""
+        # Initialize mock factory and config
+        self.mock_factory = BeamBuilderMockFactory()
+        self.mock_config = BeamBuilderMockConfig()
+        
+        # Create embedding helper using factory
+        self.mock_embedding_helper = self.mock_factory('MockEmbeddingHelper')
+        self.beam_builder = BeamBuilder(self.mock_embedding_helper)
+
+    def test_constructor_requires_embedding_helper(self):
+        """Test that BeamBuilder constructor requires an embedding helper"""
+        with self.assertRaises(TypeError):
+            BeamBuilder()
+    
+    def test_constructor_validates_embedding_helper_type(self):
+        """Test that constructor validates embedding helper has required methods"""
+        invalid_helper = Mock()
+        # Don't set up required methods properly - return non-iterable
+        invalid_helper.embed_lexical_relations.return_value = "not_a_dict"
+        
+        # Should not raise during construction, but during usage
+        beam_builder = BeamBuilder(invalid_helper)
+        
+        # Test that it fails when trying to use invalid helper
+        mock_graph = self.mock_config.get_basic_test_graph()
+        mock_model = self.mock_factory('MockEmbeddingModel')
+        
+        with self.assertRaises((AttributeError, TypeError)):
+            beam_builder.get_new_beams(mock_graph, "cat.n.01", "dog.n.01", mock_model)
+
+    def test_get_new_beams_validates_graph_parameter(self):
+        """Test that get_new_beams validates graph parameter"""
+        mock_model = self.mock_factory('MockEmbeddingModel')
+        
+        # Test with None graph
+        with self.assertRaises(AttributeError):
+            self.beam_builder.get_new_beams(None, "cat.n.01", "dog.n.01", mock_model)
+    
+    def test_get_new_beams_validates_synset_names(self):
+        """Test that get_new_beams validates synset names exist in graph"""
+        mock_graph = nx.DiGraph()
+        mock_graph.add_node("cat.n.01")
+        # Note: "dog.n.01" is NOT in the graph
+        
+        mock_model = self.mock_factory('MockEmbeddingModel')
+        
+        # Mock WordNet synset lookup to fail for non-existent synset
+        with patch('nltk.corpus.wordnet.synset') as mock_synset:
+            def synset_side_effect(name):
+                if name == "nonexistent.n.01":
+                    raise Exception("Synset not found")
+                return self.mock_factory('MockSynsetForBeam', name, f"definition for {name}")
+            
+            mock_synset.side_effect = synset_side_effect
+            
+            # Should raise error when synset doesn't exist
+            with self.assertRaises(Exception):
+                self.beam_builder.get_new_beams(
+                    mock_graph, "nonexistent.n.01", "cat.n.01", mock_model
+                )
+
+    def test_get_new_beams_validates_beam_width_parameter(self):
+        """Test that get_new_beams validates beam_width parameter"""
+        mock_graph = self.mock_config.get_basic_test_graph()
+        mock_model = self.mock_factory('MockEmbeddingModel')
+        
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
+        
+        embeddings = self.mock_config.get_empty_embeddings()
+        self.mock_embedding_helper.embed_lexical_relations.side_effect = [
+            embeddings['src_embeddings'], embeddings['tgt_embeddings']
+        ]
+        self.mock_embedding_helper.get_top_k_aligned_lex_rel_pairs.return_value = []
+        
+        with patch('nltk.corpus.wordnet.synset') as mock_synset:
+            mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
+            
+            # Test with negative beam width - should handle gracefully
+            result = self.beam_builder.get_new_beams(
+                mock_graph, "cat.n.01", "dog.n.01", mock_model, beam_width=-1
+            )
+            # Should return empty list or raise appropriate error
+            self.assertIsInstance(result, list)
+
+    def test_asymmetric_pairs_map_completeness(self):
+        """Test that asymmetric pairs map contains all expected bidirectional mappings"""
+        asymm_map = self.beam_builder.asymmetric_pairs_map
+        
+        # Get expected mappings from config
+        expected_mappings = self.mock_config.get_asymmetric_relation_test_cases()['expected_bidirectional_pairs']
+        
+        # Test that all expected mappings are present
+        for source_rel, expected_target in expected_mappings.items():
+            self.assertIn(source_rel, asymm_map,
+                         f"Expected asymmetric relation {source_rel} not found in map")
+            self.assertEqual(asymm_map[source_rel], expected_target,
+                           f"Asymmetric mapping for {source_rel} should be {expected_target}")
+        
+        # Test that each mapping is bidirectional
+        for source_rel, target_rel in asymm_map.items():
+            self.assertIn(target_rel, asymm_map, 
+                         f"Asymmetric mapping {source_rel}->{target_rel} should have reverse mapping")
+            self.assertEqual(asymm_map[target_rel], source_rel,
+                           f"Reverse mapping for {source_rel}->{target_rel} should be consistent")
+
+    def test_symmetric_pairs_map_consistency(self):
+        """Test that symmetric pairs map contains consistent self-mappings"""
+        symm_map = self.beam_builder.symmetric_pairs_map
+        
+        # Get expected self-mappings from config
+        expected_relations = self.mock_config.get_symmetric_relation_test_cases()['expected_self_mappings']
+        
+        # Test that all expected relations are present and map to themselves
+        for relation in expected_relations:
+            self.assertIn(relation, symm_map,
+                         f"Expected symmetric relation {relation} not found in map")
+            self.assertEqual(symm_map[relation], relation,
+                           f"Symmetric relation {relation} should map to itself")
+        
+        # Test that each symmetric relation maps to itself
+        for relation in symm_map:
+            self.assertEqual(symm_map[relation], relation,
+                           f"Symmetric relation {relation} should map to itself")
+
+    def test_lexical_relations_graph_consistency_validation(self):
+        """Test validation that lexical relations are consistent with graph structure"""
+        # Create a graph where source has neighbors but embeddings don't match
+        mock_graph = nx.DiGraph()
+        mock_graph.add_node("cat.n.01")
+        mock_graph.add_node("dog.n.01")
+        mock_graph.add_node("mammal.n.01")
+        mock_graph.add_edge("cat.n.01", "mammal.n.01")  # cat -> mammal edge
+        # No edge from dog to mammal
+        
+        mock_cat_synset = self.mock_factory('MockSynsetForBeam', "cat.n.01", "feline mammal")
+        mock_dog_synset = self.mock_factory('MockSynsetForBeam', "dog.n.01", "canine mammal")
+        
+        # Set up embeddings where dog has relations to nodes not in its graph neighbors
+        self.mock_embedding_helper.embed_lexical_relations.side_effect = [
+            {"hypernyms": [("mammal.n.01", 0.9)]},  # cat -> mammal (valid)
+            {"hypernyms": [("mammal.n.01", 0.8)]}   # dog -> mammal (INVALID - not a neighbor)
+        ]
+        
+        with patch('nltk.corpus.wordnet.synset') as mock_synset:
+            mock_synset.side_effect = [mock_cat_synset, mock_dog_synset]
+            
+            mock_model = self.mock_factory('MockEmbeddingModel')
+            
+            # Should raise validation error
+            with self.assertRaises(ValueError) as context:
+                self.beam_builder.get_new_beams(
+                    mock_graph, "cat.n.01", "dog.n.01", mock_model
+                )
+            
+            # Check error message contains relevant information
+            error_msg = str(context.exception)
+            self.assertIn("Not all lexical properties", error_msg)
+            self.assertIn("dog.n.01", error_msg)
+            self.assertIn("in graph", error_msg)
+
+
 class TestBeamBuilderEdgeCases(unittest.TestCase):
-    """Test edge cases and error conditions for BeamBuilder"""
+    """
+    Test suite for BeamBuilder edge cases and boundary conditions.
+    
+    This test class focuses on testing BeamBuilder behavior in unusual
+    or extreme conditions, including:
+    - Zero or negative beam widths
+    - Empty embedding responses
+    - Identical similarity scores
+    - Partial validation failures
+    - Boundary value testing
+    - Unusual input combinations
+    
+    These tests ensure the BeamBuilder handles edge cases gracefully
+    without crashing or producing invalid results.
+    """
     
     def setUp(self):
         """Set up test fixtures"""
@@ -361,7 +578,21 @@ class TestBeamBuilderEdgeCases(unittest.TestCase):
 
 
 class TestBeamBuilderIntegration(unittest.TestCase):
-    """Integration tests for BeamBuilder with realistic scenarios"""
+    """
+    Integration test suite for BeamBuilder with realistic scenarios.
+    
+    This test class focuses on testing BeamBuilder in realistic,
+    end-to-end scenarios that simulate actual usage patterns:
+    - Integration with complex WordNet-like graph structures
+    - Realistic embedding responses and similarities
+    - Multi-component interaction testing
+    - Performance with larger datasets
+    - Real-world relationship patterns
+    - Complex synset hierarchies
+    
+    These tests verify that BeamBuilder works correctly when all
+    components are integrated and operating together.
+    """
     
     def setUp(self):
         """Set up for integration testing"""

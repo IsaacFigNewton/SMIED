@@ -248,72 +248,67 @@ class PatternLoaderMockConfig:
         }
     
     @staticmethod
-    def get_performance_benchmarks():
-        """Get performance benchmarks for pattern loading."""
+    def get_pattern_management_test_data():
+        """Get test data for pattern management operations."""
         return {
-            'small_file': {
-                'patterns_count': 10,
-                'max_load_time_ms': 100,
-                'max_memory_mb': 10
+            'add_pattern_scenarios': {
+                'new_category': {
+                    'name': 'new_pattern',
+                    'pattern': [{"text": "test"}],
+                    'description': 'New pattern',
+                    'category': 'new_category'
+                },
+                'existing_category': {
+                    'name': 'another_pattern',
+                    'pattern': [{"pos": ["NOUN"]}],
+                    'description': 'Another pattern',
+                    'category': 'existing'
+                },
+                'default_category': {
+                    'name': 'default_pattern',
+                    'pattern': [{"text": "default"}],
+                    'description': '',
+                    'category': 'custom'  # Default category
+                }
             },
-            'medium_file': {
-                'patterns_count': 100,
-                'max_load_time_ms': 1000,
-                'max_memory_mb': 50
-            },
-            'large_file': {
-                'patterns_count': 1000,
-                'max_load_time_ms': 5000,
-                'max_memory_mb': 200
+            'string_representation_data': {
+                "converted": "data"
             }
         }
     
     @staticmethod
-    def get_pattern_category_examples():
-        """Get pattern category examples."""
+    def get_error_scenarios():
+        """Get error scenario test data."""
         return {
-            'grammatical_patterns': {
-                'svo': "Subject-Verb-Object",
-                'svc': "Subject-Verb-Complement",
-                'svoo': "Subject-Verb-Object-Object",
-                'passive': "Passive construction"
+            'file_errors': {
+                'file_not_found': 'nonexistent.json',
+                'permission_error': 'readonly.json',
+                'malformed_json': '{"incomplete": json',
+                'io_error': 'io_error_file.json'
             },
-            'semantic_patterns': {
-                'agent_action': "Agent performing action",
-                'possession': "Possessive relationship",
-                'location': "Locative relationship",
-                'temporal': "Temporal relationship"
+            'pattern_errors': {
+                'invalid_structure': 'not_a_dict',
+                'missing_fields': {'pattern': []},  # missing description
+                'wrong_type': 123
             },
-            'discourse_patterns': {
-                'question': "Question pattern",
-                'conditional': "Conditional statement",
-                'comparison': "Comparative structure",
-                'contrast': "Contrastive structure"
+            'conversion_errors': {
+                'deep_nesting': 100,  # levels of nesting
+                'circular_reference': True,
+                'memory_limit': '1GB'
             }
         }
     
     @staticmethod
-    def get_error_recovery_scenarios():
-        """Get error recovery scenarios for testing."""
+    def get_default_pattern_test_data():
+        """Get test data for default pattern operations."""
         return {
-            'partial_corruption': {
-                'description': 'File with some corrupted patterns',
-                'valid_patterns': 5,
-                'corrupted_patterns': 2,
-                'expected_behavior': 'load_valid_skip_invalid'
+            'mock_resource_patterns': {
+                "lexical": {"basic_word": {"description": "Basic word", "pattern": []}},
+                "simple_semantic": {"action": {"description": "Action", "pattern": []}}
             },
-            'encoding_issues': {
-                'description': 'File with encoding problems',
-                'encoding': 'latin-1',
-                'expected_encoding': 'utf-8',
-                'expected_behavior': 'attempt_encoding_detection'
-            },
-            'large_file_timeout': {
-                'description': 'Very large file causing timeout',
-                'file_size_mb': 100,
-                'timeout_ms': 30000,
-                'expected_behavior': 'timeout_gracefully'
-            }
+            'pattern_files': ["lexical", "simple_semantic", "complex_semantic", "domain_specific", 
+                           "metavertex_basic", "metavertex_semantic", "metavertex_complex"],
+            'expected_fallback': {"default": {"pattern": {}}}
         }
 
     @staticmethod
@@ -330,34 +325,196 @@ class PatternLoaderMockConfig:
                 }
             }
         }
-
+    
     @staticmethod
-    def get_json_conversion_test_data():
-        """Get test data for JSON pattern conversion."""
+    def get_basic_test_data():
+        """Get basic test data for PatternLoader functionality tests."""
         return {
-            'basic_conversion': {
-                "test_category": {
-                    "test_pattern": {
-                        "description": "Basic conversion test",
+            'simple_patterns': {
+                "basic": {
+                    "simple_svo": {
+                        "description": "Simple SVO pattern",
                         "pattern": [
-                            {"pos": ["NOUN"], "labels": ["PERSON"]},
-                            {"pos": ["VERB"], "root_type": ["LEXICAL"]},
-                            {"relation": ["agent"], "relation_type": ["SEMANTIC"]}
+                            {"pos": ["NOUN"], "dep": ["nsubj"]},
+                            {"pos": ["VERB"], "dep": ["ROOT"]},
+                            {"pos": ["NOUN"], "dep": ["dobj"]}
                         ]
                     }
                 }
             },
-            'complex_conversion': {
-                "complex_category": {
-                    "complex_pattern": {
-                        "description": "Complex pattern conversion",
+            'json_test_data': {
+                "category": {
+                    "pattern1": [
+                        {"pos": ["NOUN", "VERB"], "text": "test"},
+                        {"relation": ["subject"], "other": "value"}
+                    ]
+                }
+            },
+            'set_conversion_data': {
+                "category": {
+                    "pattern1": {
+                        "description": "Test description",
                         "pattern": [
-                            {"pos": ["NOUN", "PROPN"], "labels": ["PERSON", "ORG"]},
-                            {"pos": ["VERB"], "tense": ["PAST"], "root_type": ["ACTION"]},
-                            {"pos": ["NOUN"], "labels": ["OBJECT"]},
-                            {"relation": ["nsubj"], "relation_type": ["GRAMMATICAL"]},
-                            {"relation": ["dobj"], "relation_type": ["GRAMMATICAL"]}
+                            {"pos": {"NOUN", "VERB"}, "text": "test"},
+                            {"relation": {"subject"}, "other": "value"}
                         ]
+                    }
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_validation_test_data():
+        """Get validation test data."""
+        return {
+            'valid_pattern_data': {
+                "test_category": {
+                    "valid_pattern": {
+                        "description": "Valid pattern",
+                        "pattern": [
+                            {"pos": ["NOUN"], "text": "word"}
+                        ]
+                    }
+                }
+            },
+            'invalid_pattern_data': {
+                "test_category": {
+                    "invalid_pattern": "not_a_dict"
+                }
+            },
+            'convertible_keys_test': {
+                "category": {
+                    "pattern1": [
+                        {
+                            "pos": ["NOUN", "VERB"],         # Should convert
+                            "root_type": ["entity"],         # Should convert  
+                            "labels": ["person", "animal"],  # Should convert
+                            "relation_type": ["subject"],    # Should convert
+                            "other_list": ["keep", "as", "list"],  # Should NOT convert
+                            "string_value": "unchanged"      # Should remain unchanged
+                        }
+                    ]
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_edge_case_scenarios():
+        """Get edge case test data."""
+        return {
+            'empty_patterns': {},
+            'malformed_json': '{"incomplete": json',
+            'missing_description': {
+                "category": {
+                    "pattern1": {
+                        "pattern": [{"text": "test"}]
+                        # Missing "description" key
+                    }
+                }
+            },
+            'non_list_patterns': {
+                "category": {
+                    "pattern1": "not_a_list"
+                }
+            },
+            'large_pattern_params': {
+                'num_categories': 10,
+                'patterns_per_category': 20,
+                'items_per_pattern': 5,
+                'words_per_item': 10
+            },
+            'nested_patterns': {
+                "complex": {
+                    "nested_pattern": {
+                        "description": "Complex nested pattern",
+                        "pattern": [
+                            {
+                                "text": ["surface_text"],
+                                "nested": {
+                                    "deep": {
+                                        "pos": ["NOUN"],  # This should NOT be converted (not at top level)
+                                        "very_deep": ["value"]
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_integration_test_data():
+        """Get integration test data."""
+        return {
+            'workflow_patterns': {
+                "workflow": {
+                    "test_pattern": {
+                        "description": "Workflow test",
+                        "pattern": [{"pos": ["NOUN"], "text": "test"}]
+                    }
+                }
+            },
+            'realistic_semantic_patterns': {
+                "semantic": {
+                    "subject_verb_object": {
+                        "description": "Basic SVO pattern",
+                        "pattern": [
+                            {"pos": ["NOUN", "PROPN"], "dep": ["nsubj"]},
+                            {"pos": ["VERB"], "dep": ["ROOT"]},
+                            {"pos": ["NOUN", "PROPN"], "dep": ["dobj", "pobj"]}
+                        ]
+                    },
+                    "entity_relation": {
+                        "description": "Entity relation pattern",
+                        "pattern": [
+                            {"ent_type": ["PERSON", "ORG"], "pos": ["NOUN"]},
+                            {"relation_type": ["works_for", "part_of"]},
+                            {"ent_type": ["ORG", "PLACE"], "pos": ["NOUN"]}
+                        ]
+                    }
+                },
+                "syntactic": {
+                    "noun_phrase": {
+                        "description": "Noun phrase pattern",
+                        "pattern": [
+                            {"pos": ["DET"], "optional": True},
+                            {"pos": ["ADJ"], "optional": True, "repeat": True},
+                            {"pos": ["NOUN", "PROPN"]}
+                        ]
+                    }
+                }
+            },
+            'temp_filenames': [
+                "temp_test_patterns.json",
+                "test_workflow_patterns.json",
+                "integration_test_output.json"
+            ]
+        }
+
+    @staticmethod
+    def get_file_operation_test_data():
+        """Get file operation test data."""
+        return {
+            'valid_json_content': {
+                "test_category": {
+                    "test_pattern": {
+                        "description": "File test pattern",
+                        "pattern": [{"pos": ["NOUN"], "text": "test"}]
+                    }
+                }
+            },
+            'mock_file_paths': {
+                'existing_file': 'test_patterns.json',
+                'nonexistent_file': 'nonexistent.json',
+                'output_file': 'output.json',
+                'malformed_file': 'malformed.json'
+            },
+            'default_patterns_data': {
+                "default": {
+                    "default_pattern": {
+                        "description": "Default pattern",
+                        "pattern": [{"text": "default"}]
                     }
                 }
             }

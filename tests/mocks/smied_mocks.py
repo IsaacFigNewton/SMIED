@@ -1,10 +1,14 @@
 """
-Mock classes for SMIED tests.
+Mock classes for SMIED tests following the SMIED Testing Framework Design Specifications.
+
+This module implements the MockFactory pattern and abstract base class hierarchy
+for comprehensive SMIED component testing.
 """
 
 from unittest.mock import Mock
 from typing import Optional, List, Any, Dict
 from tests.mocks.base.library_wrapper_mock import AbstractLibraryWrapperMock
+from tests.mocks.base.entity_mock import AbstractEntityMock, EntityType
 
 
 class SMIEDMockFactory:
@@ -15,10 +19,12 @@ class SMIEDMockFactory:
             'MockISMIEDPipeline': MockISMIEDPipeline,
             'MockSMIED': MockSMIED,
             'MockSMIEDIntegration': MockSMIEDIntegration,
+            'MockSMIEDEdgeCases': MockSMIEDEdgeCases,
             'MockNLTK': MockNLTK,
             'MockSpacy': MockSpacy,
             'MockWordNet': MockWordNet,
             'MockSynset': MockSynset,
+            'MockSynsetEdgeCases': MockSynsetEdgeCases,
             'MockSemanticDecomposer': MockSemanticDecomposer,
             'MockGraph': MockGraph,
         }
@@ -89,6 +95,40 @@ class MockSMIED(Mock):
         self._show_fallback_relationships = Mock()
         self._show_hypernym_path = Mock()
         self._show_verb_relations = Mock()
+
+
+class MockSMIEDEdgeCases(Mock):
+    """Mock for SMIED edge case testing."""
+    
+    def __init__(self, failure_mode=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.failure_mode = failure_mode
+        
+        # Set up methods that may fail
+        if failure_mode == 'initialization_error':
+            self.reinitialize = Mock(side_effect=RuntimeError("Initialization failed"))
+            self.build_synset_graph = Mock(side_effect=MemoryError("Out of memory"))
+        elif failure_mode == 'analysis_error':
+            self.analyze_triple = Mock(side_effect=ValueError("Invalid triple format"))
+            self.get_synsets = Mock(side_effect=LookupError("Synsets not found"))
+        elif failure_mode == 'resource_error':
+            self.build_synset_graph = Mock(side_effect=OSError("Resource unavailable"))
+            self.calculate_similarity = Mock(side_effect=TimeoutError("Processing timeout"))
+        else:
+            # Normal behavior with edge case configurations
+            self.reinitialize = Mock()
+            self.analyze_triple = Mock(return_value=([], [], None))
+            self.get_synsets = Mock(return_value=[])
+            self.build_synset_graph = Mock(return_value=None)
+            self.calculate_similarity = Mock(return_value=None)
+        
+        # Common attributes
+        self.nlp_model_name = kwargs.get('nlp_model', 'nonexistent_model')
+        self.embedding_model = kwargs.get('embedding_model', 'unavailable_model')
+        self.auto_download = kwargs.get('auto_download', False)
+        self.nlp = None
+        self.decomposer = None
+        self.synset_graph = None
 
 
 class MockSMIEDIntegration(Mock):
@@ -388,32 +428,152 @@ class MockWordNet(AbstractLibraryWrapperMock):
         return True
 
 
-class MockSynset(Mock):
-    """Mock for WordNet Synset."""
+class MockSynset(AbstractEntityMock):
+    """Mock for WordNet Synset following abstract base class hierarchy."""
     
     def __init__(self, name="test.n.01", definition="test definition", *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(entity_type=EntityType.SYNSET, *args, **kwargs)
+        
+        # Core synset attributes
+        self._synset_name = name
+        self._synset_definition = definition
         self.name = Mock(return_value=name)
         self.definition = Mock(return_value=definition)
         self.pos = Mock(return_value="n")
         self.examples = Mock(return_value=["test example"])
+        
+        # Set entity properties
+        self.set_property('name', name)
+        self.set_property('definition', definition)
+        self.set_property('pos', 'n')
+        
+        # Lemma relationships
         self.lemmas = Mock(return_value=[Mock(name=Mock(return_value="test"))])
+        
+        # Hierarchical relationships
         self.hypernyms = Mock(return_value=[])
         self.hyponyms = Mock(return_value=[])
+        
+        # Holonym/Meronym relationships
         self.member_holonyms = Mock(return_value=[])
         self.part_holonyms = Mock(return_value=[])
         self.substance_holonyms = Mock(return_value=[])
         self.member_meronyms = Mock(return_value=[])
         self.part_meronyms = Mock(return_value=[])
         self.substance_meronyms = Mock(return_value=[])
+        
+        # Other relationships
         self.similar_tos = Mock(return_value=[])
         self.also_sees = Mock(return_value=[])
         self.verb_groups = Mock(return_value=[])
         self.entailments = Mock(return_value=[])
         self.causes = Mock(return_value=[])
+        
+        # Similarity methods
         self.path_similarity = Mock(return_value=0.5)
         self.wup_similarity = Mock(return_value=0.8)
         self.lch_similarity = Mock(return_value=2.5)
+        
+        # Initialize as valid
+        self.is_valid = True
+    
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute (synset name)."""
+        return self._synset_name
+    
+    def validate_entity(self) -> bool:
+        """Validate synset consistency."""
+        return (self.is_valid and 
+                bool(self._synset_name) and 
+                bool(self._synset_definition))
+    
+    def get_entity_signature(self) -> str:
+        """Get unique synset signature."""
+        return f"synset:{self.id}:{self._synset_name}"
+
+
+class MockSynsetEdgeCases(AbstractEntityMock):
+    """Mock for WordNet Synset edge case testing."""
+    
+    def __init__(self, edge_case_type="empty_synset", *args, **kwargs):
+        super().__init__(entity_type=EntityType.SYNSET, *args, **kwargs)
+        
+        self.edge_case_type = edge_case_type
+        
+        if edge_case_type == "empty_synset":
+            # Empty synset with no data
+            self._synset_name = ""
+            self._synset_definition = ""
+            self.is_valid = False
+        elif edge_case_type == "malformed_synset":
+            # Malformed synset data
+            self._synset_name = "invalid..synset"
+            self._synset_definition = None
+            self.is_valid = False
+        elif edge_case_type == "missing_relationships":
+            # Valid synset but no relationships
+            self._synset_name = "isolated.n.01"
+            self._synset_definition = "isolated concept"
+            self.is_valid = True
+        elif edge_case_type == "circular_relationships":
+            # Synset with circular relationships
+            self._synset_name = "circular.n.01"
+            self._synset_definition = "circular reference"
+            self.is_valid = True
+        else:
+            # Default valid synset
+            self._synset_name = "edge.n.01"
+            self._synset_definition = "edge case definition"
+            self.is_valid = True
+        
+        # Set up basic attributes
+        self.name = Mock(return_value=self._synset_name)
+        self.definition = Mock(return_value=self._synset_definition)
+        self.pos = Mock(return_value="n")
+        
+        # Configure edge case specific behaviors
+        if edge_case_type == "missing_relationships":
+            self.hypernyms = Mock(return_value=[])
+            self.hyponyms = Mock(return_value=[])
+            self.lemmas = Mock(return_value=[])
+        elif edge_case_type == "circular_relationships":
+            # Create circular reference (self-referential)
+            self.hypernyms = Mock(return_value=[self])
+            self.hyponyms = Mock(return_value=[self])
+        else:
+            self.hypernyms = Mock(return_value=[])
+            self.hyponyms = Mock(return_value=[])
+            self.lemmas = Mock(return_value=[])
+        
+        # Similarity methods that may fail
+        if not self.is_valid:
+            self.path_similarity = Mock(side_effect=ValueError("Invalid synset"))
+            self.wup_similarity = Mock(side_effect=ValueError("Invalid synset"))
+            self.lch_similarity = Mock(side_effect=ValueError("Invalid synset"))
+        else:
+            self.path_similarity = Mock(return_value=0.0)
+            self.wup_similarity = Mock(return_value=0.0)
+            self.lch_similarity = Mock(return_value=0.0)
+        
+        # Set entity properties
+        self.set_property('name', self._synset_name)
+        self.set_property('definition', self._synset_definition)
+        self.set_property('edge_case_type', edge_case_type)
+    
+    def get_primary_attribute(self) -> Any:
+        """Get the primary attribute (synset name)."""
+        return self._synset_name
+    
+    def validate_entity(self) -> bool:
+        """Validate synset consistency."""
+        if self.edge_case_type in ["empty_synset", "malformed_synset"]:
+            return False
+        return (bool(self._synset_name) and 
+                self._synset_definition is not None)
+    
+    def get_entity_signature(self) -> str:
+        """Get unique synset signature."""
+        return f"synset_edge:{self.id}:{self._synset_name}:{self.edge_case_type}"
 
 
 class MockSemanticDecomposer(Mock):

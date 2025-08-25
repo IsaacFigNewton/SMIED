@@ -15,25 +15,43 @@ from tests.mocks.base.reasoning_mock import AbstractReasoningMock, ReasoningType
 
 
 class SemanticDecomposerMockFactory:
-    """Factory class for creating SemanticDecomposer mock instances."""
+    """Factory class for creating SemanticDecomposer mock instances.
+    
+    This factory follows the SMIED Testing Framework Design Specifications
+    for mock creation using factory pattern with abstract base class hierarchy.
+    """
     
     def __init__(self):
         self._mock_classes = {
+            # Core SemanticDecomposer mocks
             'MockSemanticDecomposer': MockSemanticDecomposer,
+            'MockSemanticDecomposerValidation': MockSemanticDecomposerValidation,
+            'MockSemanticDecomposerEdgeCases': MockSemanticDecomposerEdgeCases,
             'MockSemanticDecomposerIntegration': MockSemanticDecomposerIntegration,
+            
+            # WordNet and NLP component mocks
             'MockWordNetForDecomposer': MockWordNetForDecomposer,
+            'MockSynsetForDecomposer': MockSynsetForDecomposer,
             'MockNLPForDecomposer': MockNLPForDecomposer,
             'MockDocForDecomposer': MockDocForDecomposer,
             'MockTokenForDecomposer': MockTokenForDecomposer,
+            
+            # Algorithmic component mocks
             'MockEmbeddingModelForDecomposer': MockEmbeddingModelForDecomposer,
             'MockEmbeddingHelperForDecomposer': MockEmbeddingHelperForDecomposer,
             'MockBeamBuilderForDecomposer': MockBeamBuilderForDecomposer,
             'MockGlossParserForDecomposer': MockGlossParserForDecomposer,
-            'MockNetworkXGraph': MockNetworkXGraph,
-            'MockRealWordNet': MockRealWordNet,
-            'MockRealNetworkXGraph': MockRealNetworkXGraph,
             'MockPairwiseBidirectionalAStar': MockPairwiseBidirectionalAStar,
+            
+            # Graph and data structure mocks
+            'MockNetworkXGraph': MockNetworkXGraph,
+            'MockRealNetworkXGraph': MockRealNetworkXGraph,
             'MockPatternMatcher': MockPatternMatcher,
+            
+            # Integration and edge case mocks
+            'MockRealWordNet': MockRealWordNet,
+            'MockFrameNetSpacySRL': MockFrameNetSpacySRL,
+            'MockDerivationalMorphology': MockDerivationalMorphology,
         }
     
     def __call__(self, mock_name: str, *args, **kwargs) -> Mock:
@@ -112,10 +130,13 @@ class MockSemanticDecomposerIntegration(Mock):
         """
         synsets = []
         for config in synset_configs:
-            mock_synset = Mock()
-            mock_synset.name.return_value = config.get('name', 'test.n.01')
-            mock_synset.definition.return_value = config.get('definition', 'test definition')
-            mock_synset.pos.return_value = config.get('pos', 'n')
+            # Use the factory to create proper synset mocks
+            synset_name = config.get('name', 'test.n.01')
+            mock_synset = MockSynsetForDecomposer(
+                name=synset_name,
+                definition=config.get('definition', 'test definition'),
+                pos=config.get('pos', 'n')
+            )
             synsets.append(mock_synset)
         return synsets
     
@@ -272,7 +293,13 @@ class MockWordNetForDecomposer(Mock):
         synset.definition = Mock(return_value=f"Definition for {name}")
         synset.pos = Mock(return_value=name.split('.')[1])
         synset.examples = Mock(return_value=[f"Example for {name}"])
-        synset.lemmas = Mock(return_value=[Mock(name=Mock(return_value=name.split('.')[0]))])
+        # Create proper lemma mock for synset with all necessary methods
+        lemma_mock = Mock()
+        lemma_mock.name = Mock(return_value=name.split('.')[0])
+        lemma_mock.derivationally_related_forms = Mock(return_value=[])
+        lemma_mock.pertainyms = Mock(return_value=[])
+        lemma_mock.antonyms = Mock(return_value=[])
+        synset.lemmas = Mock(return_value=[lemma_mock])
         
         # Relations - using correct method names
         synset.hypernyms = Mock(return_value=[])
@@ -288,6 +315,7 @@ class MockWordNetForDecomposer(Mock):
         synset.verb_groups = Mock(return_value=[])
         synset.entailments = Mock(return_value=[])
         synset.causes = Mock(return_value=[])
+        synset.attributes = Mock(return_value=[])
         
         # Similarity methods
         synset.path_similarity = Mock(return_value=0.5)
@@ -753,3 +781,100 @@ class MockPatternMatcher(AbstractAlgorithmicFunctionMock):
             "greedy": True,
             "supports_groups": True
         }
+
+
+class MockSemanticDecomposerValidation(Mock):
+    """Mock for SemanticDecomposer validation testing."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set up validation-specific behavior
+        self.validate_inputs = Mock(return_value=True)
+        self.validate_synsets = Mock(return_value=True)
+        self.validate_graph = Mock(return_value=True)
+        self.validate_parameters = Mock(return_value=True)
+        
+        # Validation error methods
+        self.get_validation_errors = Mock(return_value=[])
+        self.is_valid_synset = Mock(return_value=True)
+        self.is_valid_graph = Mock(return_value=True)
+
+
+class MockSemanticDecomposerEdgeCases(Mock):
+    """Mock for SemanticDecomposer edge case testing."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set up edge case behaviors
+        self.handle_empty_synsets = Mock(return_value=(None, None, None))
+        self.handle_invalid_graph = Mock(return_value=(None, None, None))
+        self.handle_missing_paths = Mock(return_value=(None, None, None))
+        self.handle_timeout = Mock(side_effect=TimeoutError("Path finding timeout"))
+        self.handle_memory_limit = Mock(side_effect=MemoryError("Memory limit exceeded"))
+
+
+class MockSynsetForDecomposer(Mock):
+    """Mock synset specifically designed for SemanticDecomposer testing."""
+    
+    def __init__(self, name="test.n.01", definition="test definition", pos="n", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._name = name
+        self._definition = definition
+        self._pos = pos
+        
+        # Configure basic synset attributes
+        self.name = Mock(return_value=name)
+        self.definition = Mock(return_value=definition)
+        self.pos = Mock(return_value=pos)
+        self.examples = Mock(return_value=[f"Example for {name}"])
+        # Create proper lemma mock with all necessary methods
+        lemma_mock = Mock()
+        lemma_mock.name = Mock(return_value=name.split('.')[0])
+        lemma_mock.derivationally_related_forms = Mock(return_value=[])
+        lemma_mock.pertainyms = Mock(return_value=[])
+        lemma_mock.antonyms = Mock(return_value=[])
+        self.lemmas = Mock(return_value=[lemma_mock])
+        
+        # Configure semantic relations
+        self.hypernyms = Mock(return_value=[])
+        self.hyponyms = Mock(return_value=[])
+        self.member_holonyms = Mock(return_value=[])
+        self.part_holonyms = Mock(return_value=[])
+        self.substance_holonyms = Mock(return_value=[])
+        self.member_meronyms = Mock(return_value=[])
+        self.part_meronyms = Mock(return_value=[])
+        self.substance_meronyms = Mock(return_value=[])
+        self.similar_tos = Mock(return_value=[])
+        self.also_sees = Mock(return_value=[])
+        self.verb_groups = Mock(return_value=[])
+        self.entailments = Mock(return_value=[])
+        self.causes = Mock(return_value=[])
+        self.attributes = Mock(return_value=[])
+        
+        # Configure similarity methods
+        self.path_similarity = Mock(return_value=0.5)
+        self.wup_similarity = Mock(return_value=0.8)
+        self.lch_similarity = Mock(return_value=2.5)
+
+
+class MockFrameNetSpacySRL(Mock):
+    """Mock FrameNetSpacySRL for SemanticDecomposer testing."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set up FrameNet SRL methods
+        self.extract_frames = Mock(return_value=[])
+        self.find_frame_connections = Mock(return_value=[])
+        self.get_semantic_roles = Mock(return_value={})
+        self.analyze_frame_relations = Mock(return_value=[])
+
+
+class MockDerivationalMorphology(Mock):
+    """Mock derivational morphology component for SemanticDecomposer testing."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set up derivational morphology methods
+        self.find_derivational_relations = Mock(return_value=[])
+        self.get_morphological_variants = Mock(return_value=[])
+        self.analyze_word_formation = Mock(return_value={})

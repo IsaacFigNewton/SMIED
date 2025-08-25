@@ -227,3 +227,167 @@ class SemanticDecomposerMockConfig:
                 }
             }
         }
+    
+    @staticmethod
+    def get_validation_test_data():
+        """Get test data for validation tests."""
+        return {
+            'valid_inputs': {
+                'subject': 'cat',
+                'predicate': 'run', 
+                'object': 'park',
+                'beam_width': 3,
+                'max_depth': 6,
+                'similarity_threshold': 0.5
+            },
+            'invalid_inputs': {
+                'empty_subject': '',
+                'none_predicate': None,
+                'invalid_beam_width': -1,
+                'invalid_max_depth': 0,
+                'invalid_threshold': 1.5
+            },
+            'boundary_inputs': {
+                'min_beam_width': 1,
+                'max_beam_width': 100,
+                'min_max_depth': 1,
+                'max_max_depth': 50,
+                'min_threshold': 0.0,
+                'max_threshold': 1.0
+            }
+        }
+    
+    @staticmethod
+    def get_edge_case_test_data():
+        """Get test data for edge case tests."""
+        return {
+            'empty_scenarios': {
+                'no_synsets_found': {
+                    'subject': 'nonexistent_word_xyz',
+                    'predicate': 'nonexistent_action_abc', 
+                    'object': 'nonexistent_location_def'
+                },
+                'empty_graph': {
+                    'nodes': [],
+                    'edges': []
+                },
+                'no_paths_found': {
+                    'source': 'emotion.n.01',
+                    'target': 'rock.n.01'
+                }
+            },
+            'malformed_scenarios': {
+                'invalid_synset_names': ['invalid', 'not.a.synset', ''],
+                'malformed_graph_data': {
+                    'nodes': [None, '', 123],
+                    'edges': [(None, 'valid'), ('', None)]
+                }
+            },
+            'performance_scenarios': {
+                'large_search_space': {
+                    'beam_width': 50,
+                    'max_depth': 20,
+                    'expected_timeout_ms': 10000
+                },
+                'memory_intensive': {
+                    'large_graph_nodes': 10000,
+                    'large_graph_edges': 50000
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_integration_scenarios():
+        """Get comprehensive integration test scenarios."""
+        return {
+            'realistic_semantic_decomposition': {
+                'triple_1': {
+                    'subject': 'scientist',
+                    'predicate': 'study',
+                    'object': 'organism',
+                    'expected_frame': 'Research',
+                    'expected_roles': ['Researcher', 'Topic'],
+                    'expected_path_length': [2, 4]
+                },
+                'triple_2': {
+                    'subject': 'student',
+                    'predicate': 'learn',
+                    'object': 'mathematics',
+                    'expected_frame': 'Education_teaching',
+                    'expected_roles': ['Student', 'Subject'],
+                    'expected_path_length': [1, 3]
+                }
+            },
+            'multi_strategy_scenarios': {
+                'frame_connection': {
+                    'synsets': ['teach.v.01', 'learn.v.01'],
+                    'strategy': 'framenet_srl',
+                    'expected_success': True
+                },
+                'derivational_fallback': {
+                    'synsets': ['teacher.n.01', 'teaching.n.01'], 
+                    'strategy': 'derivational_morphology',
+                    'expected_success': True
+                },
+                'hypernym_fallback': {
+                    'synsets': ['cat.n.01', 'mammal.n.01'],
+                    'strategy': 'hypernym_hyponym',
+                    'expected_success': True
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_mock_setup_configurations():
+        """Get configurations for mock setup in different test scenarios."""
+        return {
+            'basic_setup': {
+                'wordnet_mock': 'MockWordNetForDecomposer',
+                'nlp_mock': 'MockNLPForDecomposer',
+                'embedding_mock': 'MockEmbeddingModelForDecomposer',
+                'additional_components': ['BeamBuilder', 'EmbeddingHelper', 'GlossParser']
+            },
+            'validation_setup': {
+                'wordnet_mock': 'MockWordNetForDecomposer',
+                'nlp_mock': 'MockNLPForDecomposer',
+                'validation_mock': 'MockSemanticDecomposerValidation',
+                'enable_validation': True
+            },
+            'edge_case_setup': {
+                'wordnet_mock': 'MockWordNetForDecomposer',
+                'nlp_mock': 'MockNLPForDecomposer',
+                'edge_case_mock': 'MockSemanticDecomposerEdgeCases',
+                'simulate_failures': True
+            },
+            'integration_setup': {
+                'wordnet_mock': 'MockRealWordNet',
+                'nlp_mock': 'MockNLPForDecomposer',
+                'integration_mock': 'MockSemanticDecomposerIntegration',
+                'use_real_components': ['FrameNetSpacySRL', 'DerivationalMorphology']
+            }
+        }
+    
+    @staticmethod
+    def get_expected_test_outcomes():
+        """Get expected outcomes for different test scenarios."""
+        return {
+            'successful_pathfinding': {
+                'has_subject_path': True,
+                'has_object_path': True,
+                'has_predicate': True,
+                'path_length_range': [1, 10],
+                'similarity_score_range': [0.1, 1.0]
+            },
+            'failed_pathfinding': {
+                'has_subject_path': False,
+                'has_object_path': False,
+                'has_predicate': False,
+                'expected_exceptions': ['ValueError', 'TimeoutError']
+            },
+            'partial_success': {
+                'has_subject_path': True,
+                'has_object_path': False,
+                'has_predicate': True,
+                'fallback_strategies_used': ['hypernym_hyponym']
+            }
+        }

@@ -1,12 +1,26 @@
 """
 Configuration class containing mock constants and test data for EmbeddingHelper tests.
+
+This module provides structured test data following the SMIED Testing Framework 
+Design Specifications with:
+- Static methods for test data access
+- Hierarchically organized test scenarios
+- Consistent data formats
+- Scenario-based organization
 """
 
 import numpy as np
 
 
 class EmbeddingHelperMockConfig:
-    """Configuration class containing mock constants and test data for EmbeddingHelper tests."""
+    """Configuration class containing mock constants and test data for EmbeddingHelper tests.
+    
+    Provides centralized test data management with static methods for:
+    - Basic functionality testing
+    - Validation and constraint testing  
+    - Edge case and error condition testing
+    - Integration testing scenarios
+    """
     
     @staticmethod
     def get_embedding_dimensions():
@@ -401,5 +415,207 @@ class EmbeddingHelperMockConfig:
                 'embedding_dims': 100,
                 'similarity_threshold': 0.5,
                 'max_relations': 10
+            }
+        }
+
+    # ===== TEST LAYER-SPECIFIC DATA ORGANIZATION =====
+    
+    @staticmethod
+    def get_basic_test_data():
+        """Get test data for basic functionality tests (TestEmbeddingHelper)."""
+        return {
+            'synset_centroid_tests': {
+                'simple_synset': {
+                    'synset_name': 'cat.n.01',
+                    'lemmas': ['cat', 'feline'],
+                    'expected_centroid_shape': (3,),
+                    'mock_vectors': {
+                        'cat': np.array([1.0, 2.0, 3.0]),
+                        'feline': np.array([2.0, 3.0, 4.0])
+                    },
+                    'expected_centroid': np.array([1.5, 2.5, 3.5])
+                },
+                'compound_lemma': {
+                    'synset_name': 'ice_cream.n.01',
+                    'lemmas': ['ice_cream'],
+                    'space_separated_lookup': 'ice cream',
+                    'mock_vectors': {
+                        'ice cream': np.array([1.0, 2.0, 3.0]),
+                        'ice_cream': np.array([1.0, 2.0, 3.0])
+                    }
+                },
+                'multi_word_fallback': {
+                    'synset_name': 'hot_dog.n.01',
+                    'lemmas': ['hot_dog'],
+                    'component_words': ['hot', 'dog'],
+                    'mock_vectors': {
+                        'hot': np.array([1.0, 2.0, 3.0]),
+                        'dog': np.array([3.0, 4.0, 5.0])
+                    },
+                    'expected_centroid': np.array([2.0, 3.0, 4.0])
+                }
+            },
+            'lexical_relations_tests': {
+                'basic_relations': {
+                    'synset_name': 'cat.n.01',
+                    'relations': {
+                        'hypernyms': ['animal.n.01'],
+                        'hyponyms': ['kitten.n.01'],
+                        'empty_relations': ['part_holonyms', 'substance_holonyms', 'member_holonyms',
+                                          'part_meronyms', 'substance_meronyms', 'member_meronyms',
+                                          'entailments', 'causes', 'also_sees', 'verb_groups']
+                    },
+                    'expected_embeddings': {
+                        'hypernyms': [('animal.n.01', np.array([1.0, 2.0]))],
+                        'hyponyms': [('kitten.n.01', np.array([3.0, 4.0]))]
+                    }
+                }
+            },
+            'similarity_calculation_tests': {
+                'basic_similarity': {
+                    'rel_embs_1': [
+                        ('synset1', np.array([1.0, 0.0, 0.0])),
+                        ('synset2', np.array([1.0, 1.0, 0.0]))
+                    ],
+                    'rel_embs_2': [
+                        ('synset3', np.array([0.0, 1.0, 0.0])),
+                        ('synset4', np.array([1.0, 1.0, 0.0]))
+                    ],
+                    'expected_similarities': np.array([[0.0, 0.7071067811865476], [0.7071067811865476, 1.0]])
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_validation_test_data():
+        """Get test data for validation tests (TestEmbeddingHelperValidation)."""
+        return {
+            'input_validation_scenarios': {
+                'valid_synset_input': {
+                    'synset_name': 'cat.n.01',
+                    'model_type': 'dict',
+                    'expected_validation': True
+                },
+                'invalid_synset_input': {
+                    'synset_name': None,
+                    'model_type': 'dict',
+                    'expected_error': ValueError,
+                    'error_message': 'Invalid synset input'
+                },
+                'empty_model_input': {
+                    'synset_name': 'cat.n.01',
+                    'model_type': 'empty_dict',
+                    'expected_error': KeyError,
+                    'error_message': 'Empty embedding model'
+                }
+            },
+            'parameter_constraint_tests': {
+                'beam_width_constraints': {
+                    'valid_beam_widths': [1, 3, 5, 10],
+                    'invalid_beam_widths': [-1, 0],
+                    'edge_case_beam_widths': [1000, 0]  # 0 should return all results
+                },
+                'dimension_constraints': {
+                    'valid_dimensions': [50, 100, 200, 300],
+                    'invalid_dimensions': [0, -1],
+                    'mismatched_dimensions': {
+                        'vector_a': np.array([1.0, 2.0, 3.0]),
+                        'vector_b': np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+                        'expected_error': ValueError
+                    }
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_edge_case_test_data():
+        """Get test data for edge case tests (TestEmbeddingHelperEdgeCases)."""
+        return {
+            'empty_input_scenarios': {
+                'empty_synset_lemmas': {
+                    'synset_name': 'empty.n.01',
+                    'lemmas': [],
+                    'expected_centroid': np.array([])
+                },
+                'empty_embedding_lists': {
+                    'rel_embs_1': [],
+                    'rel_embs_2': [('synset', np.array([1.0]))],
+                    'expected_similarity_shape': (0, 0)
+                }
+            },
+            'zero_vector_scenarios': {
+                'zero_norm_vectors': {
+                    'vector_a': np.array([0.0, 0.0]),
+                    'vector_b': np.array([1.0, 1.0]),
+                    'expected_behavior': 'no_divide_by_zero_error'
+                }
+            },
+            'exception_handling_scenarios': {
+                'synset_lemmas_exception': {
+                    'side_effect': Exception('Test exception'),
+                    'expected_result': np.array([]),
+                    'expected_print_call': True
+                },
+                'relation_method_exception': {
+                    'relation': 'hypernyms',
+                    'side_effect': Exception('Test error'),
+                    'expected_empty_relation': True
+                }
+            },
+            'large_scale_scenarios': {
+                'large_matrices': {
+                    'matrix_size_1': 50,
+                    'matrix_size_2': 30,
+                    'vector_dimension': 10,
+                    'expected_shape': (50, 30),
+                    'similarity_bounds': (-1.0, 1.0)
+                }
+            }
+        }
+    
+    @staticmethod
+    def get_integration_test_data():
+        """Get test data for integration tests (TestEmbeddingHelperIntegration)."""
+        return {
+            'workflow_scenarios': {
+                'cat_to_animal_workflow': {
+                    'source_synset': {
+                        'name': 'cat.n.01',
+                        'lemmas': ['cat', 'feline'],
+                        'hypernyms': ['mammal.n.01'],
+                        'hyponyms': ['kitten.n.01']
+                    },
+                    'target_synset': {
+                        'name': 'dog.n.01', 
+                        'lemmas': ['dog', 'canine'],
+                        'hypernyms': ['mammal.n.01'],
+                        'hyponyms': ['puppy.n.01']
+                    },
+                    'embedding_model': {
+                        'cat': np.array([1.0, 0.0, 0.0]),
+                        'feline': np.array([0.9, 0.1, 0.0]),
+                        'dog': np.array([0.8, 0.2, 0.0]),
+                        'canine': np.array([0.7, 0.3, 0.0]),
+                        'mammal': np.array([0.5, 0.5, 0.0]),
+                        'kitten': np.array([0.8, 0.0, 0.2]),
+                        'puppy': np.array([0.6, 0.2, 0.2])
+                    },
+                    'expected_beam_results': {
+                        'min_similarity': 0.5,
+                        'max_results': 5
+                    }
+                }
+            },
+            'realistic_beam_generation': {
+                'multi_synset_scenario': {
+                    'synsets': ['cat.n.01', 'dog.n.01', 'bird.n.01'],
+                    'beam_width': 5,
+                    'expected_result_structure': {
+                        'result_type': list,
+                        'item_structure': tuple,
+                        'item_length': 3,
+                        'similarity_index': 2
+                    }
+                }
             }
         }

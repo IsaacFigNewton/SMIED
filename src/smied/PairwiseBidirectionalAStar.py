@@ -5,6 +5,10 @@ from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 import networkx as nx
 import numpy as np
 
+# Import WordNet for heuristic calculations
+import nltk
+from nltk.corpus import wordnet as wn
+
 # Type aliases
 SynsetName = str  # e.g., "dog.n.01"
 Path = List[SynsetName]
@@ -38,9 +42,11 @@ class PairwiseBidirectionalAStar:
         tgt: SynsetName,
         get_new_beams_fn: Optional[GetNewBeamsFn] = None,
         gloss_seed_nodes: Optional[Iterable[SynsetName]] = None,
-        beam_width: int = 3,
-        max_depth: int = 6,
-        relax_beam: bool = False,
+        beam_width: int = 10,  # Optimized: increased from 3 to 10
+        max_depth: int = 10,   # Optimized: increased from 6 to 10
+        relax_beam: bool = True,  # Optimized: changed from False to True
+        heuristic_type: str = "hybrid",  # New: hybrid, embedding, wordnet, uniform
+        embedding_helper: Optional[object] = None,  # For hybrid heuristic
     ):
         """
         Args:
@@ -48,9 +54,11 @@ class PairwiseBidirectionalAStar:
           src, tgt: synset node ids (strings).
           get_new_beams_fn: function to produce embedding-based beam pairs (optional).
           gloss_seed_nodes: explicit list of synset names seeded from glosses (optional).
-          beam_width: beam width for initial seeding (passed to get_new_beams if used).
-          max_depth: maximum hops allowed (total across both sides; enforced per side).
-          relax_beam: if True, allow exploring nodes outside the allowed beams.
+          beam_width: beam width for initial seeding (optimized default: 10).
+          max_depth: maximum hops allowed per side (optimized default: 10).
+          relax_beam: if True, allow exploring nodes outside the allowed beams (optimized default: True).
+          heuristic_type: type of heuristic function ("hybrid", "embedding", "wordnet", "uniform").
+          embedding_helper: embedding helper instance for hybrid heuristic calculations.
         """
         self.g = g
         self.src = src
@@ -60,6 +68,8 @@ class PairwiseBidirectionalAStar:
         self.beam_width = beam_width
         self.max_depth = max_depth
         self.relax_beam = relax_beam
+        self.heuristic_type = heuristic_type
+        self.embedding_helper = embedding_helper
 
         # will be set by _build_allowed_and_heuristics
         self.src_allowed: Set[SynsetName] = set()
@@ -79,6 +89,93 @@ class PairwiseBidirectionalAStar:
         self.parent_b: Dict[SynsetName, Optional[SynsetName]] = {}
         self.closed_f: Set[SynsetName] = set()
         self.closed_b: Set[SynsetName] = set()
+
+    # -------------------------
+    # WordNet Distance Estimation for Hybrid Heuristic
+    # -------------------------
+    def _different_pos(self, synset1_name: SynsetName, synset2_name: SynsetName) -> bool:
+        """Check if two synsets have different parts of speech."""
+        try:
+            syn1 = wn.synset(synset1_name)
+            syn2 = wn.synset(synset2_name)
+            return syn1.pos() != syn2.pos()
+        except Exception:
+            return False
+
+    def _estimate_wordnet_hops(self, current: SynsetName, target: SynsetName) -> float:
+        """
+        Estimate WordNet distance in hops between two synsets.
+        Uses path_similarity to estimate distance, with fallback heuristics.
+        """
+        try:
+            current_synset = wn.synset(current)
+            target_synset = wn.synset(target)
+            
+            # Try path similarity first
+            path_sim = current_synset.path_similarity(target_synset)
+            if path_sim is not None and path_sim > 0:
+                # Convert similarity (0-1) to distance estimate
+                # path_sim = 1 / (1 + distance), so distance ≈ (1/path_sim) - 1
+                estimated_distance = (1.0 / path_sim) - 1.0
+                return max(1.0, estimated_distance)  # At least 1 hop
+            
+            # Fallback: Wu-Palmer similarity
+            wup_sim = current_synset.wup_similarity(target_synset)
+            if wup_sim is not None and wup_sim > 0:
+                estimated_distance = (1.0 / wup_sim) - 1.0
+                return max(1.0, estimated_distance)
+            
+            # Fallback for different POS or unrelated synsets
+            if self._different_pos(current, target):
+                return 8.0  # Higher cost for cross-POS connections
+            else:
+                return 6.0  # Default distance within same POS
+                
+        except Exception:
+            # Ultimate fallback
+            return 5.0
+
+    def _get_embedding_similarity(self, current: SynsetName, target: SynsetName) -> float:
+        """Get embedding-based similarity between two synsets."""
+        if not self.embedding_helper:
+            return 0.5  # Default similarity
+        
+        try:
+            # This would need to be implemented based on the embedding helper interface
+            # For now, return a placeholder that could be replaced with actual implementation
+            return 0.5
+        except Exception:
+            return 0.5
+
+    def _calculate_heuristic(self, current: SynsetName, target: SynsetName) -> float:
+        """
+        Calculate heuristic value based on the configured heuristic type.
+        Lower values indicate better (closer to goal).
+        """
+        if self.heuristic_type == "uniform":
+            return 1.0
+        
+        elif self.heuristic_type == "wordnet":
+            return self._estimate_wordnet_hops(current, target)
+        
+        elif self.heuristic_type == "embedding":
+            embedding_sim = self._get_embedding_similarity(current, target)
+            return 1.0 - embedding_sim
+        
+        elif self.heuristic_type == "hybrid":
+            # Hybrid heuristic combining embedding and WordNet distance
+            embedding_sim = self._get_embedding_similarity(current, target)
+            wordnet_distance = self._estimate_wordnet_hops(current, target)
+            cross_pos_penalty = 0.2 if self._different_pos(current, target) else 0.0
+            
+            # Balanced combination (70% embedding, 30% WordNet)
+            h = (1 - embedding_sim) * 0.7 + wordnet_distance * 0.3 + cross_pos_penalty
+            return h
+        
+        else:
+            # Default to embedding-based heuristic
+            embedding_sim = self._get_embedding_similarity(current, target)
+            return 1.0 - embedding_sim
 
     # -------------------------
     # Setup: allowed sets & heuristics
@@ -112,22 +209,34 @@ class PairwiseBidirectionalAStar:
             self.src_allowed.add(node)
             self.tgt_allowed.add(node)
 
-        # Base heuristics from embedding beams
+        # Build heuristics using the new hybrid system
         self.h_forward = {}
         self.h_backward = {}
-        for (s_pair, t_pair, sim) in beams:
-            s_node = s_pair[0]
-            t_node = t_pair[0]
-            h_val = max(0.0, 1.0 - float(sim))
-            # keep smallest h (best sim)
-            if s_node not in self.h_forward or h_val < self.h_forward[s_node]:
-                self.h_forward[s_node] = h_val
-            if t_node not in self.h_backward or h_val < self.h_backward[t_node]:
-                self.h_backward[t_node] = h_val
-
-        # Ensure src/tgt have at least default heuristic
-        self.h_forward.setdefault(self.src, 0.0)
-        self.h_backward.setdefault(self.tgt, 0.0)
+        
+        # Calculate heuristics for all allowed nodes using the new system
+        all_nodes = self.src_allowed.union(self.tgt_allowed)
+        all_nodes.update({self.src, self.tgt})
+        
+        for node in all_nodes:
+            # Forward heuristic: estimate distance to target
+            h_forward_val = self._calculate_heuristic(node, self.tgt)
+            self.h_forward[node] = h_forward_val
+            
+            # Backward heuristic: estimate distance from source
+            h_backward_val = self._calculate_heuristic(self.src, node)
+            self.h_backward[node] = h_backward_val
+        
+        # For nodes from embedding beams, use the beam similarity if it's better
+        if self.heuristic_type in ["embedding", "hybrid"]:
+            for (s_pair, t_pair, sim) in beams:
+                s_node = s_pair[0]
+                t_node = t_pair[0]
+                h_val = max(0.0, 1.0 - float(sim))
+                # Use beam similarity if it's better (lower)
+                if s_node in self.h_forward:
+                    self.h_forward[s_node] = min(self.h_forward[s_node], h_val)
+                if t_node in self.h_backward:
+                    self.h_backward[t_node] = min(self.h_backward[t_node], h_val)
 
         # Apply gloss bonus: reduce heuristic for gloss seeds (they look more promising)
         for node in self.gloss_seed_nodes:
@@ -206,7 +315,10 @@ class PairwiseBidirectionalAStar:
                     self.g_f[nbr] = tentative_g
                     self.depth_f[nbr] = tentative_depth
                     self.parent_f[nbr] = current
-                    f_score = tentative_g + self.h_forward.get(nbr, 0.0)
+                    # Calculate heuristic dynamically if not in map
+                    if nbr not in self.h_forward:
+                        self.h_forward[nbr] = self._calculate_heuristic(nbr, self.tgt)
+                    f_score = tentative_g + self.h_forward[nbr]
                     heapq.heappush(self.open_f, (f_score, next(self._counter), nbr))
                     if nbr in self.closed_b:
                         return nbr
@@ -239,7 +351,10 @@ class PairwiseBidirectionalAStar:
                     self.g_b[nbr] = tentative_g
                     self.depth_b[nbr] = tentative_depth
                     self.parent_b[nbr] = current
-                    f_score = tentative_g + self.h_backward.get(nbr, 0.0)
+                    # Calculate heuristic dynamically if not in map
+                    if nbr not in self.h_backward:
+                        self.h_backward[nbr] = self._calculate_heuristic(self.src, nbr)
+                    f_score = tentative_g + self.h_backward[nbr]
                     heapq.heappush(self.open_b, (f_score, next(self._counter), nbr))
                     if nbr in self.closed_f:
                         return nbr
@@ -270,7 +385,7 @@ class PairwiseBidirectionalAStar:
     # -------------------------
     # Core: find multiple paths
     # -------------------------
-    def find_paths(self, max_results: int = 3, len_tolerance: int = 0) -> List[Tuple[Path, float]]:
+    def find_paths(self, max_results: int = 3, len_tolerance: int = 3) -> List[Tuple[Path, float]]:
         """
         Run bidirectional beam+depth constrained search and return up to max_results unique paths.
         Paths returned have total cost (sum of g_f + g_b at meet) and are kept while <= best_cost + len_tolerance.
