@@ -235,18 +235,18 @@ class FrameNetSpaCySRL:
                 span = self._expand_predicate_span(token)
                 predicates.append(span)
 
-        # Some nouns and adjectives also evoke frames
-        for chunk in doc.noun_chunks:
-            head = chunk.root
-            # Check if head noun is in our lexical unit cache
-            if (head.lemma_.lower(), 'n') in self.lexical_unit_cache:
-                predicates.append(doc[head.i:head.i+1])
+        # # Some nouns and adjectives also evoke frames
+        # for chunk in doc.noun_chunks:
+        #     head = chunk.root
+        #     # Check if head noun is in our lexical unit cache
+        #     if (head.lemma_.lower(), 'n') in self.lexical_unit_cache:
+        #         predicates.append(doc[head.i:head.i+1])
 
-        # Adjectives in predicative position
-        for token in doc:
-            if token.pos_ == "ADJ" and token.dep_ in ["acomp", "xcomp"]:
-                if (token.lemma_.lower(), 'a') in self.lexical_unit_cache:
-                    predicates.append(doc[token.i:token.i+1])
+        # # Adjectives in predicative position
+        # for token in doc:
+        #     if token.pos_ == "ADJ" and token.dep_ in ["acomp", "xcomp"]:
+        #         if (token.lemma_.lower(), 'a') in self.lexical_unit_cache:
+        #             predicates.append(doc[token.i:token.i+1])
 
         return predicates
 
