@@ -39,20 +39,6 @@ def align_wn_fn_frames(wn_frame: Any, fn_frame: Any) -> Dict[str, List[str]]:
     raise NotImplementedError
 
 
-def get_paths(subject_synsets: List[Any],
-              subject_srls: List[str],
-              predicate_synset: Any,
-              object_synsets: List[Any],
-              object_srls: List[str]) -> List[Any]:
-    """
-    Given candidate subject synsets, subject SRL labels, the predicate synset,
-    candidate object synsets and object SRL labels, compute and return a list of
-    "paths" (whatever structure you define for a path).
-    Return empty list if no paths.
-    """
-    raise NotImplementedError
-
-
 def lemmatize(word: str) -> str:
     """
     Return the lemma of the given word.
@@ -68,11 +54,11 @@ def process_triple(
         fn: Any
     ) -> Dict[str, Dict[str, Set[str]]]:
     """
-    Find candidate (WordNet-FrameNet aligned) paths for a predicate token.
+    Find candidate (WordNet-FrameNet aligned) synsets and dependency-SRL mappings for a predicate token.
     - pred_tok, subj_tok, obj_tok: token-like objects (should have .lemma or .lemma_)
     - wn: WordNet interface (object that provides wn.synsets and wn.synset)
     - fn: FrameNet interface (object that provides fn.get_frames)
-    Returns a list of paths (each path structure depends on get_paths implementation).
+    Returns Dict[synset_name, Dict[dependency role, Set[possible semantic roles]]].
     """
 
     # 1. candidate WordNet synsets for the predicate (verbs)
