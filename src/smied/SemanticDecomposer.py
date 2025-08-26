@@ -809,56 +809,31 @@ class SemanticDecomposer:
                 print(f"[_score_path_coherence] Object synset {object_synset.name()} matches word '{object_word}'")
         
         # Factor 2: Semantic role compatibility using predicate-specific logic
-        # Check if subject and object fit expected semantic roles for this specific predicate synset
-        
-        # Add bonuses based on predicate synset meaning and subject/object appropriateness
-        pred_definition = predicate_synset.definition().lower()
-        
-        # Check animacy and concreteness bonuses
-        if self._is_animate_word(subject_word):
-            score += 0.2
-            if self.verbosity >= 2:
-                print(f"[_score_path_coherence] Animate subject '{subject_word}' bonus")
-        
-        if self._is_concrete_word(object_word):
-            score += 0.2
-            if self.verbosity >= 2:
-                print(f"[_score_path_coherence] Concrete object '{object_word}' bonus")
-        
-        # Synset-specific compatibility bonuses - check specific first, then general
-        if 'romantic' in pred_definition or 'sexual' in pred_definition:
-            # Romantic pursuit - less appropriate for animal contexts
-            if subject_word in ['cat', 'dog', 'animal'] and object_word in ['mouse', 'bird']:
-                score -= 0.2  # Penalty for inappropriate context
-                if self.verbosity >= 2:
-                    print(f"[_score_path_coherence] Inappropriate romantic context penalty")
-        elif 'catch' in pred_definition or 'hunt' in pred_definition:
-            # Predatory actions - bonus if subject is animate predator and object is potential prey
-            if self._is_animate_word(subject_word) and self._is_animate_word(object_word):
-                score += 0.3
-                if self.verbosity >= 2:
-                    print(f"[_score_path_coherence] Predator-prey action bonus for {predicate_word}")
-        elif 'pursue' in pred_definition and 'romantic' not in pred_definition and 'sexual' not in pred_definition:
-            # Non-romantic pursuit - predatory behavior
-            if self._is_animate_word(subject_word) and self._is_animate_word(object_word):
-                score += 0.3
-                if self.verbosity >= 2:
-                    print(f"[_score_path_coherence] Predator-prey pursuit bonus for {predicate_word}")
-        elif 'air' in pred_definition or 'fly' in pred_definition:
-            # Flight - bonus for appropriate subjects
-            if subject_word in ['bird', 'airplane', 'insect']:
-                score += 0.3
-                if self.verbosity >= 2:
-                    print(f"[_score_path_coherence] Flight action bonus for {subject_word}")
-        
-        # Try FrameNet analysis as additional information
         try:
             predicate_text = f"{predicate_synset.lemmas()[0].name()}"
             pred_doc = self.framenet_srl.process_text(predicate_text)
             
             if len(pred_doc) > 0:
                 pred_span = pred_doc[0:1]
-                frame_scores = self.framenet_srl._get_frames_for_predicate(pred_span)
+                # Get frame information using the triple-based approach
+                verb_tokens = [tok for tok in pred_doc if tok.pos_ == 'VERB']
+                if verb_tokens:
+                    pred_tok = verb_tokens[0]
+                    subj_tok = self.framenet_srl._get_subject(pred_tok)
+                    obj_tok = self.framenet_srl._get_object(pred_tok)
+                    
+                    from nltk.corpus import wordnet as wn
+                    from nltk.corpus import framenet as fn
+                    triple_results = self.framenet_srl.process_triple(pred_tok, subj_tok, obj_tok, wn, fn)
+                    
+                    # Convert to frame scores format for compatibility
+                    frame_scores = []
+                    for synset_name, role_dict in triple_results.items():
+                        coherence = len([roles for roles in role_dict.values() if roles]) * 0.3
+                        frame_name = synset_name.split('.')[0].title() + '_frame'
+                        frame_scores.append((frame_name, coherence))
+                else:
+                    frame_scores = []
                 
                 # Use the best frame to assess role compatibility
                 if frame_scores:
@@ -897,63 +872,7 @@ class SemanticDecomposer:
             
         return False
     
-    def _is_animate_word(self, word):
-        """Check if word typically refers to animate entities."""
-        synsets = self.wn_module.synsets(word, pos=self.wn_module.NOUN)
-        
-        # Check direct word matches for common animate entities
-        animate_words = {'cat', 'dog', 'person', 'human', 'animal', 'bird', 'fish', 'horse', 'cow', 'mouse', 'rat'}
-        if word.lower() in animate_words:
-            return True
-            
-        for synset in synsets[:3]:  # Check top 3 senses
-            # Check all hypernym paths (not just direct hypernyms)
-            all_hypernyms = synset.closure(lambda s: s.hypernyms())
-            for hypernym in all_hypernyms:
-                hypernym_name = hypernym.name().lower()
-                # Check for common animate hypernyms
-                if any(animate_term in hypernym_name for animate_term in 
-                       ['person', 'individual', 'animal', 'organism', 
-                        'living_thing', 'being', 'creature', 'human', 'vertebrate']):
-                    return True
-            
-            # Also check direct synset names for animate terms
-            synset_name = synset.name().lower()
-            if any(animate_term in synset_name for animate_term in 
-                   ['person', 'animal', 'human', 'being']):
-                return True
-        
-        return False
     
-    def _is_concrete_word(self, word):
-        """Check if word typically refers to concrete objects."""
-        synsets = self.wn_module.synsets(word, pos=self.wn_module.NOUN)
-        
-        # Check direct word matches for common concrete objects
-        concrete_words = {'book', 'car', 'table', 'chair', 'house', 'computer', 'phone', 'mouse', 'ball', 'box'}
-        if word.lower() in concrete_words:
-            return True
-            
-        for synset in synsets[:3]:  # Check top 3 senses
-            # Check all hypernym paths
-            all_hypernyms = synset.closure(lambda s: s.hypernyms())
-            for hypernym in all_hypernyms:
-                hypernym_name = hypernym.name().lower()
-                # Physical objects, artifacts, substances
-                if any(concrete_term in hypernym_name for concrete_term in 
-                       ['artifact', 'physical_object', 'whole', 'object', 
-                        'instrumentality', 'device', 'structure', 'container',
-                        'conveyance', 'vehicle', 'machine', 'furniture']):
-                    return True
-            
-            # Check direct synset for concrete terms
-            synset_name = synset.name().lower()
-            if any(concrete_term in synset_name for concrete_term in 
-                   ['object', 'thing', 'item', 'artifact']):
-                return True
-                
-        return False
-
     def _find_subject_to_predicate_paths(self, subject_synsets, predicate_synset, g, get_new_beams_fn, 
                                        beam_width, max_depth, relax_beam, max_results_per_pair, 
                                        len_tolerance, max_sample_size):
@@ -1039,8 +958,15 @@ class SemanticDecomposer:
                     print(f"[_find_framenet_subject_predicate_paths] Analyzing frame: {frame_name} (coherence: {coherence_score:.3f})")
                 
                 # Get frame from cache for analysis
-                if frame_name in self.framenet_srl.frame_cache:
-                    frame = self.framenet_srl.frame_cache[frame_name]
+                # Use new cache method to get frame information
+                try:
+                    frame_cache = self.framenet_srl._get_fn_frames_for_lemma()
+                    if frame_name in frame_cache:
+                        frame = frame_cache[frame_name]
+                    else:
+                        continue  # Skip if frame not found
+                except:
+                    continue  # Skip if cache access fails
                     
                     # Find paths via this specific frame interpretation
                     frame_paths = self._find_paths_via_frame(
@@ -1322,8 +1248,15 @@ class SemanticDecomposer:
                     print(f"[_find_framenet_predicate_object_paths] Analyzing frame: {frame_name} (coherence: {coherence_score:.3f})")
                 
                 # Get frame from cache for analysis
-                if frame_name in self.framenet_srl.frame_cache:
-                    frame = self.framenet_srl.frame_cache[frame_name]
+                # Use new cache method to get frame information
+                try:
+                    frame_cache = self.framenet_srl._get_fn_frames_for_lemma()
+                    if frame_name in frame_cache:
+                        frame = frame_cache[frame_name]
+                    else:
+                        continue  # Skip if frame not found
+                except:
+                    continue  # Skip if cache access fails
                     
                     # Find paths via this specific frame interpretation
                     frame_paths = self._find_paths_via_frame_to_objects(
