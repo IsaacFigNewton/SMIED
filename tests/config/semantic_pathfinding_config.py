@@ -194,7 +194,6 @@ class SemanticPathfindingMockConfig:
                         'is_valid_path': True,
                         'path_length_reasonable': True,
                         'connecting_predicate_relevant': True,
-                        'semantic_coherence': 1.0
                     }
                 },
                 'medium_path': {
@@ -207,7 +206,6 @@ class SemanticPathfindingMockConfig:
                         'is_valid_path': True,
                         'path_length_reasonable': True,
                         'connecting_predicate_relevant': True,
-                        'semantic_coherence': 1.0
                     }
                 }
             },
@@ -419,7 +417,6 @@ class SemanticPathfindingMockConfig:
                 'max_quality_issues_shown': 20
             },
             'validation_settings': {
-                'semantic_coherence_threshold': 0.6,
                 'max_reasonable_path_length': 15,
                 'min_reasonable_path_length': 2,
                 'require_connecting_predicate_relevance': True
@@ -471,9 +468,8 @@ class SemanticPathfindingMockConfig:
                 'expected_test_types': ['easy', 'medium', 'hard', 'negative']
             },
             'validation_tests': {
-                'validation_coverage': ['path_quality', 'semantic_coherence', 'predicate_relevance'],
+                'validation_coverage': ['path_quality', 'predicate_relevance'],
                 'expected_validation_issues_count': [0, 5],
-                'coherence_score_range': [0.6, 1.0]
             },
             'edge_case_tests': {
                 'expected_exceptions': ['TimeoutError', 'MemoryError', 'ValueError'],

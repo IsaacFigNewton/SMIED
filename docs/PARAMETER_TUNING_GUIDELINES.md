@@ -326,8 +326,6 @@ analysis = analyzer.run_comprehensive_analysis()
    - Analyze graph connectivity to predict optimal parameters
    - Dynamic parameter adjustment based on graph regions
 
-3. **Semantic Quality Metrics**
-   - Automated semantic coherence evaluation
    - Human feedback integration for parameter tuning
 
 4. **Domain-Specific Models**

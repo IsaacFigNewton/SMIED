@@ -105,35 +105,6 @@ class TestSemanticPathfinding(unittest.TestCase):
         self.assertTrue(hasattr(result, 'execution_time'))
         self.assertGreater(result.execution_time, 0)
         
-    def test_pathfinding_result_validation(self):
-        """Test pathfinding result validation."""
-        # Create test case and result mocks
-        test_case_mock = self.mock_factory(
-            'MockTestCase',
-            subject='teacher',
-            predicate='explain',
-            object='concept',
-            expected_success=True
-        )
-        
-        # Create successful result mock
-        successful_result = self.mock_factory(
-            'MockPathfindingResult',
-            success=True,
-            subject_path=['teacher.n.01', 'predicate'],
-            object_path=['predicate', 'concept.n.01'],
-            execution_time=0.1
-        )
-        
-        # Validate the result
-        validation = self.mock_validator.validate_path_quality(test_case_mock, successful_result)
-        
-        # Verify validation structure
-        self.assertIsInstance(validation, dict)
-        self.assertIn('is_valid_path', validation)
-        self.assertIn('semantic_coherence', validation)
-        self.assertIn('connecting_predicate_relevant', validation)
-        self.assertIn('issues', validation)
         
     def test_performance_metrics_calculation(self):
         """Test performance metrics calculation."""
@@ -219,7 +190,6 @@ class TestSemanticPathfindingValidation(unittest.TestCase):
     
     Tests validation functionality including:
     - Path quality validation
-    - Semantic coherence checking
     - Input constraint validation
     - Validation criteria enforcement
     """
@@ -277,7 +247,6 @@ class TestSemanticPathfindingValidation(unittest.TestCase):
                 self.assertEqual(validation['is_valid_path'], expected_validation['is_valid_path'])
                 self.assertEqual(validation['path_length_reasonable'], expected_validation['path_length_reasonable'])
                 self.assertEqual(validation['connecting_predicate_relevant'], expected_validation['connecting_predicate_relevant'])
-                self.assertEqual(validation['semantic_coherence'], expected_validation['semantic_coherence'])
                 
     def test_path_quality_validation_failed(self):
         """Test path quality validation for failed results."""
@@ -336,83 +305,11 @@ class TestSemanticPathfindingValidation(unittest.TestCase):
                         else:
                             self.assertIn(expected_issue, validation['issues'])
                         
-    def test_semantic_coherence_calculation(self):
-        """Test semantic coherence score calculation."""
-        # Test various coherence scenarios
-        coherence_scenarios = [
-            {
-                'name': 'perfect_coherence',
-                'is_valid_path': True,
-                'path_length_reasonable': True,
-                'connecting_predicate_relevant': True,
-                'expected_score': 1.0
-            },
-            {
-                'name': 'partial_coherence',
-                'is_valid_path': True,
-                'path_length_reasonable': False,
-                'connecting_predicate_relevant': True,
-                'expected_score': 0.7
-            },
-            {
-                'name': 'no_coherence',
-                'is_valid_path': False,
-                'path_length_reasonable': False,
-                'connecting_predicate_relevant': False,
-                'expected_score': 0.0
-            }
-        ]
-        
-        for scenario in coherence_scenarios:
-            with self.subTest(scenario=scenario['name']):
-                # Create test case
-                test_case = self.mock_factory('MockTestCase')
-                
-                # Create result that will produce the desired validation outcome
-                if scenario['is_valid_path']:
-                    subject_path = ['valid.n.01', 'predicate']
-                    object_path = ['predicate', 'path.n.01']
-                else:
-                    subject_path = None
-                    object_path = None
-                
-                if scenario['path_length_reasonable']:
-                    # Keep paths short
-                    pass  
-                else:
-                    # Make paths too long
-                    subject_path = ['a'] * 10 if subject_path else None
-                    object_path = ['b'] * 10 if object_path else None
-                
-                connecting_predicate = None
-                if scenario['connecting_predicate_relevant']:
-                    connecting_predicate = self.mock_factory(
-                        'MockConnectingPredicate',
-                        predicate_name=test_case.predicate
-                    )
-                
-                result = self.mock_factory(
-                    'MockPathfindingResult',
-                    success=scenario['is_valid_path'],
-                    subject_path=subject_path,
-                    object_path=object_path,
-                    connecting_predicate=connecting_predicate
-                )
-                
-                # Perform validation
-                validation = self.mock_validator.validate_path_quality(test_case, result)
-                
-                # Check coherence score
-                self.assertEqual(validation['semantic_coherence'], scenario['expected_score'])
                 
     def test_validation_constraints_enforcement(self):
         """Test enforcement of validation constraints from configuration."""
         validation_settings = self.comprehensive_config['validation_settings']
         
-        # Test semantic coherence threshold
-        coherence_threshold = validation_settings['semantic_coherence_threshold']
-        self.assertGreaterEqual(coherence_threshold, 0.0)
-        self.assertLessEqual(coherence_threshold, 1.0)
         
         # Test path length constraints
         max_path_length = validation_settings['max_reasonable_path_length']
@@ -500,14 +397,10 @@ class TestSemanticPathfindingValidation(unittest.TestCase):
         
         # Verify suite validation structure
         self.assertIn('total_tests', suite_validation)
-        self.assertIn('average_semantic_coherence', suite_validation)
         self.assertIn('valid_paths', suite_validation)
-        self.assertIn('quality_issues_count', suite_validation)
         
         # Verify counts
         self.assertEqual(suite_validation['total_tests'], 5)
-        self.assertGreaterEqual(suite_validation['average_semantic_coherence'], 0.0)
-        self.assertLessEqual(suite_validation['average_semantic_coherence'], 1.0)
 
 
 class TestSemanticPathfindingEdgeCases(unittest.TestCase):
@@ -972,8 +865,6 @@ if __name__ == '__main__':
         
         if 'validation_report' in results:
             val_report = results['validation_report']
-            print(f"Average Semantic Coherence: {val_report['average_semantic_coherence']:.2f}")
-            print(f"Quality Issues: {val_report['quality_issues_count']}")
         
         print("="*60)
     

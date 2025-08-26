@@ -539,13 +539,11 @@ class MockSemanticCluster(AbstractEntityMock):
         self.name = f"cluster_{cluster_id}"
         self.concepts = set()
         self.centroid = None
-        self.coherence_score = 0.8
         
         # Cluster methods
         self.add_concept = Mock()
         self.remove_concept = Mock()
         self.compute_centroid = Mock()
-        self.get_coherence = Mock(return_value=self.coherence_score)
         self.split_cluster = Mock(return_value=[])
         self.merge_with = Mock()
     
@@ -556,11 +554,11 @@ class MockSemanticCluster(AbstractEntityMock):
     
     def validate_entity(self) -> bool:
         """Validate that the cluster is consistent and valid."""
-        return bool(self.id and 0.0 <= self.coherence_score <= 1.0)
+        return bool(self.id)
     
     def get_entity_signature(self) -> str:
         """Get a unique signature for this cluster."""
-        return f"cluster:{self.id}:{len(self.concepts)}:{self.coherence_score}"
+        return f"cluster:{self.id}:{len(self.concepts)}:0.8"
 
 
 class MockSemanticPath(AbstractEntityMock):

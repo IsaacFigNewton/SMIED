@@ -95,7 +95,6 @@ def visualize_frames(self, doc: Doc) -> str:
 - `_identify_predicates()` - replaced by triple extraction
 - `_expand_predicate_span()` - not needed for triple approach
 - `_get_frames_for_predicate()` - replaced by process_triple
-- `_score_frame_coherence()` - replaced by WordNet-FrameNet alignment
 - `_select_best_frame()` - replaced by synset selection in process_triple
 - `_score_syntactic_compatibility()` - not applicable to triple approach
 - `_extract_frame_elements()` - replaced by triple processing

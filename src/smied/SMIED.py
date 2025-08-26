@@ -19,11 +19,6 @@ class SMIED(ISMIEDPipeline):
     
     This class provides a unified interface for analyzing semantic relationships
     between words using WordNet and optional NLP models.
-    
-    Verbosity levels:
-    - 0: Silent mode - only critical errors are shown
-    - 1: Progress mode - initialization, high-level progress, and results (default)
-    - 2: Detailed mode - comprehensive debugging output from all components
     """
     
     def __init__(
@@ -31,8 +26,7 @@ class SMIED(ISMIEDPipeline):
         nlp_model: Optional[str] = "en_core_web_sm",
         embedding_model: Optional[Any] = None,
         auto_download: bool = True,
-        build_graph_on_init: bool = False,
-        verbosity: int = 1
+        build_graph_on_init: bool = False
     ):
         """
         Initialize the SMIED pipeline and all its components.
@@ -42,142 +36,54 @@ class SMIED(ISMIEDPipeline):
             embedding_model: Optional embedding model for similarity
             auto_download: Whether to automatically download required data
             build_graph_on_init: Whether to build the synset graph during initialization
-            verbosity: Debug verbosity level (0=silent, 1=progress, 2=detailed)
         """
-        self.verbosity = verbosity
         self.nlp_model_name = nlp_model
         self.embedding_model = embedding_model
-        if not self.embedding_model:
-            if self.verbosity >= 2:
-                print("[SMIED] No embedding model provided, using WordNet only")
         self.auto_download = auto_download
-        
-        if self.verbosity >= 1:
-            print(f"[SMIED] Initializing SMIED pipeline with verbosity level {verbosity}")
         
         # Download required NLTK data if needed
         if self.auto_download:
-            if self.verbosity >= 2:
-                print("[SMIED] Downloading NLTK data (wordnet, omw-1.4)...")
             nltk.download('wordnet', quiet=True)
             nltk.download('omw-1.4', quiet=True)
         
         # Set up NLP pipeline
-        if self.verbosity >= 2:
-            print(f"[SMIED] Setting up NLP pipeline with model: {nlp_model}")
         self.nlp = self._setup_nlp()
         
-        # Initialize semantic decomposer with verbosity
-        if self.verbosity >= 1:
-            print("[SMIED] Initializing SemanticDecomposer...")
+        # Initialize semantic decomposer
         self.decomposer = SemanticDecomposer(
             wn_module=wn,
             nlp_func=self.nlp,
-            embedding_model=self.embedding_model,
-            verbosity=self.verbosity
+            embedding_model=self.embedding_model
         )
         
         # Build graph if requested
         self.synset_graph = None
         if build_graph_on_init:
-            if self.verbosity >= 1:
-                print("[SMIED] Building synset graph during initialization...")
             self.synset_graph = self.build_synset_graph()
-            
-        if self.verbosity >= 1:
-            print("[SMIED] SMIED pipeline initialization complete")
-        
-    def reinitialize(
-        self,
-        nlp_model: Optional[str] = None,
-        embedding_model: Optional[Any] = None,
-        verbosity: Optional[int] = None
-    ) -> None:
-        """
-        Reinitialize the pipeline with new settings.
-        
-        Args:
-            nlp_model: New spaCy model name (optional)
-            embedding_model: New embedding model (optional)
-            verbosity: New verbosity level (optional)
-        """
-        # Update verbosity if provided
-        if verbosity is not None:
-            self.verbosity = verbosity
-            if self.verbosity >= 1:
-                print(f"[SMIED] Reinitializing with verbosity level {verbosity}")
-        
-        # Update settings if provided
-        if nlp_model is not None:
-            if self.verbosity >= 2:
-                print(f"[SMIED] Updating NLP model from {self.nlp_model_name} to {nlp_model}")
-            self.nlp_model_name = nlp_model
-            self.nlp = self._setup_nlp()
-        
-        if embedding_model is not None:
-            if self.verbosity >= 2:
-                print("[SMIED] Updating embedding model")
-            self.embedding_model = embedding_model
-        
-        # Reinitialize decomposer with new settings
-        if self.verbosity >= 1:
-            print("[SMIED] Reinitializing SemanticDecomposer...")
-        self.decomposer = SemanticDecomposer(
-            wn_module=wn,
-            nlp_func=self.nlp,
-            embedding_model=self.embedding_model,
-            verbosity=self.verbosity
-        )
-        
-        # Clear cached graph to force rebuild with new settings
-        self.synset_graph = None
-        
-        if self.verbosity >= 1:
-            print("[SMIED] Reinitialization complete")
     
     def _setup_nlp(self) -> Optional[Any]:
         """Set up spaCy NLP pipeline."""
         if not self.nlp_model_name:
-            if self.verbosity >= 2:
-                print("[SMIED] No NLP model specified, skipping spaCy setup")
             return None
             
         try:
             import spacy
-            if self.verbosity >= 2:
-                print(f"[SMIED] Loading spaCy model: {self.nlp_model_name}")
             nlp = spacy.load(self.nlp_model_name)
-            if self.verbosity >= 2:
-                print(f"[SMIED] Successfully loaded spaCy model: {self.nlp_model_name}")
             return nlp
         except OSError:
-            if self.verbosity >= 0:
-                print(f"[WARNING] spaCy '{self.nlp_model_name}' model not found.")
-                print(f"[WARNING] Install with: python -m spacy download {self.nlp_model_name}")
+            print(f"[WARNING] spaCy '{self.nlp_model_name}' model not found.")
+            print(f"[WARNING] Install with: python -m spacy download {self.nlp_model_name}")
             return None
     
-    def build_synset_graph(self, verbose: Optional[bool] = None) -> Any:
+    def build_synset_graph(self) -> Any:
         """
         Build or retrieve the synset graph.
         
-        Args:
-            verbose: Whether to print progress messages (overrides class verbosity if provided)
-            
         Returns:
             NetworkX graph of WordNet synsets
         """
-        # Use provided verbose parameter or fall back to class verbosity
-        show_progress = verbose if verbose is not None else (self.verbosity >= 1)
-        
         if self.synset_graph is None:
-            if show_progress:
-                print("[SMIED] Building WordNet synset graph... (this may take a moment)")
             self.synset_graph = self.decomposer.build_synset_graph()
-            if show_progress:
-                print(f"[SMIED] Graph built with {self.synset_graph.number_of_nodes()} nodes "
-                      f"and {self.synset_graph.number_of_edges()} edges")
-        elif self.verbosity >= 2:
-            print(f"[SMIED] Using cached synset graph with {self.synset_graph.number_of_nodes()} nodes")
         
         return self.synset_graph
     
@@ -189,9 +95,8 @@ class SMIED(ISMIEDPipeline):
         max_depth: int = 10,
         beam_width: int = 3,
         max_results_per_pair: int = 4,
-        len_tolerance: int = 5,
-        verbose: Optional[bool] = None
-    ) -> Tuple[Optional[List], Optional[List], Optional[Any]]:
+        len_tolerance: int = 5
+    ) -> List[str]:
         """
         Analyze a subject-predicate-object triple.
         
@@ -203,35 +108,14 @@ class SMIED(ISMIEDPipeline):
             beam_width: Beam width for search
             max_results_per_pair: Maximum results per word pair
             len_tolerance: Path length tolerance
-            verbose: Whether to print progress (overrides class verbosity if provided)
             
         Returns:
             Tuple of (subject_path, object_path, connecting_predicate)
         """
-        # Use provided verbose parameter or fall back to class verbosity
-        show_output = verbose if verbose is not None else (self.verbosity >= 1)
-        
-        if show_output:
-            print("=" * 80)
-            print("SEMANTIC DECOMPOSITION ANALYSIS")
-            print(f"Finding semantic paths linking: {subject} -> {predicate} -> {object}")
-            print("=" * 80)
-            print()
-        elif self.verbosity >= 2:
-            print(f"[SMIED] Starting analysis: {subject} -> {predicate} -> {object}")
-        
         # Build graph if needed
-        graph = self.build_synset_graph(verbose=show_output)
-        
-        # Show available synsets if verbose
-        if show_output:
-            self._display_synsets(subject, predicate, object)
+        graph = self.build_synset_graph()
         
         # Find connected paths
-        if show_output:
-            print("Searching for semantic paths...")
-            print("-" * 40)
-        
         try:
             result = self.decomposer.find_connected_shortest_paths(
                 subject_word=subject,
@@ -244,49 +128,11 @@ class SMIED(ISMIEDPipeline):
                 len_tolerance=len_tolerance
             )
             
-            subject_path, object_path, connecting_predicate = result
-            
-            if show_output:
-                self.display_results(
-                    subject_path, object_path, connecting_predicate,
-                    subject, predicate, object
-                )
-            elif self.verbosity >= 2:
-                success = subject_path and object_path and connecting_predicate
-                print(f"[SMIED] Analysis complete: {'SUCCESS' if success else 'NO PATH FOUND'}")
-            
             return result
             
         except Exception as e:
-            if self.verbosity >= 0:
-                print(f"[ERROR] Error during semantic decomposition: {e}")
+            print(f"[ERROR] Error during semantic decomposition: {e}")
             raise
-    
-    def set_verbosity(self, verbosity: int) -> None:
-        """
-        Set the verbosity level for the SMIED pipeline.
-        
-        Args:
-            verbosity: Verbosity level (0=silent, 1=progress, 2=detailed)
-        """
-        old_verbosity = self.verbosity
-        self.verbosity = verbosity
-        
-        # Update the decomposer's verbosity as well
-        if hasattr(self.decomposer, 'verbosity'):
-            self.decomposer.verbosity = verbosity
-            
-        if self.verbosity >= 1:
-            print(f"[SMIED] Verbosity changed from {old_verbosity} to {verbosity}")
-    
-    def get_verbosity(self) -> int:
-        """
-        Get the current verbosity level.
-        
-        Returns:
-            Current verbosity level (0=silent, 1=progress, 2=detailed)
-        """
-        return self.verbosity
     
     def get_synsets(self, word: str, pos: Optional[str] = None) -> List:
         """
@@ -303,33 +149,30 @@ class SMIED(ISMIEDPipeline):
             return wn.synsets(word, pos=pos)
         return wn.synsets(word)
     
-    def _display_synsets(self, subject: str, predicate: str, object: str) -> None:
-        """Display available synsets for the triple."""
-        print("Available synsets:")
-        print("-" * 40)
+    def reinitialize(self, **kwargs) -> None:
+        """
+        Reinitialize the pipeline components with new settings.
         
-        # Get synsets
-        subject_synsets = self.get_synsets(subject, pos=wn.NOUN)
-        predicate_synsets = self.get_synsets(predicate, pos=wn.VERB)
-        object_synsets = self.get_synsets(object, pos=wn.NOUN)
+        Args:
+            **kwargs: Settings to update (nlp_model, embedding_model, etc.)
+        """
+        # Update settings if provided
+        if 'nlp_model' in kwargs:
+            self.nlp_model_name = kwargs['nlp_model']
+            self.nlp = self._setup_nlp()
         
-        # Display subject synsets
-        print(f"{subject.capitalize()} synsets ({len(subject_synsets)}):")
-        for i, synset in enumerate(subject_synsets[:3]):
-            print(f"  {i+1}. {synset.name()}: {synset.definition()}")
-        print()
+        if 'embedding_model' in kwargs:
+            self.embedding_model = kwargs['embedding_model']
         
-        # Display predicate synsets
-        print(f"{predicate.capitalize()} synsets ({len(predicate_synsets)}):")
-        for i, synset in enumerate(predicate_synsets[:3]):
-            print(f"  {i+1}. {synset.name()}: {synset.definition()}")
-        print()
+        # Reinitialize decomposer with new settings
+        self.decomposer = SemanticDecomposer(
+            wn_module=wn,
+            nlp_func=self.nlp,
+            embedding_model=self.embedding_model
+        )
         
-        # Display object synsets
-        print(f"{object.capitalize()} synsets ({len(object_synsets)}):")
-        for i, synset in enumerate(object_synsets[:3]):
-            print(f"  {i+1}. {synset.name()}: {synset.definition()}")
-        print()
+        # Clear cached graph to force rebuild with new settings
+        self.synset_graph = None
     
     def display_results(
         self,
@@ -340,160 +183,24 @@ class SMIED(ISMIEDPipeline):
         predicate_word: str,
         object_word: str
     ) -> None:
-        """Display analysis results."""
-        if subject_path and object_path and connecting_predicate:
-            print("SUCCESS: Found connected semantic paths!")
-            print()
-            
-            # Display the paths
-            SemanticDecomposer.show_connected_paths(
-                subject_path, object_path, connecting_predicate
-            )
-            
-            # Additional analysis
-            print("ANALYSIS:")
-            print("-" * 20)
-            print(f"Connecting predicate: {connecting_predicate.name()}")
-            print(f"Predicate definition: {connecting_predicate.definition()}")
-            print(f"Subject path length: {len(subject_path)}")
-            print(f"Object path length: {len(object_path)}")
-            print(f"Total semantic distance: {len(subject_path) + len(object_path) - 1}")
-            print()
-            
-            # Show word sense disambiguation
-            print("WORD SENSE DISAMBIGUATION:")
-            print("-" * 30)
-            if subject_path:
-                print(f"Selected '{subject_word}' sense: {subject_path[0].name()} - "
-                      f"{subject_path[0].definition()}")
-            if connecting_predicate:
-                print(f"Selected '{predicate_word}' sense: {connecting_predicate.name()} - "
-                      f"{connecting_predicate.definition()}")
-            if object_path:
-                print(f"Selected '{object_word}' sense: {object_path[-1].name()} - "
-                      f"{object_path[-1].definition()}")
-        else:
-            print("No connected semantic path found.")
-            print("This could mean:")
-            print("- The words are semantically too distant")
-            print("- The search parameters are too restrictive")
-            print("- The gloss parsing couldn't find suitable connections")
-            print()
-            
-            # Show individual relationships
-            self._show_fallback_relationships(subject_word, predicate_word, object_word)
-    
-    def _show_fallback_relationships(
-        self,
-        subject: str,
-        predicate: str,
-        object: str
-    ) -> None:
-        """Show fallback relationships when no path is found."""
-        print("Individual synset relationships:")
-        print("-" * 35)
-        
-        subject_synsets = self.get_synsets(subject, pos=wn.NOUN)
-        predicate_synsets = self.get_synsets(predicate, pos=wn.VERB)
-        object_synsets = self.get_synsets(object, pos=wn.NOUN)
-        
-        # Subject-Object relationships
-        if subject_synsets and object_synsets:
-            print(f"{subject.capitalize()}-{object.capitalize()} relationships:")
-            for subj_syn in subject_synsets[:2]:
-                for obj_syn in object_synsets[:2]:
-                    try:
-                        similarity = subj_syn.path_similarity(obj_syn)
-                        if similarity:
-                            print(f"  {subj_syn.name()} <-> {obj_syn.name()}: {similarity:.3f}")
-                    except:
-                        pass
-        
-        # Subject-Predicate relationships
-        if subject_synsets and predicate_synsets:
-            print(f"{subject.capitalize()}-{predicate.capitalize()} relationships:")
-            for subj_syn in subject_synsets[:2]:
-                for pred_syn in predicate_synsets[:2]:
-                    try:
-                        subj_hypernyms = set(subj_syn.hypernyms())
-                        pred_related = set(pred_syn.entailments() + pred_syn.causes())
-                        if subj_hypernyms.intersection(pred_related):
-                            print(f"  {subj_syn.name()} ~ {pred_syn.name()}: related")
-                    except:
-                        pass
-    
-    def demonstrate_alternative_approaches(
-        self,
-        subject: str = "fox",
-        predicate: str = "jump",
-        object: str = "dog"
-    ) -> None:
         """
-        Show alternative semantic analysis approaches.
+        Display analysis results (minimal implementation).
         
         Args:
-            subject: Subject word
-            predicate: Predicate word
-            object: Object word
+            subject_path: Path from subject to predicate
+            object_path: Path from predicate to object
+            connecting_predicate: The connecting predicate synset
+            subject_word: Original subject word
+            predicate_word: Original predicate word
+            object_word: Original object word
         """
-        print("\n" + "=" * 80)
-        print("ALTERNATIVE SEMANTIC ANALYSIS")
-        print("=" * 80)
-        
-        # Show hypernym paths
-        print("Exploring hypernym hierarchies:")
-        print("-" * 35)
-        
-        subject_synsets = self.get_synsets(subject, pos=wn.NOUN)
-        object_synsets = self.get_synsets(object, pos=wn.NOUN)
-        
-        if subject_synsets:
-            subject_synset = subject_synsets[0]
-            print(f"\n{subject.capitalize()} ({subject_synset.name()}) hypernym path:")
-            self._show_hypernym_path(subject_synset, max_depth=5)
-        
-        if object_synsets:
-            object_synset = object_synsets[0]
-            print(f"\n{object.capitalize()} ({object_synset.name()}) hypernym path:")
-            self._show_hypernym_path(object_synset, max_depth=5)
-        
-        # Show verb relations
-        predicate_synsets = self.get_synsets(predicate, pos=wn.VERB)
-        if predicate_synsets:
-            predicate_synset = predicate_synsets[0]
-            self._show_verb_relations(predicate_synset, predicate)
-    
-    def _show_hypernym_path(self, synset: Any, max_depth: int = 5) -> None:
-        """Display hypernym path for a synset."""
-        current = synset
-        depth = 0
-        while current and depth < max_depth:
-            print(f"  {'  ' * depth}{current.name()}: {current.definition()}")
-            hypernyms = current.hypernyms()
-            current = hypernyms[0] if hypernyms else None
-            depth += 1
-    
-    def _show_verb_relations(self, synset: Any, verb: str) -> None:
-        """Display verb relations for a synset."""
-        print(f"\n{verb.capitalize()} ({synset.name()}) verb relations:")
-        
-        entailments = synset.entailments()
-        if entailments:
-            print("  Entailments (what it necessarily involves):")
-            for ent in entailments[:3]:
-                print(f"    {ent.name()}: {ent.definition()}")
-        
-        causes = synset.causes()
-        if causes:
-            print("  Causes (what it can cause):")
-            for cause in causes[:3]:
-                print(f"    {cause.name()}: {cause.definition()}")
-        
-        verb_groups = synset.verb_groups()
-        if verb_groups:
-            print("  Verb groups (related verbs):")
-            for vg in verb_groups[:3]:
-                print(f"    {vg.name()}: {vg.definition()}")
+        if subject_path and object_path and connecting_predicate:
+            print(f"Found semantic connection: {subject_word} -> {predicate_word} -> {object_word}")
+            print(f"Subject path length: {len(subject_path)}")
+            print(f"Object path length: {len(object_path)}")
+            print(f"Connecting predicate: {connecting_predicate.name()}")
+        else:
+            print(f"No semantic connection found for: {subject_word} -> {predicate_word} -> {object_word}")
     
     def calculate_similarity(
         self,
@@ -533,36 +240,3 @@ class SMIED(ISMIEDPipeline):
                 raise ValueError(f"Unknown similarity method: {method}")
         except:
             return None
-    
-    def get_word_info(self, word: str) -> Dict[str, Any]:
-        """
-        Get comprehensive information about a word.
-        
-        Args:
-            word: Word to analyze
-            
-        Returns:
-            Dictionary with word information
-        """
-        info = {
-            "word": word,
-            "synsets": [],
-            "total_senses": 0
-        }
-        
-        synsets = self.get_synsets(word)
-        info["total_senses"] = len(synsets)
-        
-        for synset in synsets:
-            synset_info = {
-                "name": synset.name(),
-                "definition": synset.definition(),
-                "pos": synset.pos(),
-                "examples": synset.examples(),
-                "lemmas": [lemma.name() for lemma in synset.lemmas()],
-                "hypernyms": [h.name() for h in synset.hypernyms()],
-                "hyponyms": [h.name() for h in synset.hyponyms()]
-            }
-            info["synsets"].append(synset_info)
-        
-        return info

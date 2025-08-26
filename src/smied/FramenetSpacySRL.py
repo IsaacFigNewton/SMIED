@@ -458,7 +458,7 @@ class FrameNetSpaCySRL:
     def _calculate_synset_confidence(self, synset_name: str, synset_roles: Dict[str, Set[str]]) -> float:
         """
         Calculate confidence for a specific synset selection.
-        Enhanced version that considers synset quality and role coherence.
+        Enhanced version that considers synset selection and role matching.
         """
         if not synset_roles:
             return 0.2
@@ -1024,68 +1024,3 @@ class FrameNetSpaCySRL:
             right = min(token.i + 2, right)
         
         return doc[left:right]
-        
-    # ===== Utility Methods for External Use (REMOVE) =====
-    
-    def _is_animate_word(self, word: str) -> bool:
-        """
-        Check if word typically refers to animate entities.
-        Moved here as utility method that might be useful elsewhere.
-        """
-        synsets = wn.synsets(word, pos=wn.NOUN)
-        
-        # Check direct word matches for common animate entities
-        animate_words = {'cat', 'dog', 'person', 'human', 'animal', 'bird', 'fish', 'horse', 'cow'}
-        if word.lower() in animate_words:
-            return True
-            
-        for synset in synsets[:3]:  # Check top 3 senses
-            # Check all hypernym paths (not just direct hypernyms)
-            all_hypernyms = synset.closure(lambda s: s.hypernyms())
-            for hypernym in all_hypernyms:
-                hypernym_name = hypernym.name().lower()
-                # Check for common animate hypernyms
-                if any(animate_term in hypernym_name for animate_term in 
-                       ['person', 'individual', 'animal', 'organism', 
-                        'living_thing', 'being', 'creature', 'human', 'vertebrate']):
-                    return True
-            
-            # Also check direct synset names for animate terms
-            synset_name = synset.name().lower()
-            if any(animate_term in synset_name for animate_term in 
-                   ['person', 'animal', 'human', 'being']):
-                return True
-        
-        return False
-
-    def _is_concrete_word(self, word: str) -> bool:
-        """
-        Check if word typically refers to concrete, tangible entities.
-        Moved here as utility method that might be useful elsewhere.
-        """
-        synsets = wn.synsets(word, pos=wn.NOUN)
-        
-        # Check direct word matches for common concrete objects
-        concrete_words = {'book', 'car', 'table', 'chair', 'house', 'computer', 'phone', 'mouse'}
-        if word.lower() in concrete_words:
-            return True
-            
-        for synset in synsets[:3]:  # Check top 3 senses
-            # Check all hypernym paths
-            all_hypernyms = synset.closure(lambda s: s.hypernyms())
-            for hypernym in all_hypernyms:
-                hypernym_name = hypernym.name().lower()
-                # Physical objects, artifacts, substances
-                if any(concrete_term in hypernym_name for concrete_term in 
-                       ['artifact', 'physical_object', 'whole', 'object', 
-                        'instrumentality', 'device', 'structure', 'container',
-                        'conveyance', 'vehicle', 'machine', 'furniture']):
-                    return True
-            
-            # Check direct synset for concrete terms
-            synset_name = synset.name().lower()
-            if any(concrete_term in synset_name for concrete_term in 
-                   ['object', 'thing', 'item', 'artifact']):
-                return True
-                
-        return False

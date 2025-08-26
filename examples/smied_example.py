@@ -31,76 +31,20 @@ def main():
         embedding_model=w2v_model,  # Can add embedding model for better similarity
         auto_download=True,  # Automatically download required NLTK data,
         build_graph_on_init=True,  # Build semantic graph on initialization
-        verbosity=1  # Enable verbose output
     )
-    
-    # Example 1: Analyze a triple
-    print("\n" + "=" * 60)
-    print("Example 1: Analyzing semantic triple")
-    print("=" * 60)
-    
-    result = pipeline.analyze_triple(
-        subject="cat",
-        predicate="chase",
-        object="mouse",
-        verbose=True
-    )
-    
-    # Example 2: Calculate word similarity
-    print("\n" + "=" * 60)
-    print("Example 2: Word similarity calculation")
-    print("=" * 60)
-    
-    words_pairs = [
-        ("cat", "dog"),
-        ("cat", "car"),
-        ("run", "walk"),
-        ("happy", "sad")
-    ]
-    
-    for word1, word2 in words_pairs:
-        similarity = pipeline.calculate_similarity(word1, word2, method="path")
-        if similarity:
-            print(f"{word1} <-> {word2}: {similarity:.3f}")
-        else:
-            print(f"{word1} <-> {word2}: No similarity found")
-    
-    # Example 3: Get detailed word information
-    print("\n" + "=" * 60)
-    print("Example 3: Word information")
-    print("=" * 60)
-    
-    word_info = pipeline.get_word_info("dog")
-    print(f"Word: {word_info['word']}")
-    print(f"Total senses: {word_info['total_senses']}")
-    
-    for i, synset in enumerate(word_info['synsets'][:3], 1):
-        print(f"\n{i}. {synset['name']}")
-        print(f"   Definition: {synset['definition']}")
-        print(f"   POS: {synset['pos']}")
-        if synset['examples']:
-            print(f"   Example: {synset['examples'][0]}")
-    
-    # Example 4: Non-verbose analysis
-    print("\n" + "=" * 60)
-    print("Example 4: Silent analysis (non-verbose)")
-    print("=" * 60)
-    
-    result = pipeline.analyze_triple("bird", "fly", "sky", verbose=True)
-    subject_path, object_path, predicate = result
-    
-    if subject_path and object_path:
-        print("[SUCCESS] Found semantic path connecting 'bird' -> 'fly' -> 'sky'")
-    else:
-        print("[NO PATH] No direct semantic path found for 'bird' -> 'fly' -> 'sky'")
-    
-    # Example 5: Alternative approaches
-    print("\n" + "=" * 60)
-    print("Example 5: Alternative semantic analysis")
-    print("=" * 60)
-    
-    pipeline.demonstrate_alternative_approaches("eagle", "soar", "mountain")
+    print("SMIED pipeline initialized.")
 
+    triples = [
+        ("cat", "chase", "mouse"),
+        ("dog", "bark", "stranger"),
+        ("bird", "fly", "sky"),
+    ]
+    for subj, pred, obj in triples:
+        print(f"\nAnalyzing triple: {subj, pred, obj}")
+        result = pipeline.analyze_triple(subj, pred, obj)
+        print(f"Result: {result}\n")
+    
+    
 
 if __name__ == "__main__":
     main()
