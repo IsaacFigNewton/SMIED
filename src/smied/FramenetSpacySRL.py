@@ -141,11 +141,15 @@ class FrameNetSpaCySRL:
         # Setup SpaCy extensions
         self._setup_extensions()
 
-        # Initialize WordNet and FrameNet interfaces for triple processing
-        # Keep frame_cache and lexical_unit_cache for compatibility but deprecate others
-        self.frame_cache = self._get_fn_frames_for_lemma()
-        self.lexical_unit_cache = self._get_wn_synsets_for_lemma() 
-        # fe_coreness_cache removed - no longer needed for triple approach
+        # St up lemma+pos ==> framenet frame object mappings
+        # get frame_name: frame object mappings
+        self.frame_cache = { frame.name: frame for frame in fn.frames() }
+        # get lemma.pos: frame_name mappings
+        self.lexical_unit_cache = defaultdict(list)
+        for frame in fn.frames():
+            for lu_name, lu_data in frame.lexUnit.items():
+                # Parse lexical unit name (e.g., "run.v" -> ("run", "v"))
+                self.lexical_unit_cache[lu_name].append(frame.name) 
 
     def _setup_extensions(self):
         """Setup custom SpaCy extensions for storing frame information"""
@@ -254,34 +258,12 @@ class FrameNetSpaCySRL:
 
         return filtered_synsets, original_tok_dep_reqs
 
-
-    def _get_fn_frames_for_lemma(self) -> Dict:
-        """Get FrameNet frames for lemmas - builds frame cache for quick lookup"""
-        cache = {}
-        for frame in fn.frames():
-            cache[frame.name] = frame
-        return cache
-
-    def _get_wn_synsets_for_lemma(self) -> Dict[Tuple[str, str], List[str]]:
-        """Get WordNet synsets for lemmas - builds lexical unit cache mapping (lemma, pos) -> [frame_names]"""
-        cache = defaultdict(list)
-        for frame in fn.frames():
-            for lu_name, lu_data in frame.lexUnit.items():
-                # Parse lexical unit name (e.g., "run.v" -> ("run", "v"))
-                parts = lu_name.split('.')
-                if len(parts) >= 2:
-                    lemma = '.'.join(parts[:-1])
-                    pos = parts[-1]
-                    cache[(lemma.lower(), pos)].append(frame.name)
-        return dict(cache)
-
     def _get_fe_coreness(self, frame_name: str, fe_name: str) -> str:
         """Get frame element coreness type on demand (replaces cache approach)"""
-        if frame_name in self.frame_cache:
-            frame = self.frame_cache[frame_name]
-            if fe_name in frame.FE:
-                return frame.FE[fe_name].coreType
-        return "Non-Core"
+        try:
+            return self.frame_cache[frame_name].FE[fe_name].coreType
+        except:
+            return "Non-Core"
 
     def __call__(self, doc: Doc) -> Doc:
         """Make the class callable as a SpaCy pipeline component"""
@@ -632,6 +614,10 @@ class FrameNetSpaCySRL:
         return aligned_roles
 
 
+    def _tok_to_fn_lemma(self, tok: Token) -> str:
+        return tok.lemma_ + tok.pos_[0].lower()
+
+
     def process_triple(self, pred_tok: Token) -> Dict[str, Dict[str, Set[str]]]:
         """
         Core triple processing logic adapted from new_srl_pipeline.py.
@@ -648,36 +634,36 @@ class FrameNetSpaCySRL:
         """
         try:
             # get candidate WordNet synsets for the predicate (verb)
+            #   fe_type_reqs_wn should == original doc dep reqs
             pred_synsets, fe_type_reqs_wn = self._apply_frame_based_WSD_filter(pred_tok)
             
             # 2. Get candidate FrameNet frames for the predicate lemma
             fn_frames = []
-            pos_map = {'VERB': 'v'}
-            if pred_tok.pos_ in pos_map:
-                fn_pos = pos_map[pred_tok.pos_]
-                key = (pred_tok.lemma_, fn_pos)
+            pred_fn_lemma = self._tok_to_fn_lemma(pred_tok)
 
-                if key in self.lexical_unit_cache:
-                    frame_names = self.lexical_unit_cache[key]
-                    fn_frames = [
-                        self.frame_cache[name]
-                        for name in frame_names
-                        if name in self.frame_cache
-                    ]
-                elif self.verbose:
-                    print(f"[DEBUG] No FrameNet frames found for key: {key}")
+            # map predicate lemma + pos to framenet frames
+            if pred_fn_lemma in self.lexical_unit_cache:
+                frame_names = self.lexical_unit_cache[pred_fn_lemma]
+                fn_frames = [
+                    self.frame_cache[name]
+                    for name in frame_names
+                    if name in self.frame_cache
+                ]
+            elif self.verbose:
+                print(f"[DEBUG] No FrameNet frames found for key: {pred_fn_lemma}")
 
             # for each valid synset and its frames, align to FrameNet frames
-            valid_synset_frame_roles: Dict[str, Dict[str, Set[str]]] = {}
+            valid_synset_frame_roles: Dict[str, Dict[str, Set[str]]] = dict()
             for synset_name in pred_synsets:
                 for fn_frame in fn_frames:
                     # Get FrameNet frame entities
                     fes: Dict[str, List[str]] = self._get_fn_fes(fn_frame)
-                    # Check if frame comes with required argument types or better
+                    # Check which arg types the frame comes with
                     fe_type_reqs_fn = tuple([
                         len(fes.get(role, [])) > 0
                         for role in ["subjects", "objects"]
                     ])
+                    # Check if the fn frame has the same required args as the wn synset frame requirements
                     validated_reqs = all(
                         not a or b  # a ==> b
                         for a, b in zip(fe_type_reqs_wn, fe_type_reqs_fn)
@@ -773,12 +759,11 @@ class FrameNetSpaCySRL:
         Returns:
             Tuple of (frame_name, frame_definition)
         """
-        pred_lemma = pred_tok.lemma_.lower()
         
         # Look up FrameNet frames for this predicate
-        key = (pred_lemma, 'v')
-        if key in self.lexical_unit_cache:
-            candidate_frames = self.lexical_unit_cache[key]
+        pred_fn_lemma = self._tok_to_fn_lemma(pred_tok)
+        if pred_fn_lemma in self.lexical_unit_cache:
+            candidate_frames = self.lexical_unit_cache[pred_fn_lemma]
             
             # Score each candidate frame based on role alignment
             best_frame = None
@@ -797,8 +782,8 @@ class FrameNetSpaCySRL:
                 return best_frame, frame_def
         
         # Fallback: create a generic frame name from the predicate
-        fallback_name = f"Generic_{pred_lemma}_frame"
-        fallback_def = f"Generic frame evoked by the verb '{pred_lemma}'"
+        fallback_name = f"Generic_{pred_fn_lemma}_frame"
+        fallback_def = f"Generic frame evoked by the fn-translated spacy lemma '{pred_fn_lemma}'"
         return fallback_name, fallback_def
     
     def _score_frame_alignment(self, frame: Any, synset_roles: Dict[str, Set[str]]) -> int:
