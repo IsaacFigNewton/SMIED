@@ -48,15 +48,17 @@ class FrameInstance:
     "framenet_srl",
     default_config={
         "min_confidence": 0.5,
-        "use_wordnet_expansion": True
+        "use_wordnet_expansion": True,
+        "verbose": False
     }
 )
-def create_framenet_srl_component(nlp, name, min_confidence, use_wordnet_expansion):
+def create_framenet_srl_component(nlp, name, min_confidence, use_wordnet_expansion, verbose):
     """Factory to create FrameNetSpaCySRL component"""
     return FrameNetSpaCySRL(
         nlp=nlp,
         min_confidence=min_confidence,
-        use_wordnet_expansion=use_wordnet_expansion
+        use_wordnet_expansion=use_wordnet_expansion,
+        verbose=verbose
     )
 
 @spacy.language.Language.component("wn_frame_schema_tagger")
@@ -110,7 +112,8 @@ class FrameNetSpaCySRL:
                  nlp: Optional[Language] = None,
                  spacy_model: str = "en_core_web_sm",
                  min_confidence: float = 0.5,
-                 use_wordnet_expansion: bool = True):
+                 use_wordnet_expansion: bool = True,
+                 verbose: bool = False):
         """
         Initialize the FrameNet-SpaCy SRL pipeline.
 
@@ -119,6 +122,7 @@ class FrameNetSpaCySRL:
             spacy_model: Name of SpaCy model to load (ignored if nlp is provided)
             min_confidence: Minimum confidence threshold for frame/element assignment
             use_wordnet_expansion: Whether to use WordNet for frame expansion
+            verbose: Whether to print verbose warning and error messages
         """
         # Load or use provided SpaCy model
         if nlp is not None:
@@ -132,6 +136,7 @@ class FrameNetSpaCySRL:
 
         self.min_confidence = min_confidence
         self.use_wordnet_expansion = use_wordnet_expansion
+        self.verbose = verbose
 
         # Setup SpaCy extensions
         self._setup_extensions()
@@ -228,13 +233,14 @@ class FrameNetSpaCySRL:
         # since wordnet frames only support a max of 2 args, even for ditransitive verbs,
         #   truncate to just subj, obj roles
         original_tok_dep_reqs = self._get_dep_reqs(pred_tok)
-        # print(f"Original pred_tok dependency structure requirements: {original_tok_dep_reqs}")
-
+        
         # get candidate WordNet synsets for the predicate (verbs)
         pred_lemma = pred_tok.lemma_.lower()
         # get a dict of synset names and synset objects for quick lookup
         pred_synsets = wn.synsets(pred_lemma, pos=wn.VERB)
         if not pred_synsets or not pred_synsets[0]:
+            if self.verbose:
+                print(f"[DEBUG] No WordNet synsets found for '{pred_lemma}'")
             return set(), original_tok_dep_reqs
         pred_synsets = {syn.name(): syn for syn in pred_synsets if syn}
 
@@ -540,10 +546,21 @@ class FrameNetSpaCySRL:
         mean_role_count = total_roles / filled_role_types
         # Use inverse index of dispersion of roles to balance role coverage with specificity
         #   see https://en.wikipedia.org/wiki/Index_of_dispersion
-        inverse_index_of_dispersion = mean_role_count / statistics.variance([
+        
+        # Safe variance calculation
+        role_proportions = [
             (len(roles) / total_roles)
             for roles in synset_roles.values()
-        ])
+        ]
+        mean_prop = statistics.mean(role_proportions) if role_proportions else 0
+        var_prop = statistics.variance(role_proportions) if len(role_proportions) > 1 else 0
+
+        if mean_prop != 0 and var_prop != 0:
+            idi = var_prop / mean_prop
+            inverse_index_of_dispersion = 1 / idi
+        else:
+            idi = 0
+            inverse_index_of_dispersion = 0  # or use a default confidence value like 0.5
         
         # WordNet synset frequency bonus (more common synsets tend to be more reliable)
         # This is a simplified heuristic - in practice you'd use actual frequency data
@@ -571,11 +588,31 @@ class FrameNetSpaCySRL:
             "objects": [], 
             "themes": []
         }
-        # Subject-like roles
+        # Subject-like roles (expanded to include more FrameNet frame elements)
         all_roles = {
-            "subjects": ['agent', 'experiencer', 'cognizer', 'speaker', 'actor', 'protagonist', 'donor', 'giver', 'provider'],
-            "objects": ['patient', 'theme', 'stimulus', 'content', 'message', 'undergoer'], 
-            "themes": ['recipient', 'beneficiary', 'goal', 'destination', 'addressee']
+            "subjects": [
+                'agent', 'experiencer', 'cognizer', 'speaker', 'actor', 'protagonist', 
+                'donor', 'giver', 'provider', 'cook', 'creator', 'performer', 'worker',
+                'user', 'operator', 'driver', 'leader', 'maker', 'builder', 'writer',
+                'buyer', 'seller', 'teacher', 'student', 'communicator', 'evaluator',
+                'killer', 'victim', 'participant', 'competitor', 'winner', 'loser'
+            ],
+            "objects": [
+                'patient', 'stimulus', 'content', 'message', 'undergoer',
+                'food', 'produced_food', 'problem', 'product', 'creation', 'entity',
+                'item', 'object', 'thing', 'material', 'substance', 'target',
+                'goods', 'information', 'idea', 'concept', 'sound', 'noise', 'text',
+                'document', 'tool', 'instrument', 'resource', 'equipment', 'vehicle',
+                'building', 'structure', 'money', 'payment', 'gift', 'offering',
+                'recipient', 'beneficiary'
+            ], 
+            "themes": [
+                'goal', 'destination', 'addressee',
+                'source', 'location', 'place', 'container', 'manner', 'means',
+                'purpose', 'reason', 'cause', 'time', 'duration', 'frequency',
+                'degree', 'extent', 'path', 'direction', 'origin', 'endpoint',
+                'theme'
+            ]
         }
         combined_regexes = {
             k: re.compile('|'.join([re.escape(role) for role in v]), re.IGNORECASE)
@@ -609,55 +646,67 @@ class FrameNetSpaCySRL:
         Returns: 
             Dict[synset_name, Dict[dependency_role, Set[frame_element_names]]]
         """
-        # get candidate WordNet synsets for the predicate (verb)
-        pred_synsets, fe_type_reqs_wn = self._apply_frame_based_WSD_filter(pred_tok)
-        
-        # 2. Get candidate FrameNet frames for the predicate lemma
-        fn_frames = []
-        pos_map = {'VERB': 'v'}
-        if pred_tok.pos_ in pos_map:
-            fn_pos = pos_map[pred_tok.pos_]
-            key = (pred_tok.lemma_, fn_pos)
+        try:
+            # get candidate WordNet synsets for the predicate (verb)
+            pred_synsets, fe_type_reqs_wn = self._apply_frame_based_WSD_filter(pred_tok)
+            
+            # 2. Get candidate FrameNet frames for the predicate lemma
+            fn_frames = []
+            pos_map = {'VERB': 'v'}
+            if pred_tok.pos_ in pos_map:
+                fn_pos = pos_map[pred_tok.pos_]
+                key = (pred_tok.lemma_, fn_pos)
 
-            if key in self.lexical_unit_cache:
-                frame_names = self.lexical_unit_cache[key]
-                fn_frames = [
-                    self.frame_cache[name]
-                    for name in frame_names
-                    if name in self.frame_cache
-                ]
+                if key in self.lexical_unit_cache:
+                    frame_names = self.lexical_unit_cache[key]
+                    fn_frames = [
+                        self.frame_cache[name]
+                        for name in frame_names
+                        if name in self.frame_cache
+                    ]
+                elif self.verbose:
+                    print(f"[DEBUG] No FrameNet frames found for key: {key}")
 
-        # for each valid synset and its frames, align to FrameNet frames
-        valid_synset_frame_roles: Dict[str, Dict[str, Set[str]]] = {}
-        for synset_name in pred_synsets:
-            for fn_frame in fn_frames:
-                # Get FrameNet frame entities
-                fes: Dict[str, List[str]] = self._get_fn_fes(fn_frame)
-                # Check if frame comes with required argument types or better
-                fe_type_reqs_fn = tuple([
-                    len(fes.get(role, [])) > 0
-                    for role in ["subjects", "objects"]
-                ])
-                validated_reqs = all(
-                    not a or b  # a ==> b
-                    for a, b in zip(fe_type_reqs_wn, fe_type_reqs_fn)
-                )
-                # Only keep frames that meet or exceed WordNet-based fe type requirements
-                if validated_reqs:
-                    # Map aligned roles to synset
-                    for role_type, role_names in fes.items():
-                        # Initialize entry if not present
-                        if synset_name not in valid_synset_frame_roles:
-                            valid_synset_frame_roles[synset_name] = {
-                                "subjects": set(),
-                                "objects": set(),
-                                "themes": set()
-                            }
-                        
-                        # Add all aligned roles for this type
-                        valid_synset_frame_roles[synset_name][role_type].update(role_names)
+            # for each valid synset and its frames, align to FrameNet frames
+            valid_synset_frame_roles: Dict[str, Dict[str, Set[str]]] = {}
+            for synset_name in pred_synsets:
+                for fn_frame in fn_frames:
+                    # Get FrameNet frame entities
+                    fes: Dict[str, List[str]] = self._get_fn_fes(fn_frame)
+                    # Check if frame comes with required argument types or better
+                    fe_type_reqs_fn = tuple([
+                        len(fes.get(role, [])) > 0
+                        for role in ["subjects", "objects"]
+                    ])
+                    validated_reqs = all(
+                        not a or b  # a ==> b
+                        for a, b in zip(fe_type_reqs_wn, fe_type_reqs_fn)
+                    )
+                    # Only keep frames that meet or exceed WordNet-based fe type requirements
+                    if validated_reqs:
+                        # Map aligned roles to synset
+                        for role_type, role_names in fes.items():
+                            # Initialize entry if not present
+                            if synset_name not in valid_synset_frame_roles:
+                                valid_synset_frame_roles[synset_name] = {
+                                    "subjects": set(),
+                                    "objects": set(),
+                                    "themes": set()
+                                }
+                            
+                            # Add all aligned roles for this type
+                            valid_synset_frame_roles[synset_name][role_type].update(role_names)
 
-        return valid_synset_frame_roles
+            return valid_synset_frame_roles
+            
+        except ZeroDivisionError as e:
+            if hasattr(self, 'verbose') and self.verbose:
+                print(f"[WARNING] FrameNetSpaCySRL: Division by zero in predicate '{pred_tok.text}': {e}")
+            return {}
+        except Exception as e:
+            if hasattr(self, 'verbose') and self.verbose:
+                print(f"[ERROR] FrameNetSpaCySRL: Error processing predicate '{pred_tok.text}': {e}")
+            return {}
 
     def _triple_to_frame_instance(self,
             pred_tok: Token,
@@ -765,26 +814,41 @@ class FrameNetSpaCySRL:
         """
         score = 0
         
-        if hasattr(frame, 'FE'):
-            frame_elements = set(frame.FE.keys())
+        # Input validation
+        if not frame or not synset_roles:
+            return score
             
-            # Check overlap between frame elements and our semantic roles
-            all_synset_roles = set()
-            for roles in synset_roles.values():
-                all_synset_roles.update(roles)
-            
-            # Score based on overlap
-            overlap = frame_elements.intersection(all_synset_roles)
-            score += len(overlap) * 2
-            
-            # Bonus for having core elements
-            for fe_name in frame_elements:
-                if fe_name in all_synset_roles:
-                    fe_type = self._get_fe_coreness(frame.name, fe_name)
-                    if fe_type == "Core":
-                        score += 3
-                    elif fe_type == "Core-Unexpressed":
-                        score += 2
+        try:
+            if hasattr(frame, 'FE'):
+                frame_elements = set(frame.FE.keys())
+                
+                # Check overlap between frame elements and our semantic roles
+                all_synset_roles = set()
+                for roles in synset_roles.values():
+                    if roles:  # Check that roles is not None or empty
+                        all_synset_roles.update(roles)
+                
+                # Score based on overlap
+                overlap = frame_elements.intersection(all_synset_roles)
+                score += len(overlap) * 2
+                
+                # Bonus for having core elements
+                for fe_name in frame_elements:
+                    if fe_name in all_synset_roles:
+                        try:
+                            fe_type = self._get_fe_coreness(frame.name, fe_name)
+                            if fe_type == "Core":
+                                score += 3
+                            elif fe_type == "Core-Unexpressed":
+                                score += 2
+                        except Exception as e:
+                            if self.verbose:
+                                print(f"[WARNING] Error getting FE coreness for {fe_name}: {e}")
+                            continue
+        except Exception as e:
+            if self.verbose:
+                print(f"[ERROR] _score_frame_alignment: {e}")
+            return 0
         
         return score
     
@@ -834,13 +898,38 @@ class FrameNetSpaCySRL:
             List of FrameElement objects
         """
         frame_elements = []
+        
+        # Input validation
+        if not pred_tok or not synset_roles or not frame_name:
+            if self.verbose:
+                print(f"[WARNING] _create_frame_elements: Invalid input - pred_tok: {bool(pred_tok)}, "
+                      f"synset_roles: {bool(synset_roles)}, frame_name: {bool(frame_name)}")
+            return frame_elements
+        
         # Extract subject, object, theme
         role_tokens = self._get_subj_obj_theme_tokens(pred_tok)
         
         # Map tokens to frame elements with calculated confidence
+        # Note: role_tokens uses singular keys ('subject', 'object', 'theme')  
+        # while synset_roles uses plural keys ('subjects', 'objects', 'themes')
+        role_key_mapping = {
+            'subject': 'subjects',
+            'object': 'objects', 
+            'theme': 'themes'
+        }
+        
+        # Validate that all expected keys exist in synset_roles
+        expected_synset_keys = set(role_key_mapping.values())
+        actual_synset_keys = set(synset_roles.keys())
+        missing_keys = expected_synset_keys - actual_synset_keys
+        if missing_keys and self.verbose:
+            print(f"[WARNING] _create_frame_elements: Missing expected keys in synset_roles: {missing_keys}")
+            print(f"[DEBUG] Expected: {expected_synset_keys}, Got: {actual_synset_keys}")
+        
         for role_type, token in role_tokens.items():
-            if token and synset_roles.get(role_type):
-                semantic_roles = list(synset_roles[role_type])
+            synset_role_key = role_key_mapping.get(role_type, role_type)
+            if token and synset_roles.get(synset_role_key):
+                semantic_roles = list(synset_roles[synset_role_key])
                 if semantic_roles:
                     # Take the first (best) semantic role
                     semantic_role = semantic_roles[0]
@@ -857,7 +946,7 @@ class FrameNetSpaCySRL:
                     fe_type = self._get_fe_coreness(frame_name, semantic_role)
                     if not fe_type or fe_type == "":
                         # Default based on role type
-                        fe_type = "Core" if role_type in ["subjects", "objects"] else "Non-Core"
+                        fe_type = "Core" if role_type in ["subject", "object"] else "Non-Core"
                     
                     # Get definition if available
                     definition = self._get_fe_definition(frame_name, semantic_role)
@@ -892,7 +981,7 @@ class FrameNetSpaCySRL:
         confidence = 0.6
         
         # Higher confidence for subjects and objects (core arguments)
-        if role_type in ["subjects", "objects"]:
+        if role_type in ["subject", "object"]:
             confidence += 0.2
         
         # Lower confidence if there are many alternative roles (ambiguity)
@@ -904,7 +993,7 @@ class FrameNetSpaCySRL:
             confidence += 0.1
         
         # Boost for pronouns in subject position
-        if role_type == "subjects" and token.pos_ == "PRON":
+        if role_type == "subject" and token.pos_ == "PRON":
             confidence += 0.1
             
         return min(0.95, max(0.3, confidence))

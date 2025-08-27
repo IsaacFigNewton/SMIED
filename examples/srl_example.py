@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # Process text through the pipeline
     for sentence in test_sentences:
-        doc = nlp("The company announced its new product at the conference.")
+        doc = nlp(sentence)
 
         # Access frame information
         for frame in doc._.frames:
@@ -61,4 +61,4 @@ if __name__ == "__main__":
             print(f"\tConfidence: {frame_data['confidence']:.2f}")
             print(f"\tFrame entities:")
             for element in frame_data['elements']:
-                print(f"\t\t{element['role']}: '{element['text']}' ({element["type"]})")
+                print(f"\t\t{element['role']}: '{element['text']}' ({element['type']})")

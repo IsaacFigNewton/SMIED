@@ -89,13 +89,57 @@ class SMIED(ISMIEDPipeline):
         Returns:
             Tuple of (subject_path, object_path, connecting_predicate)
         """
+        # Input validation
+        if not all([subj_tok is not None, pred_tok is not None, obj_tok is not None]):
+            print("[ERROR] All triple components (subject, predicate, object) must be non-None")
+            return None
+
+        # Convert to strings and validate for string inputs
+        subject_str = str(subj_tok).strip() if not isinstance(subj_tok, Token) else str(subj_tok)
+        predicate_str = str(pred_tok).strip() if not isinstance(pred_tok, Token) else str(pred_tok)
+        obj_str = str(obj_tok).strip() if not isinstance(obj_tok, Token) else str(obj_tok)
+
+        # Check for empty or whitespace-only strings
+        if not all([subject_str, predicate_str, obj_str]):
+            print("[ERROR] Triple components cannot be empty or whitespace-only")
+            return None
+
+        # Check for very long inputs that might cause memory issues (max 1000 chars each)
+        max_input_length = 1000
+        if (len(subject_str) > max_input_length or 
+            len(predicate_str) > max_input_length or 
+            len(obj_str) > max_input_length):
+            print(f"[ERROR] Input components cannot exceed {max_input_length} characters")
+            return None
+
+        # Check for potentially problematic special characters that might break parsing
+        import re
+        # Allow letters, numbers, spaces, hyphens, apostrophes, and basic punctuation
+        valid_pattern = re.compile(r'^[a-zA-Z0-9\s\-\'.,!?()]+$')
+        
+        for component, name in [(subject_str, "subject"), (predicate_str, "predicate"), (obj_str, "object")]:
+            # Check for non-ASCII characters that might cause encoding issues
+            try:
+                component.encode('ascii')
+            except UnicodeEncodeError:
+                print(f"[WARNING] {name} contains non-ASCII characters, proceeding with caution")
+            
+            # Check for potentially problematic characters
+            if not valid_pattern.match(component):
+                print(f"[WARNING] {name} contains special characters that might affect parsing: '{component}'")
 
         if isinstance(subj_tok, str):
-            subj_tok = self.nlp(subj_tok)[0]
+            if not subject_str:  # Additional check after validation
+                return None
+            subj_tok = self.nlp(subject_str)[0]
         if isinstance(pred_tok, str):
-            pred_tok = self.nlp(pred_tok)[0]
+            if not predicate_str:  # Additional check after validation
+                return None
+            pred_tok = self.nlp(predicate_str)[0]
         if isinstance(obj_tok, str):
-            obj_tok = self.nlp(obj_tok)[0]
+            if not obj_str:  # Additional check after validation
+                return None
+            obj_tok = self.nlp(obj_str)[0]
 
         # Find connected paths
         try:

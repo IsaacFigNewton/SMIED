@@ -81,9 +81,9 @@ class SemanticDecomposer:
         # Dict[synset_name, Dict[dependency_role, Set[frame_element_names]]]
         predicate_synsets: Dict[str, Dict[str, Set[str]]] = self.framenet_srl.process_triple(pred_tok)
         # subject synsets
-        subject_synsets = self.wn_module.synsets(subj_tok, pos='n')
+        subject_synsets = self.wn_module.synsets(subj_tok.lemma_ if hasattr(subj_tok, 'lemma_') else str(subj_tok), pos='n')
         # object synsets
-        object_synsets = self.wn_module.synsets(obj_tok, pos='n')
+        object_synsets = self.wn_module.synsets(obj_tok.lemma_ if hasattr(obj_tok, 'lemma_') else str(obj_tok), pos='n')
         # Check if we found any synsets
         if not subject_synsets or not predicate_synsets or not object_synsets:
             return []
@@ -105,7 +105,7 @@ class SemanticDecomposer:
             # Get shortest combinations for this synset
             for subj_path in lcs_paths_subj_pred[:max_sample_size]:
                 for obj_path in lcs_paths_pred_obj[:max_sample_size]:
-                    combined_path = subj_path + [pred_synset_name] + obj_path
+                    combined_path = list(subj_path) + [pred_synset_name] + list(obj_path)
                     shortest_paths.append(combined_path)
 
         # Return combined paths sorted by ascending path length
