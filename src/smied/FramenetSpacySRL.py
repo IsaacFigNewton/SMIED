@@ -7,6 +7,8 @@ from typing import List, Dict, Tuple, Optional, Set, Any
 from dataclasses import dataclass
 from collections import defaultdict
 import re
+import numpy as np
+import statistics
 
 import spacy
 from spacy.tokens import Doc, Span, Token
@@ -57,6 +59,28 @@ def create_framenet_srl_component(nlp, name, min_confidence, use_wordnet_expansi
         use_wordnet_expansion=use_wordnet_expansion
     )
 
+@spacy.language.Language.component("wn_frame_schema_tagger")
+def wn_frame_schema_tagger(doc):
+    mapping = {"something": "NN", "someone": "NN"}  # Use suitable tag string
+    for token in doc:
+        # Save original tag
+        token._.orig_tag = token.tag_
+        # Retag if verb lemma mistagged as noun
+        if token.text.lower() not in mapping and token.pos_ == "NOUN":
+            token.tag_ = "VB"
+    return doc
+
+def sigmoid(x):
+    """
+    Implements the sigmoid function using NumPy.
+
+    Parameters:
+    x (np.ndarray or scalar): The input value(s) to apply the sigmoid function to.
+
+    Returns:
+    np.ndarray or scalar: The result of applying the sigmoid function.
+    """
+    return 1 / (1 + np.exp(-x))
 
 class FrameNetSpaCySRL:
     """
@@ -76,6 +100,14 @@ class FrameNetSpaCySRL:
         doc = srl.process("John gave Mary a book.")
     """
 
+    # add class variables for dependency role mapping
+    vect_order = ["subject", "object"]  #, "theme"]
+    dep_map = {
+        "subject": {"nsubj", "nsubjpass"},
+        "object": {"dobj", "obj", "pobj"},
+        "theme": {"iobj"}
+    }
+
     def __init__(self,
                  nlp: Optional[Language] = None,
                  spacy_model: str = "en_core_web_sm",
@@ -94,13 +126,11 @@ class FrameNetSpaCySRL:
         if nlp is not None:
             self.nlp = nlp
         else:
-            try:
-                self.nlp = spacy.load(spacy_model)
-            except OSError:
-                print(f"[WARNING] FrameNetSpaCySRL: spaCy '{spacy_model}' model not found.")
-                print(f"[WARNING] Install with: python -m spacy download {spacy_model}")
-                print("[WARNING] FrameNetSpaCySRL will operate with limited functionality.")
-                self.nlp = None
+            self.nlp = spacy.load(spacy_model)
+        # Add custom pipeline component for fixing wordnet frame pos tagging
+        self.arg_schema_nlp = spacy.load("en_core_web_sm")
+        self.arg_schema_nlp.add_pipe("wn_frame_schema_tagger", after="tagger")
+
 
         self.min_confidence = min_confidence
         self.use_wordnet_expansion = use_wordnet_expansion
@@ -128,6 +158,98 @@ class FrameNetSpaCySRL:
         
         # Note: Removed Token.is_predicate as it's not meaningful in triple approach
         # Note: Removed Span extensions as we no longer use spans for frame elements
+
+    def _flatten_tok_deps(self, tok: Token) -> Set[Token]:
+        deps = set()
+        for child in tok.children:
+            deps.add(child)
+            deps.update(self._flatten_tok_deps(child))
+        return deps
+
+
+    # TODO: retain original arg structure and add other syntactic/lexical info for better SRL
+    def _flattened_fn_arg_schema(self, doc: Doc|Token|Set[Token]) -> Dict[str, str]:
+        # used as fallback if FE parsing fails later on
+        schema_atom_synset_maps = {
+            "something": "entity.n.01",
+            "someone": "causal_agent.n.01",
+        }
+
+        # if it's a token, just flatten its children and call that set a doc
+        if isinstance(doc, Token):
+            doc = self._flatten_tok_deps(doc)
+
+        arg_schema = dict()
+        for tok in doc:
+            if tok.lower in schema_atom_synset_maps.keys():
+                arg_schema[tok.dep_] = schema_atom_synset_maps[tok.lower_]
+            else:
+                arg_schema[tok.dep_] = tok.lemma_
+        return arg_schema
+
+
+    def _get_dep_reqs(self, doc: Doc|Token) -> Tuple[bool, ...]:
+        arg_schema_reqs = self._flattened_fn_arg_schema(doc)
+
+        # restructure arg_reqs based to only evaluate core dependencies
+        #   TODO: add more relationships for finer-grained SRL
+        return tuple([
+            len(self.dep_map[k].intersection(set(arg_schema_reqs.keys()))) > 0
+            for k in self.vect_order
+        ])
+    
+
+
+    def _get_f_id_arg_struct_dict(self, syn) -> Dict[int, Tuple[bool, ...]]:
+        syn_frame_ids_strs: Dict[int, Tuple[bool, ...]] = dict()
+        for lemma in syn.lemmas():
+
+            # get all FrameNet frame IDs for this lemma
+            for i, f_id in enumerate(lemma.frame_ids()):
+
+                # get the argument structure for this frame as a string
+                f_str = lemma.frame_strings()[i]
+                # parse f_str into an argument structure vector
+                #   use tuple to make it hashable
+                f_arg_structure = f_str.split(' ')
+                
+                # remove any extra arguments beyond subject, object, theme
+                if f_arg_structure[-1] != f_arg_structure[-1].lower():
+                    f_arg_structure = f_arg_structure[:-1]
+                
+                # create a spacy doc for the argument structure template
+                doc = self.arg_schema_nlp(' '.join(f_arg_structure))
+                # # display dependency parse tree for debugging
+                # displacy.render(doc, style='dep')
+                syn_frame_ids_strs[f_id] = self._get_dep_reqs(doc)
+        
+        return syn_frame_ids_strs
+
+
+    def _apply_frame_based_WSD_filter(self, pred_tok: Token) -> Tuple[Set[str], Tuple[bool, ...]]:
+        # since wordnet frames only support a max of 2 args, even for ditransitive verbs,
+        #   truncate to just subj, obj roles
+        original_tok_dep_reqs = self._get_dep_reqs(pred_tok)
+        print(f"Original pred_tok dependency structure requirements: {original_tok_dep_reqs}")
+
+        # get candidate WordNet synsets for the predicate (verbs)
+        pred_lemma = pred_tok.lemma_.lower()
+        # get a dict of synset names and synset objects for quick lookup
+        pred_synsets = wn.synsets(pred_lemma, pos=wn.VERB)
+        if not pred_synsets or not pred_synsets[0]:
+            return set(), original_tok_dep_reqs
+        pred_synsets = {syn.name(): syn for syn in pred_synsets if syn}
+
+        # filter pred_synsets by their wordnet frames
+        filtered_synsets: Set[str] = set()
+        for s_name, syn in pred_synsets.items():
+            for frame_id, arg_struct_tuple in self._get_f_id_arg_struct_dict(syn).items():
+                # ensure the proposed tuple matches the requirements of the original token
+                if arg_struct_tuple == original_tok_dep_reqs:
+                    filtered_synsets.add(s_name)
+
+        return filtered_synsets, original_tok_dep_reqs
+
 
     def _get_fn_frames_for_lemma(self) -> Dict:
         """Get FrameNet frames for lemmas - builds frame cache for quick lookup"""
@@ -171,11 +293,31 @@ class FrameNetSpaCySRL:
         Returns:
             Processed SpaCy Doc with frame annotations, or None if no NLP model available
         """
-        if self.nlp is None:
-            print("[WARNING] FrameNetSpaCySRL: Cannot process text, no spaCy model available.")
-            return None
-        doc = self.nlp(text)
-        return self.process_doc(doc)
+        return self.process_doc(self.nlp(text))
+
+
+    def _get_subj_obj_theme_tokens(self,
+            pred_tok: Token
+        ) -> Dict[str, Optional[Token]]:
+        """
+        Extract subject, object, and theme tokens for a given predicate token.
+
+        Args:
+            pred_tok: Predicate token (verb)
+
+        Returns:
+            Tuple of (subject_token, object_token, theme_token)
+        """
+        role_tokens: Dict[str, Optional[Token]] = { k: None for k in self.dep_map.keys() }
+
+        for child in pred_tok.children:
+            for role, dep_set in self.dep_map.items():
+                if child.dep_ in dep_set:
+                    role_tokens[role] = child
+                    break
+
+        return role_tokens
+
 
     def process_doc(self, doc: Doc) -> Doc:
         """
@@ -206,17 +348,8 @@ class FrameNetSpaCySRL:
         # Step 2: For each predicate, process the triple with error handling
         for pred_tok in predicates:
             try:
-                # Extract subject, object, theme using Phase 1 helpers
-                subj_tok = self._get_subject(pred_tok)
-                obj_tok = self._get_object(pred_tok)
-                theme_tok = self._get_theme(pred_tok)
-                
-                # Skip if no arguments found (intransitive verbs with no subject)
-                if not any([subj_tok, obj_tok, theme_tok]):
-                    continue
-                
                 # Process the triple through the core engine
-                triple_results = self.process_triple(pred_tok, subj_tok, obj_tok, wn, fn)
+                triple_results = self.process_triple(pred_tok)
                 
                 # Convert triple results to FrameInstance for compatibility
                 if triple_results:
@@ -234,36 +367,6 @@ class FrameNetSpaCySRL:
                 continue
 
         return doc
-
-    def process(self, doc: Doc) -> Doc:
-        """
-        Backward-compatible process method.
-        
-        This method maintains the original API while internally using 
-        the new triple-based processing approach.
-        
-        Args:
-            doc: SpaCy Doc object
-        
-        Returns:
-            Doc with frame annotations added
-        """
-        return self.process_doc(doc)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def get_frame_summary(self, doc: Doc) -> Dict:
@@ -421,123 +524,46 @@ class FrameNetSpaCySRL:
         lines.append("=" * 80)
         return "\n".join(lines)
 
-    # ===== Helper Methods (moved from deprecated span-based methods) =====
-    
-    def _calculate_triple_confidence(self, synset_roles: Dict[str, Set[str]]) -> float:
-        """
-        Calculate confidence for triple-based semantic role assignment.
-        Enhanced version with better confidence modeling.
-        """
-        if not synset_roles:
-            return 0.2
-        
-        # Base confidence based on number of filled roles
-        filled_roles = sum(1 for roles in synset_roles.values() if roles)
-        total_roles = sum(len(roles) for roles in synset_roles.values())
-        
-        if filled_roles == 0:
-            return 0.2
-        
-        # Base score from role coverage
-        base_confidence = min(0.8, 0.3 + (filled_roles * 0.15))
-        
-        # Bonus for having multiple semantic roles (indicates rich frame)
-        if total_roles > filled_roles:
-            base_confidence += min(0.1, (total_roles - filled_roles) * 0.02)
-        
-        # Bonus for having subject (most important argument)
-        if synset_roles.get("subjects"):
-            base_confidence += 0.1
-            
-        # Penalty for incomplete argument structure
-        if not synset_roles.get("objects") and filled_roles < 2:
-            base_confidence -= 0.05
-        
-        return min(0.95, max(0.2, base_confidence))
-        
-    def _calculate_synset_confidence(self, synset_name: str, synset_roles: Dict[str, Set[str]]) -> float:
+    # ===== Helper Methods =====
+    def _score_synset_by_idi_and_freq(self,
+            synset_name: str,
+            synset_roles: Dict[str, Set[str]]
+        ) -> float:
         """
         Calculate confidence for a specific synset selection.
         Enhanced version that considers synset selection and role matching.
         """
-        if not synset_roles:
-            return 0.2
+        if len(synset_roles["subjects"]) == 0:
+            return 0.0  # Must have at least subject role
         
-        # Base confidence from role coverage
+        # Determine role coverage and specificity
         total_roles = sum(len(roles) for roles in synset_roles.values())
         filled_role_types = sum(1 for roles in synset_roles.values() if roles)
-        
-        base_confidence = min(0.8, 0.4 + (total_roles * 0.08))
-        
-        # Bonus for balanced argument structure
-        if filled_role_types >= 2:  # Has both subject and object/theme
-            base_confidence += 0.1
+        mean_role_count = total_roles / filled_role_types
+        # Use inverse index of dispersion of roles to balance role coverage with specificity
+        #   see https://en.wikipedia.org/wiki/Index_of_dispersion
+        inverse_index_of_dispersion = mean_role_count / statistics.variance([
+            (len(roles) / total_roles)
+            for roles in synset_roles.values()
+        ])
         
         # WordNet synset frequency bonus (more common synsets tend to be more reliable)
         # This is a simplified heuristic - in practice you'd use actual frequency data
         if '.' in synset_name:
             # Parse synset sense number (lower numbers = more common)
-            try:
-                sense_num = int(synset_name.split('.')[-1])
-                if sense_num <= 2:  # First two senses are typically more reliable
-                    base_confidence += 0.05
-            except (ValueError, IndexError):
-                pass
+            sense_num = int(synset_name.split('.')[-1])
         
-        # Penalty for overly complex role assignments (might indicate overalignment)
-        if total_roles > 6:
-            base_confidence -= 0.1
-            
-        return min(0.9, max(0.2, base_confidence))
+        # Combine factors into a score
+        score = inverse_index_of_dispersion / sense_num  # Penalize higher sense numbers
+        
+        # apply sigmoid to normalize
+        return sigmoid(score)
     
+
     # ===== Phase 1: Core Triple Processing Infrastructure =====
-    
-    def _get_subject(self, pred_tok: Token) -> Optional[Token]:
+    def _get_fn_fes(self, fn_frame: Any) -> Dict[str, List[str]]:
         """
-        Extract subject token from predicate using spaCy dependencies.
-        Looks for nsubj, nsubjpass dependencies.
-        """
-        for child in pred_tok.children:
-            if child.dep_ in ["nsubj", "nsubjpass"]:
-                return child
-        return None
-
-    def _get_object(self, pred_tok: Token) -> Optional[Token]:
-        """
-        Extract direct object token from predicate.
-        Looks for dobj, obj dependencies.
-        """
-        for child in pred_tok.children:
-            if child.dep_ in ["dobj", "obj"]:
-                return child
-        return None
-
-    def _get_theme(self, pred_tok: Token) -> Optional[Token]:
-        """
-        Extract indirect object/theme token from predicate.
-        Looks for iobj, dative dependencies.
-        """
-        for child in pred_tok.children:
-            if child.dep_ in ["iobj", "dative"]:
-                return child
-        return None
-
-    def _lemmatize(self, word: str) -> str:
-        """
-        Get lemma form of word using spaCy.
-        """
-        if self.nlp is None:
-            return word.lower()
-        
-        # Process the word to get its lemma
-        doc = self.nlp(word)
-        if len(doc) > 0:
-            return doc[0].lemma_
-        return word.lower()
-
-    def _align_wn_fn_frames(self, wn_frame: Any, fn_frame: Any) -> Dict[str, List[str]]:
-        """
-        Align WordNet frame with FrameNet frame.
+        Align syntactic dependency roles with FrameNet frame roles.
         Returns: {"subjects": [...], "objects": [...], "themes": [...]}
         
         This is a basic implementation that maps common semantic roles.
@@ -547,34 +573,31 @@ class FrameNetSpaCySRL:
             "objects": [], 
             "themes": []
         }
-        
+        # Subject-like roles
+        all_roles = {
+            "subjects": ['agent', 'experiencer', 'cognizer', 'speaker', 'actor', 'protagonist', 'donor', 'giver', 'provider'],
+            "objects": ['patient', 'theme', 'stimulus', 'content', 'message', 'undergoer'], 
+            "themes": ['recipient', 'beneficiary', 'goal', 'destination', 'addressee']
+        }
+        combined_regexes = {
+            k: re.compile('|'.join([re.escape(role) for role in v]), re.IGNORECASE)
+            for k, v in all_roles.items()
+        }
+
         # Get FrameNet frame elements if available
         if hasattr(fn_frame, 'FE'):
             frame_elements = list(fn_frame.FE.keys())
             
-            # Map common FrameNet roles to our categories
+            # Map common FrameNet roles to the categories
             for fe in frame_elements:
-                fe_lower = fe.lower()
-                
-                # Subject-like roles
-                if any(subj_role in fe_lower for subj_role in 
-                       ['agent', 'experiencer', 'cognizer', 'speaker', 'actor', 'protagonist', 'donor', 'giver', 'provider']):
-                    aligned_roles["subjects"].append(fe)
-                
-                # Object-like roles  
-                elif any(obj_role in fe_lower for obj_role in
-                        ['patient', 'theme', 'stimulus', 'content', 'message', 'undergoer']):
-                    aligned_roles["objects"].append(fe)
-                
-                # Theme/indirect object-like roles
-                elif any(theme_role in fe_lower for theme_role in
-                        ['recipient', 'beneficiary', 'goal', 'destination', 'addressee']):
-                    aligned_roles["themes"].append(fe)
+                for k, v in combined_regexes.items():
+                    if v.search(fe.lower()):
+                        aligned_roles[k].append(fe)
         
         return aligned_roles
 
-    def process_triple(self, pred_tok: Token, subj_tok: Optional[Token], 
-                      obj_tok: Optional[Token], wn: Any, fn: Any) -> Dict[str, Dict[str, Set[str]]]:
+
+    def process_triple(self, pred_tok: Token) -> Dict[str, Dict[str, Set[str]]]:
         """
         Core triple processing logic adapted from new_srl_pipeline.py.
         
@@ -586,112 +609,64 @@ class FrameNetSpaCySRL:
             fn: FrameNet interface
             
         Returns: 
-            Dict[synset_name, Dict[dependency_role, Set[semantic_roles]]]
+            Dict[synset_name, Dict[dependency_role, Set[frame_element_names]]]
         """
-        # 1. Get candidate WordNet synsets for the predicate (verbs)
-        pred_lemma = pred_tok.lemma_
-        pred_synsets = wn.synsets(pred_lemma, pos=wn.VERB)
+        # get candidate WordNet synsets for the predicate (verb)
+        pred_synsets, fe_type_reqs_wn = self._apply_frame_based_WSD_filter(pred_tok)
         
         # 2. Get candidate FrameNet frames for the predicate lemma
         fn_frames = []
         pos_map = {'VERB': 'v'}
         if pred_tok.pos_ in pos_map:
             fn_pos = pos_map[pred_tok.pos_]
-            key = (pred_lemma.lower(), fn_pos)
+            key = (pred_tok.lemma_, fn_pos)
+
             if key in self.lexical_unit_cache:
                 frame_names = self.lexical_unit_cache[key]
-                fn_frames = [self.frame_cache[name] for name in frame_names if name in self.frame_cache]
+                fn_frames = [
+                    self.frame_cache[name]
+                    for name in frame_names
+                    if name in self.frame_cache
+                ]
 
-        # 3. Extract spaCy-derived argument tokens
-        # Use the helper functions we just implemented
-        spacy_args = {
-            "subj": self._get_subject(pred_tok),
-            "obj": self._get_object(pred_tok), 
-            "iobj": self._get_theme(pred_tok)
-        }
-        
-        # Override with provided arguments if they exist
-        if subj_tok is not None:
-            spacy_args["subj"] = subj_tok
-        if obj_tok is not None:
-            spacy_args["obj"] = obj_tok
-
-        # 4. Filter WordNet synsets by argument structure compatibility
-        valid_synsets_frames: Dict[str, List[Any]] = {}
-
-        for synset in pred_synsets:
-            # Get WordNet frames (using a basic approach since frames() may not exist)
-            # We'll simulate this by checking synset definitions and example patterns
-            wn_frames = self._get_wn_frames_for_synset(synset, spacy_args)
-            
-            if wn_frames:
-                valid_synsets_frames[synset.name()] = wn_frames
-
-        # 5. For each valid synset & its frames, align to FrameNet frames
+        # for each valid synset and its frames, align to FrameNet frames
         valid_synset_frame_roles: Dict[str, Dict[str, Set[str]]] = {}
-
-        for synset_name, valid_wn_frames in valid_synsets_frames.items():
-            for wn_frame in valid_wn_frames:
-                for fn_frame in fn_frames:
-                    # Align WordNet frame with FrameNet frame
-                    valid_args: Dict[str, List[str]] = self._align_wn_fn_frames(wn_frame, fn_frame)
-
-                    # Only keep this synset-frame pairing if we have at least subject info
-                    if valid_args["subjects"]:
-                        # Initialize if not exists
+        for synset_name in pred_synsets:
+            for fn_frame in fn_frames:
+                # Get FrameNet frame entities
+                fes: Dict[str, List[str]] = self._get_fn_fes(fn_frame)
+                # Check if frame comes with required argument types or better
+                fe_type_reqs_fn = tuple([
+                    len(fes.get(role, [])) > 0
+                    for role in ["subjects", "objects"]
+                ])
+                validated_reqs = all(
+                    not a or b  # a ==> b
+                    for a, b in zip(fe_type_reqs_wn, fe_type_reqs_fn)
+                )
+                # Only keep frames that meet or exceed WordNet-based fe type requirements
+                if validated_reqs:
+                    # Map aligned roles to synset
+                    for role_type, role_names in fes.items():
+                        # Initialize entry if not present
                         if synset_name not in valid_synset_frame_roles:
                             valid_synset_frame_roles[synset_name] = {
                                 "subjects": set(),
-                                "objects": set(), 
+                                "objects": set(),
                                 "themes": set()
                             }
                         
-                        # Add semantic roles to the sets
-                        existing = valid_synset_frame_roles[synset_name]
-                        existing["subjects"].update(valid_args["subjects"])
-                        existing["objects"].update(valid_args["objects"])
-                        existing["themes"].update(valid_args["themes"])
+                        # Add all aligned roles for this type
+                        valid_synset_frame_roles[synset_name][role_type].update(role_names)
 
         return valid_synset_frame_roles
 
-    def _get_wn_frames_for_synset(self, synset: Any, spacy_args: Dict[str, Optional[Token]]) -> List[Any]:
-        """
-        Get WordNet frames for a synset based on argument structure.
-        This is a simplified implementation that creates frame-like structures
-        based on the presence of arguments.
-        """
-        frames = []
-        
-        # Create a basic frame representation based on argument structure
-        frame_arity = 0
-        if spacy_args.get("subj"):
-            frame_arity += 1
-        if spacy_args.get("obj"):
-            frame_arity += 1
-        if spacy_args.get("iobj"):
-            frame_arity += 1
-            
-        # Create a mock frame object with the determined arity
-        # This simulates the filtering logic from new_srl_pipeline.py
-        class MockWNFrame:
-            def __init__(self, arity):
-                self.arity = arity
-            
-            def __len__(self):
-                return self.arity
-        
-        # Always include a frame that matches our argument structure
-        frames.append(MockWNFrame(frame_arity))
-        
-        # Also include frames of different arities for flexibility
-        for arity in [1, 2, 3]:
-            if arity != frame_arity:
-                frames.append(MockWNFrame(arity))
-        
-        return frames
-
-    def _triple_to_frame_instance(self, pred_tok: Token, triple_results: Dict[str, Dict[str, Set[str]]], 
-                                 doc: Doc) -> Optional[FrameInstance]:
+    def _triple_to_frame_instance(self,
+            pred_tok: Token,
+            triple_results: Dict[str, Dict[str, Set[str]]], 
+            doc: Doc,
+            sample_size: int = 3
+        ) -> Optional[FrameInstance]:
         """
         Convert triple processing results to FrameInstance for backward compatibility.
         
@@ -708,17 +683,18 @@ class FrameNetSpaCySRL:
         """
         if not triple_results:
             return None
-        
-        # Select the best synset based on confidence scores
-        best_synset_name, synset_roles = self._select_best_synset(triple_results)
-        if not synset_roles:
-            return None
-            
-        # Calculate confidence for this synset assignment
-        synset_confidence = self._calculate_synset_confidence(best_synset_name, synset_roles)
-        
+                    
+        # Calculate robustness score for each synset assignment
+        sorted_synsets = list()
+        for synset_name, synset_roles in triple_results.items():
+            synset_score = self._score_synset_by_idi_and_freq(synset_name, synset_roles)
+            sorted_synsets.append((synset_name, synset_roles, synset_score))
+        # Sort by usefulness descending
+        sorted_synsets.sort(key=lambda x: x[2], reverse=True)
+
         # Try to find the best matching FrameNet frame
-        frame_name, frame_definition = self._find_best_framenet_frame(pred_tok, synset_roles)
+        for synset_name, synset_roles, synset_confidence in sorted_synsets[:sample_size]:
+            frame_name, frame_definition = self._find_best_framenet_frame(pred_tok, synset_roles)
         
         # Create target span (expand to include particles/auxiliaries if present)
         target_span = self._get_predicate_span(pred_tok, doc)
@@ -737,41 +713,7 @@ class FrameNetSpaCySRL:
         )
         
         return frame_instance
-        
-    def _select_best_synset(self, triple_results: Dict[str, Dict[str, Set[str]]]) -> Tuple[str, Dict[str, Set[str]]]:
-        """
-        Select the best synset from triple results based on role coverage and confidence.
-        
-        Args:
-            triple_results: Results from process_triple
-            
-        Returns:
-            Tuple of (best_synset_name, synset_roles)
-        """
-        if not triple_results:
-            return "", {}
-            
-        best_synset = None
-        best_score = 0
-        best_roles = {}
-        
-        for synset_name, synset_roles in triple_results.items():
-            # Score based on number of filled roles and role coverage
-            score = 0
-            for role_type, roles in synset_roles.items():
-                if roles:  # If this role type has semantic roles assigned
-                    score += len(roles)  # More roles = higher score
-                    
-            # Bonus for having subject (core argument)
-            if synset_roles.get("subjects"):
-                score += 2
-                
-            if score > best_score:
-                best_score = score
-                best_synset = synset_name
-                best_roles = synset_roles
-        
-        return best_synset or "", best_roles
+
     
     def _find_best_framenet_frame(self, pred_tok: Token, synset_roles: Dict[str, Set[str]]) -> Tuple[str, str]:
         """
@@ -894,13 +836,8 @@ class FrameNetSpaCySRL:
             List of FrameElement objects
         """
         frame_elements = []
-        
-        # Get actual tokens for subject, object, theme
-        role_tokens = {
-            "subjects": self._get_subject(pred_tok),
-            "objects": self._get_object(pred_tok),
-            "themes": self._get_theme(pred_tok)
-        }
+        # Extract subject, object, theme
+        role_tokens = self._get_subj_obj_theme_tokens(pred_tok)
         
         # Map tokens to frame elements with calculated confidence
         for role_type, token in role_tokens.items():

@@ -9,12 +9,14 @@ import os
 # Add the src directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
+import spacy
 from smied.SMIED import SMIED
 import gensim.downloader as api
 
 def main():
     """Demonstrate SMIED class usage."""
-    
+    # nlp = spacy.load("en_core_web_sm")
+
     # Load Word2Vec model (optional)
     print("Loading Word2Vec model...")
     w2v_model = None
@@ -30,7 +32,6 @@ def main():
         nlp_model="en_core_web_sm",  # Set to "en_core_web_sm" if spaCy is installed
         embedding_model=w2v_model,  # Can add embedding model for better similarity
         auto_download=True,  # Automatically download required NLTK data,
-        build_graph_on_init=True,  # Build semantic graph on initialization
     )
     print("SMIED pipeline initialized.")
 

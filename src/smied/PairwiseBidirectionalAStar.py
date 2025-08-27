@@ -1,7 +1,7 @@
 import heapq
 import itertools
 from collections import deque
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, Any
 import networkx as nx
 import numpy as np
 
@@ -44,7 +44,6 @@ class PairwiseBidirectionalAStar:
         beam_width: int = 10,  # Optimized: increased from 3 to 10
         max_depth: int = 10,   # Optimized: increased from 6 to 10
         relax_beam: bool = True,  # Optimized: changed from False to True
-        heuristic_type: str = "hybrid",  # New: hybrid, embedding, wordnet, uniform
         embedding_helper: Optional[object] = None,  # For hybrid heuristic
     ):
         """
@@ -61,11 +60,16 @@ class PairwiseBidirectionalAStar:
         self.g = g
         self.src = src
         self.tgt = tgt
+
+        if not get_new_beams_fn:
+            def default_get_new_beams_fn(g, s, t) -> List[BeamElement]:
+                return []
+            get_new_beams_fn = default_get_new_beams_fn
         self.get_new_beams_fn = get_new_beams_fn
+
         self.beam_width = beam_width
         self.max_depth = max_depth
         self.relax_beam = relax_beam
-        self.heuristic_type = heuristic_type
         self.embedding_helper = embedding_helper
 
         # will be set by _build_allowed_and_heuristics
@@ -90,39 +94,23 @@ class PairwiseBidirectionalAStar:
     # -------------------------
     # WordNet Distance Estimation for Hybrid Heuristic
     # -------------------------
+    def _overlapping_lch_paths(self, syn1, syn2) -> List[Any]:
+        lchs = syn1.lowest_common_hypernyms(syn2)
+        print("LCHs:", [lch.name() for lch in lchs])
+        common_paths = []
 
-    def _estimate_wordnet_hops(self, current: SynsetName, target: SynsetName) -> float:
-        """
-        Estimate WordNet distance in hops between two synsets.
-        Uses path_similarity to estimate distance, with fallback heuristics.
-        """
-        try:
-            current_synset = wn.synset(current)
-            target_synset = wn.synset(target)
-            
-            # Try path similarity first
-            path_sim = current_synset.path_similarity(target_synset)
-            if path_sim is not None and path_sim > 0:
-                # Convert similarity (0-1) to distance estimate
-                # path_sim = 1 / (1 + distance), so distance ≈ (1/path_sim) - 1
-                estimated_distance = (1.0 / path_sim) - 1.0
-                return max(1.0, estimated_distance)  # At least 1 hop
-            
-            # Fallback: Wu-Palmer similarity
-            wup_sim = current_synset.wup_similarity(target_synset)
-            if wup_sim is not None and wup_sim > 0:
-                estimated_distance = (1.0 / wup_sim) - 1.0
-                return max(1.0, estimated_distance)
-            
-            # Fallback for different POS or unrelated synsets
-            if wn.synset(current).pos() != wn.synset(target).pos():
-                return 8.0  # Higher cost for cross-POS connections
-            else:
-                return 6.0  # Default distance within same POS
-                
-        except Exception:
-            # Ultimate fallback
-            return 5.0
+        for p1 in syn1.hypernym_paths():
+            for p2 in syn2.hypernym_paths():
+                if any(lch in p1 for lch in lchs) and any(lch in p2 for lch in lchs):
+                    # truncate the paths until they've got one of the lchs
+                    while p1 and p2 and p1[0] not in lchs:
+                        last_lch = p1[0]
+                        p1 = p1[1:]
+                        p2 = p2[1:]
+                    # get the shared lch path
+                    common_paths.append(p1[::-1] + p2[1:])
+
+        return common_paths
 
     def _get_embedding_similarity(self, current: SynsetName, target: SynsetName) -> float:
         """Get embedding-based similarity between two synsets."""
@@ -137,34 +125,18 @@ class PairwiseBidirectionalAStar:
             return 0.5
 
     def _calculate_heuristic(self, current: SynsetName, target: SynsetName) -> float:
-        """
-        Calculate heuristic value based on the configured heuristic type.
-        Lower values indicate better (closer to goal).
-        """
-        if self.heuristic_type == "uniform":
-            return 1.0
+        # Use embedding similarity if available
+        embedding_sim = self._get_embedding_similarity(current, target)
+
+        current_synset = wn.synset(current)
+        target_synset = wn.synset(target)
+        if current_synset and target_synset:
+            # Wu-Palmer Similarity: Return a score denoting how similar two word senses are,
+            #   based on the depth of the two senses in the taxonomy and that of their Least Common Subsumer (most specific ancestor node).
+            wordnet_sim = current_synset.wup_similarity(wn.synset(target_synset)) or 0.5
+            return (embedding_sim + wordnet_sim) / 2.0
         
-        elif self.heuristic_type == "wordnet":
-            return self._estimate_wordnet_hops(current, target)
-        
-        elif self.heuristic_type == "embedding":
-            embedding_sim = self._get_embedding_similarity(current, target)
-            return 1.0 - embedding_sim
-        
-        elif self.heuristic_type == "hybrid":
-            # Hybrid heuristic combining embedding and WordNet distance
-            embedding_sim = self._get_embedding_similarity(current, target)
-            wordnet_distance = self._estimate_wordnet_hops(current, target)
-            cross_pos_penalty = 0.2 if (wn.synset(current).pos() != wn.synset(target).pos()) else 0.0
-            
-            # Balanced combination (70% embedding, 30% WordNet)
-            h = (1 - embedding_sim) * 0.7 + wordnet_distance * 0.3 + cross_pos_penalty
-            return h
-        
-        else:
-            # Default to embedding-based heuristic
-            embedding_sim = self._get_embedding_similarity(current, target)
-            return 1.0 - embedding_sim
+        return embedding_sim
 
     # -------------------------
     # Setup: allowed sets & heuristics
@@ -175,12 +147,7 @@ class PairwiseBidirectionalAStar:
         - src_allowed/tgt_allowed: union of beam nodes and explicit gloss seeds + src/tgt.
         - h_forward/h_backward: h = 1 - sim (embedding), gloss seeds get bonus.
         """
-        beams = []
-        if self.get_new_beams_fn is not None:
-            try:
-                beams = self.get_new_beams_fn(self.g, self.src, self.tgt) or []
-            except Exception:
-                beams = []
+        beams = self.get_new_beams_fn(self.g, self.src, self.tgt)
 
         # base allowed sets from embedding beams
         src_beam_pairs = [b[0] for b in beams]
@@ -210,16 +177,15 @@ class PairwiseBidirectionalAStar:
             self.h_backward[node] = h_backward_val
         
         # For nodes from embedding beams, use the beam similarity if it's better
-        if self.heuristic_type in ["embedding", "hybrid"]:
-            for (s_pair, t_pair, sim) in beams:
-                s_node = s_pair[0]
-                t_node = t_pair[0]
-                h_val = max(0.0, 1.0 - float(sim))
-                # Use beam similarity if it's better (lower)
-                if s_node in self.h_forward:
-                    self.h_forward[s_node] = min(self.h_forward[s_node], h_val)
-                if t_node in self.h_backward:
-                    self.h_backward[t_node] = min(self.h_backward[t_node], h_val)
+        for (s_pair, t_pair, sim) in beams:
+            s_node = s_pair[0]
+            t_node = t_pair[0]
+            h_val = max(0.0, 1.0 - float(sim))
+            # Use beam similarity if it's better (lower)
+            if s_node in self.h_forward:
+                self.h_forward[s_node] = min(self.h_forward[s_node], h_val)
+            if t_node in self.h_backward:
+                self.h_backward[t_node] = min(self.h_backward[t_node], h_val)
 
     # -------------------------
     # Initialization of queues

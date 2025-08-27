@@ -6,10 +6,16 @@ Main class for semantic decomposition and path finding.
 import sys
 import os
 from typing import Optional, Tuple, List, Any, Dict
-from smied.interfaces.ISMIEDPipeline import ISMIEDPipeline
-
+import spacy
+from spacy.tokens import Token, Doc
 import nltk
+
+nltk.download('wordnet', quiet=True)
+nltk.download('omw-1.4', quiet=True)
+
 from nltk.corpus import wordnet as wn
+
+from smied.interfaces.ISMIEDPipeline import ISMIEDPipeline
 from smied.SemanticDecomposer import SemanticDecomposer
 
 
@@ -23,10 +29,9 @@ class SMIED(ISMIEDPipeline):
     
     def __init__(
         self,
-        nlp_model: Optional[str] = "en_core_web_sm",
+        nlp_model: str = "en_core_web_sm",
         embedding_model: Optional[Any] = None,
         auto_download: bool = True,
-        build_graph_on_init: bool = False
     ):
         """
         Initialize the SMIED pipeline and all its components.
@@ -37,7 +42,6 @@ class SMIED(ISMIEDPipeline):
             auto_download: Whether to automatically download required data
             build_graph_on_init: Whether to build the synset graph during initialization
         """
-        self.nlp_model_name = nlp_model
         self.embedding_model = embedding_model
         self.auto_download = auto_download
         
@@ -47,7 +51,11 @@ class SMIED(ISMIEDPipeline):
             nltk.download('omw-1.4', quiet=True)
         
         # Set up NLP pipeline
-        self.nlp = self._setup_nlp()
+        try:
+            self.nlp = spacy.load(nlp_model)
+        except:
+            print(f"WARNING: INVALID SPACY MODEL PROVIDED.")
+            self.nlp = spacy.load("en_core_web_sm")
         
         # Initialize semantic decomposer
         self.decomposer = SemanticDecomposer(
@@ -57,23 +65,8 @@ class SMIED(ISMIEDPipeline):
         )
         
         # Build graph if requested
-        self.synset_graph = None
-        if build_graph_on_init:
-            self.synset_graph = self.build_synset_graph()
+        self.synset_graph = self.build_synset_graph()
     
-    def _setup_nlp(self) -> Optional[Any]:
-        """Set up spaCy NLP pipeline."""
-        if not self.nlp_model_name:
-            return None
-            
-        try:
-            import spacy
-            nlp = spacy.load(self.nlp_model_name)
-            return nlp
-        except OSError:
-            print(f"[WARNING] spaCy '{self.nlp_model_name}' model not found.")
-            print(f"[WARNING] Install with: python -m spacy download {self.nlp_model_name}")
-            return None
     
     def build_synset_graph(self) -> Any:
         """
@@ -89,14 +82,13 @@ class SMIED(ISMIEDPipeline):
     
     def analyze_triple(
         self,
-        subject: str,
-        predicate: str,
-        object: str,
-        max_depth: int = 10,
+        subj_tok: Token|str,
+        pred_tok: Token|str,
+        obj_tok: Token|str,
         beam_width: int = 3,
         max_results_per_pair: int = 4,
         len_tolerance: int = 5
-    ) -> List[str]:
+    ) -> List[List[str]]:
         """
         Analyze a subject-predicate-object triple.
         
@@ -115,14 +107,20 @@ class SMIED(ISMIEDPipeline):
         # Build graph if needed
         graph = self.build_synset_graph()
         
+        if isinstance(subj_tok, str):
+            subj_tok = self.nlp(subj_tok)[0]
+        if isinstance(pred_tok, str):
+            pred_tok = self.nlp(pred_tok)[0]
+        if isinstance(obj_tok, str):
+            obj_tok = self.nlp(obj_tok)[0]
+
         # Find connected paths
         try:
             result = self.decomposer.find_connected_shortest_paths(
-                subject_word=subject,
-                predicate_word=predicate,
-                object_word=object,
+                subj_tok=subj_tok,
+                pred_tok=pred_tok,
+                obj_tok=obj_tok,
                 g=graph,
-                max_depth=max_depth,
                 beam_width=beam_width,
                 max_results_per_pair=max_results_per_pair,
                 len_tolerance=len_tolerance
@@ -158,8 +156,11 @@ class SMIED(ISMIEDPipeline):
         """
         # Update settings if provided
         if 'nlp_model' in kwargs:
-            self.nlp_model_name = kwargs['nlp_model']
-            self.nlp = self._setup_nlp()
+            # Set up NLP pipeline
+            try:
+                self.nlp = spacy.load(kwargs['nlp_model'])
+            except:
+                print(f"WARNING: INVALID SPACY MODEL PROVIDED.")
         
         if 'embedding_model' in kwargs:
             self.embedding_model = kwargs['embedding_model']

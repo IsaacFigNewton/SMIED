@@ -1,11 +1,13 @@
+from typing import Optional, Callable, Dict, List, Tuple, Any, Set
 import networkx as nx
+from spacy.tokens import Token
 import nltk
 
 nltk.download('wordnet', quiet=True)
 nltk.download('omw-1.4', quiet=True)
 
 from nltk.corpus import wordnet as wn
-from typing import Optional, Callable, Dict, List, Tuple, Any, Set
+
 from .PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
 from .BeamBuilder import BeamBuilder
 from .EmbeddingHelper import EmbeddingHelper
@@ -49,23 +51,22 @@ class SemanticDecomposer:
 
     def find_connected_shortest_paths(
         self,
-        subject_word: str,
-        predicate_word: str,
-        object_word: str,
+        subj_tok: Token,
+        pred_tok: Token,
+        obj_tok: Token,
         model=None,  # embedding model
         g: nx.DiGraph|None = None,  # synset graph
-        max_depth: int = 10,
-        max_self_intersection: int = 5,
         beam_width: int = 3,
         max_results_per_pair: int = 3,
         len_tolerance: int = 1,
         relax_beam: bool = False,
         max_sample_size: int = 5
-    ) -> List[str]:
+    ) -> List[List[str]]:
         """
         Main entry point for finding semantic paths between subject-predicate-object triples.
         Returns the best connected path between the subject, predicate, and object.
         """
+
         # Use provided model or fallback to instance model
         if model is None:
             model = self.embedding_model
@@ -81,122 +82,109 @@ class SemanticDecomposer:
         if g is None:
             g = self.build_synset_graph()
 
-        # Get synsets for each word
-        subject_synsets = self.wn_module.synsets(subject_word, pos=self.wn_module.NOUN)
-        predicate_synsets = self.wn_module.synsets(predicate_word, pos=self.wn_module.VERB)
-        object_synsets = self.wn_module.synsets(object_word, pos=self.wn_module.NOUN)
-        
+        # SRL-filtered predicate synsets and associated frame elements
+        # Dict[synset_name, Dict[dependency_role, Set[frame_element_names]]]
+        predicate_synsets: Dict[str, Dict[str, Set[str]]] = self.framenet_srl.process_triple(pred_tok)
+        # subject synsets
+        subject_synsets = self.wn_module.synsets(subj_tok, pos='n')
+        # object synsets
+        object_synsets = self.wn_module.synsets(obj_tok, pos='n')
         # Check if we found any synsets
         if not subject_synsets or not predicate_synsets or not object_synsets:
             return []
-
-        # Collect all possible interpretations, then select most coherent
-        all_interpretation_paths = []
         
-        # Try each predicate synset
-        for pred in predicate_synsets:
-            # Get paths for frame interpretations
-            subject_paths = self._find_subject_to_predicate_paths(
-                subject_synsets, pred, g, get_new_beams_fn, beam_width, max_depth, 
-                relax_beam, max_results_per_pair, len_tolerance, max_sample_size
-            )
+        shortest_paths = []
+        for pred_synset_name, roles in predicate_synsets.items():
+            # subject-like frame elements that were identified from the predicate's frames
+            #   get subject-like FEs for each predicate synset, use entity.n.01 as fallback
+            subj_fe_synsets = self._get_fe_synsets(roles["subjects"]) or {"entity.n.01"}
+            # get paths from subject synsets to the frame entities' synsets
+            lcs_paths_subj_pred = self._get_all_overlapping_lcs_paths(subject_synsets, subj_fe_synsets)
             
-            object_paths = self._find_predicate_to_object_paths(
-                pred, object_synsets, g, get_new_beams_fn, beam_width, max_depth,
-                relax_beam, max_results_per_pair, len_tolerance, max_sample_size
-            )
+            # object-like frame elements that were identified from the predicate's frames
+            #   get subject-like FEs for each predicate synset, use entity.n.01 as fallback
+            obj_fe_synsets = self._get_fe_synsets(roles["objects"]) or {"entity.n.01"}
+            # get paths from the frame entities' synsets to the object synsets
+            lcs_paths_pred_obj = self._get_all_overlapping_lcs_paths(obj_fe_synsets, object_synsets)
+        
+            # Get shortest combinations for this synset
+            for subj_path in lcs_paths_subj_pred[:max_sample_size]:
+                for obj_path in lcs_paths_pred_obj[:max_sample_size]:
+                    combined_path = subj_path + [pred_synset_name] + obj_path
+                    shortest_paths.append(combined_path)
 
-            # Score valid combinations
-            for subj_path in subject_paths:
-                for obj_path in object_paths:
-                    # Check self-intersection constraint
-                    intersection_count = len(set(subj_path).intersection(set(obj_path)))
-                    if intersection_count <= max_self_intersection:
-                        combined_length = len(subj_path) + len(obj_path) - 1
-                        all_interpretation_paths.append((
-                            subj_path, obj_path, pred, combined_length
-                        ))
+        # Return combined paths sorted by ascending path length
+        return sorted(shortest_paths, key=lambda p: len(p), reverse=False)
 
-        # Select best interpretation by path length
-        if all_interpretation_paths:
-            best = min(all_interpretation_paths, key=lambda x: x[3])  # Select shortest path
-            best_subject_path, best_object_path, best_predicate, _ = best
-            return best_subject_path + [best_predicate] + best_object_path
-        else:
-            # Try fallback strategy
-            fallback_result = self._try_fallback_strategy(
-                subject_synsets, predicate_synsets, object_synsets, 
-                subject_word, predicate_word, object_word
-            )
-            return fallback_result if fallback_result else []
+        
 
-    def _try_fallback_strategy(self, subject_synsets, predicate_synsets, object_synsets,
-                             subject_word, predicate_word, object_word) -> List[str]:
+
+    def _get_fe_synsets(self, fes: Set[str]) -> set:
         """
-        Fallback strategy: Find semantic paths through WordNet relationships.
+        Get synsets for a set of frame elements.
         """
-        # Try the most common synsets first
-        for predicate_synset in predicate_synsets[:2]:  # Try top 2 predicate senses
-            for subject_synset in subject_synsets[:3]:  # Try top 3 subject senses
-                for object_synset in object_synsets[:3]:  # Try top 3 object senses
-                    try:
-                        # Find paths through semantic relationships
-                        subject_path = self._find_semantic_path(
-                            subject_synset, predicate_synset, max_depth=4
-                        )
-                        object_path = self._find_semantic_path(
-                            predicate_synset, object_synset, max_depth=4
-                        )
-                        
-                        if subject_path and object_path:
-                            return subject_path + [predicate_synset] + object_path 
-                    except Exception:
-                        continue
-        
-        return []
+        fe_synsets = set()
+        for fe in fes:
+            addtional_synsets = set(self.wn_module.synsets(fe.lower(), pos='n'))
+            fe_synsets.update(addtional_synsets)
+        return fe_synsets
 
-    def _find_semantic_path(self, start_synset, end_synset, max_depth=4) -> List[str]:
+
+    def _get_all_overlapping_lcs_paths(self,
+            set_of_synsets1:set,
+            set_of_synsets2:set,
+        ) -> List[list]:
         """
-        Find a semantic path between two synsets using WordNet relationships.
+        Get all overlapping lowest common subsumer paths between two lists of synsets.
+
+        Args:
+            set_of_synsets1: Set of synsets for the first word
+            set_of_synsets2: Set of synsets for the second word
+        Returns:
+            List of paths sorted by length ascending
         """
-        if start_synset == end_synset:
-            return [start_synset.name()]
-            
-        # BFS to find shortest semantic path
-        from collections import deque
-        
-        queue = deque([(start_synset, [start_synset])])
-        visited = {start_synset}
-        
-        while queue and len(queue[0][1]) < max_depth:
-            current_synset, path = queue.popleft()
-            
-            # Get all semantically related synsets
-            related_synsets = self._get_related_synsets(current_synset)
-            
-            for related_synset in related_synsets:
-                if related_synset == end_synset:
-                    # Found path to target
-                    return path + [related_synset]
-                    
-                if related_synset not in visited:
-                    visited.add(related_synset)
-                    new_path = path + [related_synset]
-                    if len(new_path) <= max_depth:
-                        queue.append((related_synset, new_path))
-        
-        # If no path found through direct semantic relationships, try hypernym path
-        try:
-            similarity = start_synset.path_similarity(end_synset)
-            if similarity and similarity > 0.05:  # Threshold for meaningful connection
-                # Find a path through their lowest common hypernym
-                path = self._find_hypernym_path(start_synset, end_synset)
-                if path and len(path) <= max_depth:
-                    return path
-        except:
-            pass
-            
-        return []
+        all_paths = []
+        for syn1 in set_of_synsets1:
+            for syn2 in set_of_synsets2:
+                paths = self._overlapping_lcs_paths(syn1, syn2)
+                all_paths.extend(paths)
+
+        return sorted(
+            all_paths,
+            key=lambda p: len(p),
+            reverse=False
+        )
+
+    
+    def _overlapping_lcs_paths(self,
+            syn1,
+            syn2
+        ) -> List[Tuple[list, list]]:
+        """
+        Find overlapping lowest common subsumer paths between two synsets.
+        Args:
+            syn1: First synset
+            syn2: Second synset
+        Returns:
+            List of tuples containing paths from syn1 and syn2 to their common hypernyms
+        """
+        lchs = syn1.lowest_common_hypernyms(syn2)
+        common_paths = []
+
+        for p1 in syn1.hypernym_paths():
+            for p2 in syn2.hypernym_paths():
+                if any(lch in p1 for lch in lchs) and any(lch in p2 for lch in lchs):
+                    # truncate the paths until they've got one of the lchs
+                    while p1 and p2 and p1[0] not in lchs:
+                        last_lch = p1[0]
+                        p1 = p1[1:]
+                        p2 = p2[1:]
+                    # get the shared lch path
+                    common_paths.append((p1[::-1], p2))
+
+        return common_paths
+    
+
     
     def _get_related_synsets(self, synset):
         """
