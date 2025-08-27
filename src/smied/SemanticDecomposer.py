@@ -47,7 +47,7 @@ class SemanticDecomposer:
             self.framenet_srl = FrameNetSpaCySRL(nlp=None, min_confidence=0.2)
         
         # Cached graph for performance optimization
-        self._synset_graph = None
+        self.synset_graph = self.build_synset_graph()
 
     def find_connected_shortest_paths(
         self,
@@ -55,12 +55,11 @@ class SemanticDecomposer:
         pred_tok: Token,
         obj_tok: Token,
         model=None,  # embedding model
-        g: nx.DiGraph|None = None,  # synset graph
         beam_width: int = 3,
         max_results_per_pair: int = 3,
         len_tolerance: int = 1,
         relax_beam: bool = False,
-        max_sample_size: int = 5
+        max_sample_size: int = 2
     ) -> List[List[str]]:
         """
         Main entry point for finding semantic paths between subject-predicate-object triples.
@@ -73,14 +72,10 @@ class SemanticDecomposer:
 
         # Create the beam function if we have a model
         get_new_beams_fn = None
-        if model is not None and g is not None:
+        if model and self.synset_graph:
             get_new_beams_fn = lambda graph, src, tgt: self.embedding_helper.get_new_beams_from_embeddings(
                 graph, src, tgt, self.wn_module, model, beam_width=beam_width
             )
-
-        # Build the graph if not provided
-        if g is None:
-            g = self.build_synset_graph()
 
         # SRL-filtered predicate synsets and associated frame elements
         # Dict[synset_name, Dict[dependency_role, Set[frame_element_names]]]
@@ -616,17 +611,15 @@ class SemanticDecomposer:
         Build a directed graph of synsets with their lexical relations.
         Uses caching to avoid rebuilding the graph multiple times.
         """
-        if self._synset_graph is not None:
-            return self._synset_graph
             
-        g = nx.DiGraph()
+        self.synset_graph = nx.DiGraph()
 
         # Get all synsets
         all_synsets = list(self.wn_module.all_synsets())
 
         # Add nodes to the graph
         for synset in all_synsets:
-            g.add_node(synset.name())
+            self.synset_graph.add_node(synset.name())
 
         # Add edges based on lexical relations
         edge_count = 0
@@ -659,8 +652,8 @@ class SemanticDecomposer:
                     relation_counts[rel_type] = 0
                     
                 for related in related_synsets:
-                    if related.name() in g:
-                        g.add_edge(synset_name, related.name(),
+                    if related.name() in self.synset_graph:
+                        self.synset_graph.add_edge(synset_name, related.name(),
                                   relation=rel_type, weight=1.0)
                         edge_count += 1
                         relation_counts[rel_type] += 1
@@ -674,8 +667,8 @@ class SemanticDecomposer:
                     
                     for antonym_lemma in antonyms:
                         antonym_synset_name = antonym_lemma.synset().name()
-                        if antonym_synset_name in g:
-                            g.add_edge(synset_name, antonym_synset_name,
+                        if antonym_synset_name in self.synset_graph:
+                            self.synset_graph.add_edge(synset_name, antonym_synset_name,
                                       relation='antonyms', weight=1.5)
                             edge_count += 1
                             relation_counts['antonyms'] += 1
@@ -687,21 +680,18 @@ class SemanticDecomposer:
                     relation_counts['derivational'] = 0
                 
                 for deriv_synset in derivational_synsets:
-                    if deriv_synset.name() in g:
-                        g.add_edge(synset_name, deriv_synset.name(),
+                    if deriv_synset.name() in self.synset_graph:
+                        self.synset_graph.add_edge(synset_name, deriv_synset.name(),
                                   relation='derivational', weight=0.8)
                         edge_count += 1
                         relation_counts['derivational'] += 1
 
         # Add FrameNet-based semantic frame connections
-        frame_edge_count = self._add_frame_based_edges(g, all_synsets)
+        frame_edge_count = self._add_frame_based_edges(self.synset_graph, all_synsets)
         edge_count += frame_edge_count
         relation_counts['framenet'] = frame_edge_count
         
-        # Cache the graph
-        self._synset_graph = g
-        
-        return g
+        return self.synset_graph
 
     def _add_frame_based_edges(self, graph: nx.DiGraph, all_synsets: List, sample_size: int = 1000) -> int:
         """

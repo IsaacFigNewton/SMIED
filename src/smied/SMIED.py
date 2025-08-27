@@ -63,22 +63,7 @@ class SMIED(ISMIEDPipeline):
             nlp_func=self.nlp,
             embedding_model=self.embedding_model
         )
-        
-        # Build graph if requested
-        self.synset_graph = self.build_synset_graph()
-    
-    
-    def build_synset_graph(self) -> Any:
-        """
-        Build or retrieve the synset graph.
-        
-        Returns:
-            NetworkX graph of WordNet synsets
-        """
-        if self.synset_graph is None:
-            self.synset_graph = self.decomposer.build_synset_graph()
-        
-        return self.synset_graph
+
     
     def analyze_triple(
         self,
@@ -104,9 +89,7 @@ class SMIED(ISMIEDPipeline):
         Returns:
             Tuple of (subject_path, object_path, connecting_predicate)
         """
-        # Build graph if needed
-        graph = self.build_synset_graph()
-        
+
         if isinstance(subj_tok, str):
             subj_tok = self.nlp(subj_tok)[0]
         if isinstance(pred_tok, str):
@@ -120,7 +103,6 @@ class SMIED(ISMIEDPipeline):
                 subj_tok=subj_tok,
                 pred_tok=pred_tok,
                 obj_tok=obj_tok,
-                g=graph,
                 beam_width=beam_width,
                 max_results_per_pair=max_results_per_pair,
                 len_tolerance=len_tolerance
@@ -171,9 +153,7 @@ class SMIED(ISMIEDPipeline):
             nlp_func=self.nlp,
             embedding_model=self.embedding_model
         )
-        
-        # Clear cached graph to force rebuild with new settings
-        self.synset_graph = None
+
     
     def display_results(
         self,

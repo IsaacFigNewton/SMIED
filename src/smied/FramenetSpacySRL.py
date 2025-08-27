@@ -63,8 +63,6 @@ def create_framenet_srl_component(nlp, name, min_confidence, use_wordnet_expansi
 def wn_frame_schema_tagger(doc):
     mapping = {"something": "NN", "someone": "NN"}  # Use suitable tag string
     for token in doc:
-        # Save original tag
-        token._.orig_tag = token.tag_
         # Retag if verb lemma mistagged as noun
         if token.text.lower() not in mapping and token.pos_ == "NOUN":
             token.tag_ = "VB"
@@ -230,7 +228,7 @@ class FrameNetSpaCySRL:
         # since wordnet frames only support a max of 2 args, even for ditransitive verbs,
         #   truncate to just subj, obj roles
         original_tok_dep_reqs = self._get_dep_reqs(pred_tok)
-        print(f"Original pred_tok dependency structure requirements: {original_tok_dep_reqs}")
+        # print(f"Original pred_tok dependency structure requirements: {original_tok_dep_reqs}")
 
         # get candidate WordNet synsets for the predicate (verbs)
         pred_lemma = pred_tok.lemma_.lower()

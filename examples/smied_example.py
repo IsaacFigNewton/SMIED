@@ -29,9 +29,9 @@ def main():
     # Create SMIED instance
     print("Initializing SMIED pipeline...")
     pipeline = SMIED(
-        nlp_model="en_core_web_sm",  # Set to "en_core_web_sm" if spaCy is installed
-        embedding_model=w2v_model,  # Can add embedding model for better similarity
-        auto_download=True,  # Automatically download required NLTK data,
+        nlp_model="en_core_web_sm",     # Set to "en_core_web_sm" if spaCy is installed
+        embedding_model=w2v_model,      # Can add embedding model for better similarity
+        auto_download=True,             # Automatically download required NLTK data,
     )
     print("SMIED pipeline initialized.")
 
