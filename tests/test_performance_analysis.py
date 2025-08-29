@@ -25,11 +25,9 @@ from tests.mocks.performance_analysis_mocks import (
 from tests.config.performance_analysis_config import PerformanceAnalysisMockConfig
 
 # Import actual classes if available
-try:
-    from smied.SMIED import SMIED
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
+# SMIED module has been removed
+SMIED_AVAILABLE = False
+SMIED = None
 
 
 @unittest.skipUnless(SMIED_AVAILABLE, "SMIED not available for testing")

@@ -13,12 +13,8 @@ import argparse
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-try:
-    from smied.SMIED import SMIED
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
-    print("WARNING: SMIED not available. Some tests will be skipped.")
+# SMIED module has been removed
+SMIED_AVAILABLE = False
 
 # Import test modules
 try:
@@ -46,10 +42,10 @@ class ComprehensiveTestRunner:
         
         if self.verbosity >= 1:
             print("=" * 80)
-            print("SMIED COMPREHENSIVE TESTING SUITE")
+            print("COMPREHENSIVE TESTING SUITE")
             print("=" * 80)
             print(f"Start time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"SMIED Available: {SMIED_AVAILABLE}")
+            # SMIED module has been removed
             print(f"Test Modules Available: {TEST_MODULES_AVAILABLE}")
             print()
     

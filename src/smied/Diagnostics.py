@@ -29,8 +29,6 @@ from nltk.corpus import wordnet as wn
 try:
     from .SemanticDecomposer import SemanticDecomposer
     from .PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
-    from .BeamBuilder import BeamBuilder
-    from .EmbeddingHelper import EmbeddingHelper
 except ImportError:
     # Fallback for direct execution
     import sys
@@ -38,8 +36,6 @@ except ImportError:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from smied.SemanticDecomposer import SemanticDecomposer
     from smied.PairwiseBidirectionalAStar import PairwiseBidirectionalAStar
-    from smied.BeamBuilder import BeamBuilder
-    from smied.EmbeddingHelper import EmbeddingHelper
 
 
 class SMIEDDiagnostics:
@@ -53,8 +49,6 @@ class SMIEDDiagnostics:
     Attributes:
         verbosity (int): Verbosity level (0=quiet, 1=normal, 2=verbose)
         semantic_decomposer (SemanticDecomposer): SMIED semantic decomposer
-        embedding_helper (EmbeddingHelper): SMIED embedding helper  
-        beam_builder (BeamBuilder): SMIED beam builder
         graph (nx.DiGraph): Current WordNet graph instance
     """
     
@@ -85,15 +79,6 @@ class SMIEDDiagnostics:
             embedding_model=embedding_model,
             verbosity=verbosity
         )
-        
-        try:
-            self.embedding_helper = EmbeddingHelper()
-            self.beam_builder = BeamBuilder(self.embedding_helper)
-        except Exception as e:
-            if self.verbosity >= 1:
-                print(f"Warning: Could not initialize embedding components: {e}")
-            self.embedding_helper = None
-            self.beam_builder = None
         
         # Build default graph
         self.graph = None

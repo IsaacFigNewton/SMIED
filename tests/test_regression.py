@@ -28,13 +28,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from tests.mocks.regression_mocks import regression_mock_factory
 from tests.config.regression_config import RegressionMockConfig
 
-try:
-    from smied.SMIED import SMIED
-    from smied.SemanticDecomposer import SemanticDecomposer
-    from tests.test_semantic_pathfinding import SemanticPathfindingTestSuite, TestCase
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
+# SMIED module has been removed
+SMIED_AVAILABLE = False
+SMIED = None
 
 
 @unittest.skipUnless(SMIED_AVAILABLE, "SMIED not available for testing")

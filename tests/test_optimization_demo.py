@@ -18,11 +18,9 @@ from unittest.mock import patch, Mock
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-try:
-    from smied.SMIED import SMIED
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
+# SMIED module has been removed
+SMIED_AVAILABLE = False
+SMIED = None
 
 # Import mock factory and configuration following 3-layer architecture
 from tests.mocks.optimization_demo_mocks import OptimizationDemoMockFactory

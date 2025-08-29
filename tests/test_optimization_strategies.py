@@ -26,12 +26,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 from tests.mocks.optimization_strategies_mocks import OptimizationStrategiesMockFactory
 from tests.config.optimization_strategies_config import OptimizationStrategiesMockConfig
 
-try:
-    from smied.SMIED import SMIED
-    from smied.SemanticDecomposer import SemanticDecomposer
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
+# SMIED module has been removed
+SMIED_AVAILABLE = False
+SMIED = None
 
 
 # Mock test case class for compatibility (renamed to avoid pytest collection)

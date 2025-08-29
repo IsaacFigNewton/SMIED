@@ -268,18 +268,67 @@ class MockWordNetForDecomposer(Mock):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.synsets = Mock(side_effect=self._mock_synsets)
+        self.synsets = Mock(side_effect=self._robust_mock_synsets)
         self.synset = Mock(side_effect=self._mock_synset)
         self.all_synsets = Mock(return_value=[self._create_mock_synset("test.n.01")])
+        # Add constants
+        self.NOUN = 'n'
+        self.VERB = 'v'
+        # Keep track of original side_effect for fallback
+        self._original_side_effect = None
+        self._call_count = 0
         
+    def _robust_mock_synsets(self, word, pos=None):
+        """Robust mock synsets that handles both finite and infinite calls."""
+        # If a test has set a finite side_effect, use it first, then fallback
+        if hasattr(self.synsets, '_mock_side_effect') and self.synsets._mock_side_effect:
+            try:
+                # If it's a list, try to get the next item
+                if isinstance(self.synsets._mock_side_effect, list):
+                    if self._call_count < len(self.synsets._mock_side_effect):
+                        result = self.synsets._mock_side_effect[self._call_count]
+                        self._call_count += 1
+                        return result
+                    else:
+                        # Exhausted the list, fall back to default behavior
+                        pass
+            except (StopIteration, IndexError):
+                # Fallback to default behavior
+                pass
+        
+        # Use the default behavior
+        return self._mock_synsets(word, pos)
+    
     def _mock_synsets(self, word, pos=None):
-        """Mock synsets method behavior."""
-        if word == "cat":
-            return [self._create_mock_synset("cat.n.01")]
-        elif word == "run":
-            return [self._create_mock_synset("run.v.01")]
-        elif word == "park":
-            return [self._create_mock_synset("park.n.01")]
+        """Mock synsets method behavior that handles common words and returns empty for unknown."""
+        word_lower = word.lower() if isinstance(word, str) else str(word).lower()
+        
+        # Define common synset mappings
+        synset_mappings = {
+            "cat": "cat.n.01",
+            "run": "run.v.01", 
+            "park": "park.n.01",
+            "entity": "entity.n.01",
+            "agent": "agent.n.01",
+            "experiencer": "experiencer.n.01",
+            "theme": "theme.n.01", 
+            "patient": "patient.n.01",
+            "goal": "goal.n.01",
+            "beneficiary": "beneficiary.n.01",
+            "teacher": "teacher.n.01",
+            "teach": "teach.v.01",
+            "student": "student.n.01",
+            "emotion": "emotion.n.01",
+            "connect": "connect.v.01",
+            "rock": "rock.n.01",
+            "mammal": "mammal.n.01",
+            "relate": "relate.v.01"
+        }
+        
+        if word_lower in synset_mappings:
+            return [self._create_mock_synset(synset_mappings[word_lower])]
+        
+        # Return empty list for unknown words (this prevents StopIteration)
         return []
     
     def _mock_synset(self, name):
@@ -855,6 +904,10 @@ class MockSynsetForDecomposer(Mock):
         self.path_similarity = Mock(return_value=0.5)
         self.wup_similarity = Mock(return_value=0.8)
         self.lch_similarity = Mock(return_value=2.5)
+        
+        # Add missing methods required for SemanticDecomposer path finding
+        self.hypernym_paths = Mock(return_value=[[self]])  # Returns list of paths, each path is a list of synsets
+        self.lowest_common_hypernyms = Mock(return_value=[self])  # Returns list of common hypernym synsets
 
 
 class MockFrameNetSpacySRL(Mock):
@@ -867,6 +920,15 @@ class MockFrameNetSpacySRL(Mock):
         self.find_frame_connections = Mock(return_value=[])
         self.get_semantic_roles = Mock(return_value={})
         self.analyze_frame_relations = Mock(return_value=[])
+        
+        # Add the critical missing process_triple method
+        self.process_triple = Mock(return_value={
+            "test_synset.v.01": {
+                "subjects": {"Agent", "Experiencer"},
+                "objects": {"Theme", "Patient"}, 
+                "themes": {"Goal", "Beneficiary"}
+            }
+        })
 
 
 class MockDerivationalMorphology(Mock):

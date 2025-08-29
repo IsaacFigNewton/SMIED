@@ -6,7 +6,6 @@ from .PatternLoader import PatternLoader
 from .PatternMatcher import PatternMatcher
 from .FramenetSpacySRL import FrameNetSpaCySRL
 from .SemanticDecomposer import SemanticDecomposer
-from .Diagnostics import SMIEDDiagnostics
 
 # Define what gets imported with "from package import *"
 __all__ = [
@@ -17,6 +16,4 @@ __all__ = [
     "PatternMatcher",
     "FrameNetSpaCySRL",
     "SemanticDecomposer",
-    # Diagnostics
-    "SMIEDDiagnostics",
 ]

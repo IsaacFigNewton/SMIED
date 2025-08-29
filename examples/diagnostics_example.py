@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Example usage of SMIED Diagnostics infrastructure.
+Example usage of Diagnostics infrastructure.
 
 This script demonstrates how to use the SMIEDDiagnostics class for analyzing
-semantic pathfinding issues in the SMIED system.
+semantic pathfinding issues in the system.
 """
 
 import sys
@@ -16,7 +16,7 @@ import json
 
 def main():
     """Demonstrate SMIEDDiagnostics functionality."""
-    print("SMIED Diagnostics Example")
+    print("Diagnostics Example")
     print("=" * 50)
     
     # Initialize diagnostics

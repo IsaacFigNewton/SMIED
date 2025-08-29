@@ -32,12 +32,9 @@ from tests.mocks.comparative_analysis_mocks import (
 )
 from tests.config.comparative_analysis_config import ComparativeAnalysisMockConfig
 
-try:
-    from smied.SMIED import SMIED
-    SMIED_AVAILABLE = True
-except ImportError:
-    SMIED_AVAILABLE = False
-    SMIED = None
+# SMIED module has been removed
+SMIED_AVAILABLE = False
+SMIED = None
 
 
 @unittest.skipUnless(SMIED_AVAILABLE, "SMIED not available for testing")
