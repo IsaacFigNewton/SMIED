@@ -1,167 +1,157 @@
-# SMIED Bug Remediation Plan
+# TODO
 
-## Executive Summary
-The SMIED package has a critical blocking error preventing any semantic decomposition functionality, along with numerous warnings that affect reliability. This plan outlines the minimum necessary changes to restore core operation.
+## Test Debugging Strategy
 
-## Critical Issues Identified
+### Test Suite Overview
+- **Total Tests**: 624 tests identified across 19 test modules
+- **Test Framework**: pytest 8.4.1 with Python 3.12.6
+- **Primary Issues**: Test timeout issues and failures in core modules
 
-### 1. BLOCKING ERROR: Token/String Type Mismatch
-- **Severity**: CRITICAL - Prevents all functionality
-- **Location**: `src/smied/SemanticDecomposer.py`, lines 84, 85, 86
-- **Error**: `TypeError: 'int' object is not callable`
-- **Root Cause**: spaCy Token objects passed to WordNet synsets() which expects strings
+### Critical Failures Analysis
 
-### 2. Division by Zero in Variance Calculations
-- **Severity**: HIGH - Causes 42+ warnings, affects confidence scoring
-- **Location**: `src/smied/FramenetSpacySRL.py`, lines 543-546
-- **Error**: `float division by zero`
-- **Root Cause**: statistics.variance() returns 0 when all role proportions are identical
+#### 1. Test Timeout Issues
+- **Problem**: Multiple test runs timing out after 2 minutes
+- **Affected Areas**: Full test suite execution
+- **Root Cause Hypothesis**: 
+  - Tests may be hanging on network requests or resource initialization
+  - Possible deadlocks in concurrent operations
+  - Missing test mocks for external dependencies
 
-### 3. Edge Case Handling
-- **Severity**: MEDIUM - Causes crashes with certain inputs
-- **Locations**: Multiple
-- **Issues**: Empty inputs, non-English words, malformed triples
+#### 2. Core Module Failures (test_smied.py)
+- **Failed Tests**: 17 out of 52 tests in test_smied.py
+- **Key Failure Patterns**:
+  - `test_analyze_triple_*` tests failing
+  - `test_build_synset_graph*` tests failing
+  - `test_initialization_*` tests failing
+  - `test_setup_nlp_*` tests failing
+  - Display and demonstration tests failing
 
-## Remediation Plan
+#### 3. Integration Test Failures
+- **test_comparative_analysis.py**: End-to-end integration test failing
+- **test_framenet_spacy_srl_triple_based.py**: Multiple test failures (incomplete run)
 
-### Phase 1: Critical Fix (IMMEDIATE - Required for Basic Functionality)
+### Debugging Strategy
 
-#### Fix 1.1: Token to String Conversion in SemanticDecomposer
-**File**: `src/smied/SemanticDecomposer.py`
-**Lines**: 84-86
-**Change**:
-```python
-# CURRENT (BROKEN):
-subject_synsets = self.wn_module.synsets(subj_tok, pos='n')
-predicate_synsets = self.wn_module.synsets(pred_tok, pos='v') 
-object_synsets = self.wn_module.synsets(obj_tok, pos='n')
+#### Phase 1: Immediate Actions (Priority: Critical)
+1. **Isolate Timeout Issues**
+   - [ ] Identify specific tests causing timeouts: `pytest -v --durations=10`
+   - [ ] Add timeout decorators to long-running tests
+   - [ ] Mock external dependencies (APIs, network calls)
 
-# FIXED:
-subject_synsets = self.wn_module.synsets(subj_tok.lemma_ if hasattr(subj_tok, 'lemma_') else str(subj_tok), pos='n')
-predicate_synsets = self.wn_module.synsets(pred_tok.lemma_ if hasattr(pred_tok, 'lemma_') else str(pred_tok), pos='v')
-object_synsets = self.wn_module.synsets(obj_tok.lemma_ if hasattr(obj_tok, 'lemma_') else str(obj_tok), pos='n')
-```
+2. **Fix Core SMIED Module**
+   - [ ] Debug initialization failures in SMIED class
+   - [ ] Check NLP model loading issues
+   - [ ] Verify WordNet data availability
+   - [ ] Review mock implementations in test_smied.py
 
-### Phase 2: High Priority Fixes (Required for Stable Operation)
+3. **Resource Management**
+   - [ ] Check for proper resource cleanup in tearDown methods
+   - [ ] Identify memory leaks or unclosed connections
+   - [ ] Add proper exception handling
 
-#### Fix 2.1: Division by Zero Protection in FramenetSpacySRL
-**File**: `src/smied/FramenetSpacySRL.py`
-**Lines**: 543-546
-**Change**:
-```python
-# CURRENT (PROBLEMATIC):
-idi = statistics.variance(role_proportions) / statistics.mean(role_proportions) if statistics.mean(role_proportions) != 0 else 0
-inverse_idi = 1 / idi if idi != 0 else 0
+#### Phase 2: Systematic Testing (Priority: High)
+1. **Test Isolation**
+   - [ ] Run each test module independently
+   - [ ] Document which modules pass/fail in isolation
+   - [ ] Identify inter-test dependencies
 
-# FIXED:
-mean_prop = statistics.mean(role_proportions) if role_proportions else 0
-var_prop = statistics.variance(role_proportions) if len(role_proportions) > 1 else 0
+2. **Mock Enhancement**
+   - [ ] Review and update all mock objects in tests/mocks/
+   - [ ] Ensure mocks properly simulate external dependencies
+   - [ ] Add missing mocks for network operations
 
-if mean_prop != 0 and var_prop != 0:
-    idi = var_prop / mean_prop
-    inverse_idi = 1 / idi
-else:
-    idi = 0
-    inverse_idi = 0  # or use a default confidence value like 0.5
-```
+3. **Performance Analysis**
+   - [ ] Profile slow tests using pytest-profiling
+   - [ ] Optimize test data fixtures
+   - [ ] Implement test parallelization where appropriate
 
-#### Fix 2.2: Improve Error Handling in FramenetSpacySRL._process_predicate
-**File**: `src/smied/FramenetSpacySRL.py`
-**Location**: Within `_process_predicate` method
-**Add**: Wrap the entire method body in proper exception handling:
-```python
-try:
-    # existing method body
-except ZeroDivisionError as e:
-    if self.verbose:
-        print(f"[WARNING] FrameNetSpaCySRL: Division by zero in predicate '{predicate}': {e}")
-    return {}  # Return empty dict instead of crashing
-except Exception as e:
-    if self.verbose:
-        print(f"[ERROR] FrameNetSpaCySRL: Error processing predicate '{predicate}': {e}")
-    return {}
-```
+#### Phase 3: Integration Testing (Priority: Medium)
+1. **Fix Integration Tests**
+   - [ ] Debug comparative_analysis integration failures
+   - [ ] Fix FrameNet integration issues
+   - [ ] Ensure proper test data availability
 
-### Phase 3: Input Validation (Required for Robustness)
+2. **End-to-End Testing**
+   - [ ] Create minimal reproducible test cases
+   - [ ] Add integration test timeouts
+   - [ ] Implement retry logic for flaky tests
 
-#### Fix 3.1: Add Input Validation to SMIED.analyze_triple
-**File**: `src/smied/SMIED.py`
-**Location**: Beginning of `analyze_triple` method (around line 90)
-**Add**:
-```python
-# Input validation
-if not all([subject, predicate, obj]):
-    print("[ERROR] All triple components (subject, predicate, object) must be non-empty")
-    return None
+#### Phase 4: Long-term Improvements (Priority: Low)
+1. **Test Infrastructure**
+   - [ ] Implement test coverage reporting
+   - [ ] Add performance benchmarks
 
-# Ensure strings are not empty after stripping
-subject = str(subject).strip()
-predicate = str(predicate).strip()
-obj = str(obj).strip()
+2. **Documentation**
+   - [ ] Document test dependencies
+   - [ ] Create test troubleshooting guide
+   - [ ] Add test execution guidelines
 
-if not all([subject, predicate, obj]):
-    print("[ERROR] Triple components cannot be empty or whitespace-only")
-    return None
-```
+### Debugging Commands
 
-### Phase 4: Testing & Verification
-
-#### Test 4.1: Run Existing Tests
 ```bash
-python -m pytest tests/test_hypothesis_validation.py -v
-python -m pytest tests/test_edge_cases.py -v
+# Run specific test with verbose output
+pytest tests/test_smied.py::TestSmied::test_initialization_basic -vvs
+
+# Run with debugging output
+pytest tests/test_smied.py --log-cli-level=DEBUG
+
+# Run with coverage
+pytest tests/ --cov=src/smied --cov-report=html
+
+# Run tests in parallel (if pytest-xdist installed)
+pytest tests/ -n auto
+
+# Profile slow tests
+pytest tests/ --durations=20
+
+# Run with memory profiling
+pytest tests/ --memprof
 ```
 
-#### Test 4.2: Run Example Script
-```bash
-python examples/smied_example.py
-```
+### Test Categories for Isolated Debugging
 
-#### Test 4.3: Verify No Warnings
-- Ensure no division by zero warnings appear during normal operation
-- Verify all triples process without errors
+1. **Unit Tests** (Should run fast, no external deps)
+   - test_beam_builder.py  (22 tests passing)
+   - test_directed_metagraph.py
+   - test_embedding_helper.py
+   - test_pattern_loader.py
+   - test_pattern_matcher.py
 
-### Implementation Order
+2. **Integration Tests** (May require external resources)
+   - test_smied.py L (17/52 failing)
+   - test_comparative_analysis.py � (1 failing)
+   - test_framenet_integration.py
+   - test_semantic_decomposer.py
 
-1. **Day 1**: Implement Fix 1.1 (Critical Token conversion) - MUST be done first
-2. **Day 1**: Test that basic functionality works with Fix 1.1
-3. **Day 2**: Implement Fixes 2.1 and 2.2 (Division by zero protection)
-4. **Day 2**: Implement Fix 3.1 (Input validation)
-5. **Day 3**: Run full test suite and verify all fixes
+3. **Performance Tests**
+   - test_optimization_demo.py
+   - test_optimization_strategies.py
+   - test_performance_analysis.py
 
-## Expected Outcomes
+### Next Steps
 
-After implementing these fixes:
-1. ✅ The example script will run without crashing
-2. ✅ No division by zero warnings during initialization
-3. ✅ Proper error messages for invalid inputs
-4. ✅ Core semantic decomposition functionality restored
-5. ✅ Confidence scoring will work reliably
+1. **Immediate**: Fix timeout issues by running tests with increased timeout
+2. **Today**: Debug and fix SMIED initialization failures
+3. **This Week**: Complete Phase 1 and 2 debugging tasks
+4. **This Month**: Achieve 90%+ test pass rate
 
-## Files to Modify (Minimum Set)
+### Success Metrics
+- [ ] All tests complete without timeout
+- [ ] Core SMIED tests passing (test_smied.py)
+- [ ] Integration tests passing
+- [ ] Test execution time under 5 minutes
+- [ ] Test coverage above 80%
 
-1. `src/smied/SemanticDecomposer.py` - 3 lines
-2. `src/smied/FramenetSpacySRL.py` - ~15 lines (variance fix + error handling)
-3. `src/smied/SMIED.py` - ~10 lines (input validation)
+### Resources Needed
+- Access to WordNet data files
+- Proper NLP model files (spaCy models)
+- Test fixtures and mock data
+- Debugging tools (debugger, profiler)
 
-Total: ~28 lines of code changes across 3 files
-
-## Verification Checklist
-
-- [ ] Fix 1.1 implemented and tested
-- [ ] examples/smied_example.py runs without TypeError
-- [ ] Fix 2.1 implemented and tested
-- [ ] No division by zero warnings in output
-- [ ] Fix 2.2 implemented
-- [ ] Fix 3.1 implemented
-- [ ] All tests in tests/test_hypothesis_validation.py pass
-- [ ] All tests in tests/test_edge_cases.py pass
-- [ ] Example script produces meaningful semantic output
-- [ ] No regression in existing functionality
-
-## Notes
-
-- These are the MINIMUM changes required for core operation
-- Additional improvements (logging, documentation, optimization) can be added later
-- Focus is on fixing blocking errors first, then stability issues
-- All fixes maintain backward compatibility
+### Risk Mitigation
+- **Risk**: External API dependencies causing failures
+  - **Mitigation**: Implement comprehensive mocking
+- **Risk**: Resource exhaustion in CI/CD
+  - **Mitigation**: Add resource limits and cleanup
+- **Risk**: Flaky tests due to timing issues
+  - **Mitigation**: Add retry logic and proper waits
