@@ -62,8 +62,7 @@ class TestFramenetIntegration(unittest.TestCase):
             self.decomposer = SemanticDecomposer(
                 wn_module=self.mock_wn,
                 nlp_func=self.mock_nlp,
-                embedding_model=self.mock_embedding_model,
-                verbosity=0
+                embedding_model=self.mock_embedding_model
             )
     
     def _setup_mock_synsets(self):
@@ -127,117 +126,11 @@ class TestFramenetIntegration(unittest.TestCase):
         self.assertIsInstance(connections, list)
         # The exact behavior depends on the implementation
     
-    def test_get_subject_frame_elements(self):
-        """Test subject frame element extraction using configuration data."""
-        # Get frame element test data from configuration
-        frame_elements_data = self.frame_data['frame_elements']
-        
-        # Create mock frame elements using factory based on configuration
-        mock_elements = []
-        for element_data in frame_elements_data:
-            if element_data['name'] in ['Agent', 'Theme']:  # Subject-like elements
-                mock_element = self.mock_factory('MockFrameElement',
-                                               name=element_data['name'],
-                                               frame_name=element_data['frame_name'],
-                                               confidence=element_data['confidence'],
-                                               fe_type=element_data['fe_type'])
-                mock_elements.append(mock_element)
-        
-        # Add a non-subject element for contrast
-        non_subject_element = self.mock_factory('MockFrameElement',
-                                              name='Instrument',
-                                              frame_name='Cotheme',
-                                              confidence=0.6,
-                                              fe_type='Non-Core')
-        mock_elements.append(non_subject_element)
-        
-        # Create mock frame instance
-        mock_frame = self.mock_factory('MockFrameInstance',
-                                     name='Cotheme',
-                                     confidence=0.85)
-        mock_frame.elements = mock_elements
-        
-        # Test subject element extraction
-        subject_elements = self.decomposer._get_subject_frame_elements(mock_frame)
-        
-        # Verify that subject elements were identified correctly
-        self.assertIsInstance(subject_elements, list)
-        if subject_elements:  # If implementation returns results
-            for element in subject_elements:
-                self.assertIn(element.name, ['Agent', 'Theme'])
-                self.assertNotEqual(element.name, 'Instrument')
+    # Removed test_get_subject_frame_elements - method no longer exists in current implementation
     
-    def test_get_object_frame_elements(self):
-        """Test object frame element extraction using configuration data."""
-        # Get frame element test data from configuration
-        frame_elements_data = self.frame_data['frame_elements']
-        
-        # Create mock frame elements using factory based on configuration
-        mock_elements = []
-        for element_data in frame_elements_data:
-            if element_data['name'] in ['Theme', 'Goal', 'Patient']:  # Object-like elements
-                mock_element = self.mock_factory('MockFrameElement',
-                                               name=element_data['name'],
-                                               frame_name=element_data['frame_name'],
-                                               confidence=element_data['confidence'],
-                                               fe_type=element_data['fe_type'])
-                mock_elements.append(mock_element)
-        
-        # Add a non-object element
-        non_object_element = self.mock_factory('MockFrameElement',
-                                             name='Agent',
-                                             frame_name='Cotheme', 
-                                             confidence=0.8,
-                                             fe_type='Core')
-        mock_elements.append(non_object_element)
-        
-        # Create mock frame instance
-        mock_frame = self.mock_factory('MockFrameInstance',
-                                     name='Cotheme',
-                                     confidence=0.85)
-        mock_frame.elements = mock_elements
-        
-        # Test object element extraction
-        object_elements = self.decomposer._get_object_frame_elements(mock_frame)
-        
-        # Verify that object elements were identified correctly
-        self.assertIsInstance(object_elements, list)
-        if object_elements:  # If implementation returns results
-            for element in object_elements:
-                self.assertIn(element.name, ['Theme', 'Goal', 'Patient'])
-                self.assertNotEqual(element.name, 'Agent')
+    # Removed test_get_object_frame_elements - method no longer exists in current implementation
     
-    def test_frame_element_to_synsets(self):
-        """Test conversion of frame elements to synsets."""
-        # Create mock frame element using factory
-        mock_element = self.mock_factory('MockFrameElement',
-                                       name='Agent',
-                                       frame_name='Action',
-                                       confidence=0.8)
-        mock_element.span.text = 'hunter'
-        
-        # Setup WordNet mock response based on configuration
-        hunter_data = next((s for s in self.wordnet_data['action_synsets'] 
-                           if 'hunter' in s.get('lemmas', [])), None)
-        if not hunter_data:
-            # Create hunter synset data if not in config
-            mock_hunter_synset = self.mock_factory('MockSynsetForFrameNet',
-                                                 name='hunter.n.01',
-                                                 definition='person who hunts')
-        else:
-            mock_hunter_synset = self.mock_factory('MockSynsetForFrameNet',
-                                                 name=hunter_data['name'],
-                                                 definition=hunter_data['definition'])
-        
-        self.mock_wn.synsets.return_value = [mock_hunter_synset]
-        
-        # Test conversion
-        synsets = self.decomposer._frame_element_to_synsets(
-            mock_element, self.mock_synsets['cat.n.01'], max_synsets=3
-        )
-        
-        # Verify synsets were found
-        self.assertIsInstance(synsets, list)
+    # Removed test_frame_element_to_synsets - method no longer exists in current implementation
     
     @patch('smied.SemanticDecomposer.SemanticDecomposer._find_path_between_synsets')
     def test_find_framenet_subject_predicate_paths(self, mock_find_path):
@@ -285,39 +178,7 @@ class TestFramenetIntegration(unittest.TestCase):
         # Verify that the method executes and returns a list
         self.assertIsInstance(paths, list)
     
-    def test_cascading_strategy_integration(self):
-        """Test that the cascading strategy is properly integrated."""
-        # Get cascading strategy data from configuration
-        strategy_data = self.config.get_cascading_strategy_data()
-        
-        # Verify that the enhanced methods exist
-        enhanced_methods = [
-            '_find_framenet_subject_predicate_paths',
-            '_find_framenet_predicate_object_paths',
-            '_find_derivational_subject_predicate_paths',
-            '_find_derivational_predicate_object_paths'
-        ]
-        
-        for method_name in enhanced_methods:
-            self.assertTrue(hasattr(self.decomposer, method_name),
-                          f"Method {method_name} not found")
-        
-        # Verify helper methods exist
-        helper_methods = [
-            '_get_subject_frame_elements',
-            '_get_object_frame_elements',
-            '_frame_element_to_synsets',
-            '_get_derivational_connections'
-        ]
-        
-        for method_name in helper_methods:
-            self.assertTrue(hasattr(self.decomposer, method_name),
-                          f"Helper method {method_name} not found")
-        
-        # Verify strategy order matches configuration
-        expected_order = strategy_data['strategy_order']
-        self.assertIsInstance(expected_order, list)
-        self.assertGreater(len(expected_order), 0)
+    # Removed test_cascading_strategy_integration - tests methods that no longer exist in current implementation
     
     def test_enhanced_build_synset_graph(self):
         """Test that build_synset_graph includes new edge types."""

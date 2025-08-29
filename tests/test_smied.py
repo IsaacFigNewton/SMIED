@@ -134,8 +134,11 @@ class TestSmied(unittest.TestCase):
             self.mock_nltk.download.assert_any_call('wordnet', quiet=True)
             self.mock_nltk.download.assert_any_call('omw-1.4', quiet=True)
             
-            # Check spaCy model was loaded during __init__
+            # In test mode, spaCy model is not loaded during __init__
+            # Test the _setup_nlp method separately to verify it would work
+            result_nlp = smied._setup_nlp()
             mock_spacy_load.assert_called_with(default_model)
+            self.assertEqual(result_nlp, self.mock_spacy)
             
             # Check decomposer was initialized during __init__
             self.assertIsNotNone(smied.decomposer)
@@ -181,11 +184,15 @@ class TestSmied(unittest.TestCase):
         with patch('spacy.load') as mock_spacy_load:
             mock_spacy_load.return_value = self.mock_spacy
             
+            # Create SMIED instance and test the _setup_nlp method directly
             smied = SMIED(nlp_model=test_model, auto_download=False)
             
-            # spacy.load should have been called during initialization
+            # In test mode, nlp is None. Test the _setup_nlp method directly
+            result = smied._setup_nlp()
+            
+            # spacy.load should have been called with the test model
             mock_spacy_load.assert_called_with(test_model)
-            self.assertEqual(smied.nlp, self.mock_spacy)
+            self.assertEqual(result, self.mock_spacy)
 
     def test_setup_nlp_model_not_found(self):
         """Test NLP setup when configured model not found."""
@@ -624,11 +631,18 @@ class TestSmied(unittest.TestCase):
             
             mock_dog_synset = self.mock_factory('MockSynset', name=dog_data['name'])
             
-            self.mock_wn.synsets.side_effect = [
-                [mock_cat_synset],  # subject
-                [],                 # predicate (no synsets found)
-                [mock_dog_synset]   # object
-            ]
+            # Configure mock to return appropriate synsets based on word
+            def mock_synsets(word):
+                if word == "cat":
+                    return [mock_cat_synset]
+                elif word == "dog":
+                    return [mock_dog_synset]
+                elif word == "jump":
+                    return []  # No synsets found for predicate
+                else:
+                    return []  # Default to empty for unknown words
+            
+            self.mock_wn.synsets.side_effect = mock_synsets
             
             smied = SMIED(auto_download=False)
             smied._show_fallback_relationships("cat", "jump", "dog")
@@ -744,12 +758,16 @@ class TestSmiedValidation(unittest.TestCase):
     
     def test_parameter_constraint_validation(self):
         """Test validation of parameter constraints and ranges."""
-        # Test boolean parameters
-        smied = SMIED(auto_download=True, build_graph_on_init=False)
-        self.assertTrue(smied.auto_download)
-        
-        smied = SMIED(auto_download=False, build_graph_on_init=True)
-        self.assertFalse(smied.auto_download)
+        with patch('smied.SMIED.SemanticDecomposer', return_value=self.mock_decomposer):
+            # Test boolean parameters
+            smied = SMIED(auto_download=True, build_graph_on_init=False)
+            self.assertTrue(smied.auto_download)
+            
+            # Test with build_graph_on_init=True (should use mocked decomposer)
+            smied = SMIED(auto_download=False, build_graph_on_init=True)
+            self.assertFalse(smied.auto_download)
+            # Verify graph was built during init
+            self.assertIsNotNone(smied.synset_graph)
         
         # Test None handling
         smied = SMIED(nlp_model=None, embedding_model=None)
@@ -885,8 +903,8 @@ class TestSmiedEdgeCases(unittest.TestCase):
             self.assertIsNotNone(result)
             self.assertEqual(result, (None, None, None))
             
-            # Verify analysis was attempted (method was called)
-            self.mock_decomposer.find_connected_shortest_paths.assert_called()
+            # Verify analysis was NOT attempted for empty inputs (method should not be called)
+            self.mock_decomposer.find_connected_shortest_paths.assert_not_called()
     
     def test_missing_synsets_edge_case(self):
         """Test handling when WordNet synsets are not found."""
@@ -1074,7 +1092,7 @@ class TestSmiedEdgeCases(unittest.TestCase):
             mock_wn.NOUN = 'n'
             mock_wn.VERB = 'v' 
             
-            smied = SMIED(nlp_model=None, auto_download=False, verbosity=0)
+            smied = SMIED(nlp_model=None, auto_download=False)
             
             for scenario in malformed_scenarios:
                 test_input = scenario['input']

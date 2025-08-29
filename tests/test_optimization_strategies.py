@@ -34,8 +34,8 @@ except ImportError:
     SMIED_AVAILABLE = False
 
 
-# Mock test case class for compatibility
-class TestCase:
+# Mock test case class for compatibility (renamed to avoid pytest collection)
+class MockTestCase:
     """Mock test case class for compatibility with existing code."""
     
     def __init__(self, subject: str, predicate: str, object: str, description: str = ""):
@@ -75,7 +75,7 @@ class TestOptimizationStrategies(unittest.TestCase):
         
         # Real SMIED for integration testing if available
         if SMIED_AVAILABLE:
-            self.real_smied = SMIED(nlp_model=None, auto_download=False, verbosity=0)
+            self.real_smied = SMIED(nlp_model=None, auto_download=False)
     
     def test_path_cache_basic_functionality(self):
         """Test basic path cache put/get functionality."""
@@ -197,7 +197,7 @@ class TestOptimizationStrategies(unittest.TestCase):
         # Create test cases from config
         test_cases = []
         for case_data in benchmark_scenario['test_cases']:
-            test_case = TestCase(**case_data)
+            test_case = MockTestCase(**case_data)
             test_cases.append(test_case)
         
         # Run benchmark
@@ -544,7 +544,7 @@ class OptimizationBenchmark:
         self.mock_factory = OptimizationStrategiesMockFactory()
         self.optimized_smied = self.mock_factory('MockOptimizedSMIED', base_smied, verbosity=verbosity)
     
-    def run_optimization_benchmark(self, test_cases: List[TestCase], 
+    def run_optimization_benchmark(self, test_cases: List[MockTestCase], 
                                  runs_per_test: int = 3) -> Dict[str, Any]:
         """
         Compare performance between optimized and unoptimized SMIED.
@@ -581,7 +581,7 @@ def run_optimization_analysis(verbosity: int = 1, save_results: bool = True) -> 
         return {}
     
     print("Initializing SMIED for optimization analysis...")
-    smied = SMIED(nlp_model=None, auto_download=False, verbosity=0)
+    smied = SMIED(nlp_model=None, auto_download=False)
     
     # Run optimization benchmark using mock
     mock_factory = OptimizationStrategiesMockFactory()
@@ -590,7 +590,7 @@ def run_optimization_analysis(verbosity: int = 1, save_results: bool = True) -> 
     # Create mock test cases
     config = OptimizationStrategiesMockConfig
     benchmark_scenario = config.get_optimization_benchmark_scenarios()['comprehensive_benchmark']
-    test_cases = [TestCase(**case_data) for case_data in benchmark_scenario['test_cases'][:15]]
+    test_cases = [MockTestCase(**case_data) for case_data in benchmark_scenario['test_cases'][:15]]
     
     results = benchmark._mock_run_optimization_benchmark(test_cases, runs_per_test=2)
     
