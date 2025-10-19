@@ -324,5 +324,3 @@ def calculate_similarity(self, other: 'AbstractEntityMock') -> float:
 - **Consistent patterns**: Follow established patterns throughout
 - **Regular refactoring**: Keep test code clean and organized
 - **Version control**: Track changes to test data and mock implementations
-
-This testing framework provides a robust, extensible foundation for comprehensive testing of the SMIED semantic processing system, ensuring reliability and maintainability as the system evolves.
